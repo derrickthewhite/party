@@ -10,7 +10,8 @@ This project is a lightweight foundation for browser-based multiplayer games.
 
 ## Project Layout
 
-- `public/` static app shell and JS modules
+- `index.html` static app shell at the web root
+- `js/` frontend JavaScript modules
 - `api/` REST entrypoint, route handlers, shared helpers
 - `sql/` schema, seed, cleanup, and full reset scripts
 
@@ -30,7 +31,7 @@ This project is a lightweight foundation for browser-based multiplayer games.
 - Optional: `PARTY_DEBUG=1` for detailed server errors
 
 3. Serve project root with PHP-enabled web server.
-4. Open `public/index.html`.
+4. Open `index.html`.
 
 ## API Overview
 
