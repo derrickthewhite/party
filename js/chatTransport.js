@@ -1,4 +1,4 @@
-window.ChatTransport = (function createChatTransportModule() {
+export function createChatTransport(api) {
   let timerId = null;
 
   async function tick(options) {
@@ -8,7 +8,7 @@ window.ChatTransport = (function createChatTransportModule() {
 
     try {
       const sinceId = options.getSinceId();
-      const result = await window.PartyApi.listMessages(options.gameId, sinceId);
+      const result = await api.listMessages(options.gameId, sinceId);
       options.onMessages(result.messages || []);
       options.onCursor(result.last_id || sinceId || 0);
     } catch (err) {
@@ -38,4 +38,4 @@ window.ChatTransport = (function createChatTransportModule() {
     startPolling,
     stopPolling,
   };
-})();
+}

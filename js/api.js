@@ -1,5 +1,6 @@
-window.PartyApi = (function createApiModule() {
-  const API_BASE = '../api';
+function createApiModule() {
+  // Resolve API root relative to this module so subdirectory hosting keeps working.
+  const API_BASE = new URL('../api', import.meta.url).toString().replace(/\/$/, '');
 
   async function request(path, method, payload) {
     const response = await fetch(API_BASE + path, {
@@ -41,4 +42,6 @@ window.PartyApi = (function createApiModule() {
     listMessages: (gameId, sinceId) => request('/games/' + encodeURIComponent(gameId) + '/messages?since_id=' + encodeURIComponent(sinceId || 0), 'GET'),
     sendMessage: (gameId, body) => request('/games/' + encodeURIComponent(gameId) + '/messages', 'POST', { body }),
   };
-})();
+}
+
+export const api = createApiModule();

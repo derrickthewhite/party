@@ -1,4 +1,4 @@
-window.PartyState = (function createStateModule() {
+function createStateModule() {
   const state = {
     screen: 'welcome',
     user: null,
@@ -63,4 +63,6 @@ window.PartyState = (function createStateModule() {
     setMessageCursor,
     getMessageCursor,
   };
-})();
+}
+
+export const state = createStateModule();
