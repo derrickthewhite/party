@@ -27,12 +27,18 @@ function createApiModule() {
   }
 
   return {
-    signup: (username, password, inviteKey) => request('/auth/signup', 'POST', {
+    signup: (username, salt, verifier, inviteKey) => request('/auth/signup', 'POST', {
       username,
-      password,
+      salt,
+      verifier,
       invite_key: inviteKey,
     }),
-    signin: (username, password) => request('/auth/signin', 'POST', { username, password }),
+    signinStart: (username) => request('/auth/signin/start', 'POST', { username }),
+    signinFinish: (username, clientPublic, clientProof) => request('/auth/signin/finish', 'POST', {
+      username,
+      client_public: clientPublic,
+      client_proof: clientProof,
+    }),
     signout: () => request('/auth/signout', 'POST'),
     me: () => request('/auth/me', 'GET'),
     listGames: () => request('/games', 'GET'),

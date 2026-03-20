@@ -1,4 +1,5 @@
 import { createStatusNode, labelAndInput, setStatus } from './dom.js';
+import { startClientHandshake } from '../srpClient.js';
 
 export function createSigninScreen(deps) {
   const state = deps.state;
@@ -24,8 +25,23 @@ export function createSigninScreen(deps) {
   submit.textContent = 'Sign in';
   submit.addEventListener('click', async function onSubmit() {
     try {
+      const trimmedUsername = username.input.value.trim();
+      const rawPassword = password.input.value;
+
+      if (trimmedUsername === '' || rawPassword === '') {
+        throw new Error('Username and password are required.');
+      }
+
       setStatus(status, 'Signing in...', '');
-      const result = await api.signin(username.input.value.trim(), password.input.value);
+      const start = await api.signinStart(trimmedUsername);
+      const handshake = await startClientHandshake(trimmedUsername, rawPassword, start);
+      const result = await api.signinFinish(trimmedUsername, handshake.clientPublic, handshake.clientProof);
+
+      if ((result.server_proof || '') !== handshake.expectedServerProof) {
+        throw new Error('Unable to verify server auth proof.');
+      }
+
+      password.input.value = '';
       state.patch({ user: result.user });
       setStatus(status, '', '');
       await refreshGames();

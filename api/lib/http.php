@@ -69,6 +69,32 @@ function require_method(string $method): void
     }
 }
 
+function request_is_https(): bool
+{
+    if ((!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['SERVER_PORT'] ?? null) === '443')) {
+        return true;
+    }
+
+    $forwardedProto = strtolower((string)($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? ''));
+    if ($forwardedProto === 'https') {
+        return true;
+    }
+
+    return false;
+}
+
+function require_https_request(): void
+{
+    $enforceHttps = (bool)(config()['auth']['enforce_https'] ?? false);
+    if (!$enforceHttps) {
+        return;
+    }
+
+    if (!request_is_https()) {
+        error_response('HTTPS is required for authentication endpoints.', 400);
+    }
+}
+
 function path_segments(): array
 {
     $uriPath = parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH);

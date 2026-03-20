@@ -78,6 +78,10 @@ function config(): array
         'cors' => [
             'allow_origin' => config_env_value(['PARTY_ALLOW_ORIGIN'], '*'),
         ],
+        'auth' => [
+            'enforce_https' => true,
+            'srp_challenge_ttl_seconds' => 300,
+        ],
     ];
 
     $cfg = config_apply_overrides($cfg);

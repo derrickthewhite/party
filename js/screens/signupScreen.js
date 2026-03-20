@@ -1,4 +1,5 @@
 import { createStatusNode, labelAndInput, setStatus } from './dom.js';
+import { buildSignupPayload } from '../srpClient.js';
 
 export function createSignupScreen(deps) {
   const state = deps.state;
@@ -24,8 +25,18 @@ export function createSignupScreen(deps) {
   submit.textContent = 'Create account';
   submit.addEventListener('click', async function onSubmit() {
     try {
+      const trimmedUsername = username.input.value.trim();
+      const rawPassword = password.input.value;
+
+      if (trimmedUsername === '' || rawPassword === '') {
+        throw new Error('Username and password are required.');
+      }
+
       setStatus(status, 'Creating account...', '');
-      await api.signup(username.input.value.trim(), password.input.value, invite.input.value);
+      const srpPayload = await buildSignupPayload(trimmedUsername, rawPassword);
+      await api.signup(srpPayload.username, srpPayload.salt, srpPayload.verifier, invite.input.value);
+
+      password.input.value = '';
       setStatus(status, 'Account created. You can sign in now.', 'ok');
     } catch (err) {
       setStatus(status, err.message, 'error');

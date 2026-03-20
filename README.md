@@ -40,9 +40,12 @@ Base path: `/api`
 ### Auth
 
 - `POST /api/auth/signup`
-  - body: `{ "username": "...", "password": "...", "invite_key": "..." }`
-- `POST /api/auth/signin`
-  - body: `{ "username": "...", "password": "..." }`
+  - body: `{ "username": "...", "salt": "<hex>", "verifier": "<hex>", "invite_key": "..." }`
+- `POST /api/auth/signin/start`
+  - body: `{ "username": "..." }`
+  - response: `{ "salt": "<hex>", "server_public": "<hex>", "params": { ... } }`
+- `POST /api/auth/signin/finish`
+  - body: `{ "username": "...", "client_public": "<hex>", "client_proof": "<hex>" }`
 - `POST /api/auth/signout`
 - `GET /api/auth/me`
 - `GET /api/auth/test`
@@ -99,6 +102,11 @@ This endpoint is currently always enabled for troubleshooting and should be rest
 1. Import `sql/001_schema.sql`
 2. Import `sql/002_seed.sql`
 
+### Existing database auth migration
+
+1. Import `sql/012_migrate_to_srp_auth.sql`
+2. Recreate users via signup (existing users are invalidated by this migration)
+
 ### Clean chat only
 
 1. Import `sql/010_cleanup_messages.sql`
@@ -113,11 +121,13 @@ This endpoint is currently always enabled for troubleshooting and should be rest
 
 ## Security Notes
 
-- Passwords are hashed using `password_hash` and verified with `password_verify`.
+- Passwords are never posted directly to the API. Auth uses SRP-style verifier/challenge proof exchange.
+- The server stores only `srp_salt` and `srp_verifier` for authentication.
 - Session ID is regenerated on signin.
 - API uses prepared statements (PDO) for SQL operations.
 - Game chat endpoints require membership in the game.
-- Use HTTPS in production so cookie `Secure` behavior is effective.
+- HTTPS is required for auth endpoints in all environments.
+- PHP `gmp` extension is required for SRP arithmetic in the API.
 - Keep `PARTY_DEBUG` off in production.
 
 ## Known v1 Limits
