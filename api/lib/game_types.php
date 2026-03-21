@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 function allowed_game_types(): array
 {
-    return ['chat', 'mafia', 'diplomacy', 'rumble'];
+    return ['chat', 'mafia', 'diplomacy', 'rumble', 'stub'];
 }
 
 function normalize_game_type(string $gameType): string
@@ -33,6 +33,9 @@ function default_phase_for_game_type(string $gameType): string
     }
     if ($type === 'rumble') {
         return 'bidding';
+    }
+    if ($type === 'stub') {
+        return 'chat';
     }
 
     return 'chat';

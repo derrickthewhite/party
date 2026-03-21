@@ -1,6 +1,7 @@
 import { clearNode, createStatusNode, setStatus } from './dom.js';
 
-export function createGameScreen(deps) {
+export function createBaseGameScreen(deps, options) {
+	const config = options || {};
 	const api = deps.api;
 	const state = deps.state;
 	const chat = deps.chat;
@@ -13,7 +14,7 @@ export function createGameScreen(deps) {
 	headingRow.className = 'row';
 
 	const title = document.createElement('h2');
-	title.textContent = 'Game';
+	title.textContent = config.title || 'Game';
 
 	const spacer = document.createElement('div');
 	spacer.style.flex = '1';
@@ -130,6 +131,14 @@ export function createGameScreen(deps) {
 	actionRow.appendChild(actionPayload);
 	actionRow.appendChild(actionButton);
 
+	if (config.showActionComposer === false) {
+		actionRow.style.display = 'none';
+	}
+
+	const typePanel = document.createElement('div');
+	typePanel.className = 'column';
+	typePanel.style.marginTop = '8px';
+
 	const status = createStatusNode();
 
 	const adminControls = document.createElement('div');
@@ -207,11 +216,12 @@ export function createGameScreen(deps) {
 	root.appendChild(feed);
 	root.appendChild(composerRow);
 	root.appendChild(actionRow);
+	root.appendChild(typePanel);
 	root.appendChild(status);
 	root.appendChild(adminControls);
 
 	function setGame(game) {
-		title.textContent = game ? game.title : 'Game';
+		title.textContent = game ? game.title + (config.titleSuffix ? ' (' + config.titleSuffix + ')' : '') : (config.title || 'Game');
 		subtitle.textContent = game
 			? 'Type: ' + game.game_type + ' | Owner: ' + game.owner_username + ' | Status: ' + game.status + ' | Phase: ' + game.phase + ' | Round: ' + game.current_round
 			: '';
@@ -252,10 +262,29 @@ export function createGameScreen(deps) {
 
 		if (game.status === 'open') {
 			modeInfo.textContent = 'Game has not started yet: chat is enabled, game actions are disabled.';
-			return;
+		} else {
+			modeInfo.textContent = 'Game in progress: chat and actions are enabled for active players.';
 		}
 
-		modeInfo.textContent = 'Game in progress: chat and actions are enabled for active players.';
+		if (typeof config.onSetGame === 'function') {
+			config.onSetGame({
+				game,
+				api,
+				state,
+				chat,
+				refreshGames,
+				setStatusNode: function setStatusNode(text, kind) {
+					setStatus(status, text, kind);
+				},
+				nodes: {
+					root,
+					typePanel,
+					composerRow,
+					actionRow,
+					feed,
+				},
+			});
+		}
 	}
 
 	function appendMessages(messages) {
@@ -288,6 +317,12 @@ export function createGameScreen(deps) {
 		setGame,
 		appendMessages,
 		clearMessages,
+		setTypePanel: function setTypePanel(node) {
+			clearNode(typePanel);
+			if (node) {
+				typePanel.appendChild(node);
+			}
+		},
 		setStatus: (text, kind) => setStatus(status, text, kind),
 	};
 }

@@ -67,8 +67,7 @@ function actions_list(int $gameId): void
     foreach ($rows as $row) {
         $isHiddenDiplomacyOrder = $type === 'diplomacy'
             && (string)$row['action_type'] === 'order'
-            && $row['revealed_at'] === null
-            && (int)$row['user_id'] !== (int)$user['id'];
+            && $row['revealed_at'] === null;
 
         if ($isHiddenDiplomacyOrder) {
             continue;
@@ -179,8 +178,10 @@ function actions_force_reveal(int $gameId): void
     }
 
     $role = game_require_member_or_403((int)$user['id'], $gameId);
-    if ($role !== 'owner') {
-        error_response('Only the game owner can force reveal.', 403);
+    $isOwner = $role === 'owner';
+    $isAdmin = (int)($user['is_admin'] ?? 0) === 1;
+    if (!$isOwner && !$isAdmin) {
+        error_response('Only the game owner or an admin can end the turn.', 403);
     }
 
     $type = normalize_game_type((string)$game['game_type']);
@@ -188,13 +189,13 @@ function actions_force_reveal(int $gameId): void
         error_response('Force reveal is only available for diplomacy games.', 409);
     }
 
-    $stmt = db()->prepare('UPDATE game_actions SET revealed_at = NOW() WHERE game_id = :game_id AND action_type = :action_type AND revealed_at IS NULL');
-    $stmt->execute([
-        'game_id' => $gameId,
-        'action_type' => 'order',
-    ]);
+    $stateStmt = db()->prepare('SELECT current_round FROM game_state WHERE game_id = :game_id LIMIT 1');
+    $stateStmt->execute(['game_id' => $gameId]);
+    $roundNumber = (int)($stateStmt->fetchColumn() ?: 1);
 
-    success_response(['revealed' => true, 'count' => $stmt->rowCount()]);
+    $revealedCount = diplomacy_reveal_round_and_advance($gameId, $roundNumber);
+
+    success_response(['revealed' => true, 'count' => $revealedCount, 'round' => $roundNumber]);
 }
 
 function diplomacy_maybe_auto_reveal(int $gameId, int $roundNumber): void
@@ -229,14 +230,58 @@ function diplomacy_maybe_auto_reveal(int $gameId, int $roundNumber): void
         return;
     }
 
-    $revealStmt = db()->prepare(
-        'UPDATE game_actions '
-        . 'SET revealed_at = NOW() '
+    diplomacy_reveal_round_and_advance($gameId, $roundNumber);
+}
+
+function diplomacy_reveal_round_and_advance(int $gameId, int $roundNumber): int
+{
+    $pendingStmt = db()->prepare(
+        'SELECT COUNT(*) FROM game_actions '
         . 'WHERE game_id = :game_id AND round_number = :round_number AND action_type = :action_type AND revealed_at IS NULL'
     );
-    $revealStmt->execute([
+    $pendingStmt->execute([
         'game_id' => $gameId,
         'round_number' => $roundNumber,
         'action_type' => 'order',
     ]);
+    $pendingCount = (int)$pendingStmt->fetchColumn();
+
+    if ($pendingCount <= 0) {
+        return 0;
+    }
+
+    $pdo = db();
+    $pdo->beginTransaction();
+
+    try {
+        $revealStmt = $pdo->prepare(
+            'UPDATE game_actions '
+            . 'SET revealed_at = NOW() '
+            . 'WHERE game_id = :game_id AND round_number = :round_number AND action_type = :action_type AND revealed_at IS NULL'
+        );
+        $revealStmt->execute([
+            'game_id' => $gameId,
+            'round_number' => $roundNumber,
+            'action_type' => 'order',
+        ]);
+        $updated = $revealStmt->rowCount();
+
+        $stateStmt = $pdo->prepare(
+            'INSERT INTO game_state (game_id, phase, current_round) VALUES (:game_id, :phase, :current_round) '
+            . 'ON DUPLICATE KEY UPDATE current_round = GREATEST(current_round, :next_round), phase = :phase_update'
+        );
+        $stateStmt->execute([
+            'game_id' => $gameId,
+            'phase' => 'orders',
+            'current_round' => $roundNumber,
+            'next_round' => $roundNumber + 1,
+            'phase_update' => 'orders',
+        ]);
+
+        $pdo->commit();
+        return $updated;
+    } catch (Throwable $ex) {
+        $pdo->rollBack();
+        throw $ex;
+    }
 }

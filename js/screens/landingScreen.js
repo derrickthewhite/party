@@ -59,17 +59,29 @@ export function createLandingScreen(deps) {
 	gameTypeLabel.textContent = 'Game type';
 
 	const gameTypeSelect = document.createElement('select');
-	[
-		{ value: 'chat', text: 'Chat' },
-		{ value: 'mafia', text: 'Mafia' },
-		{ value: 'diplomacy', text: 'Diplomacy' },
-		{ value: 'rumble', text: 'Rumble' },
-	].forEach(function eachType(type) {
-		const option = document.createElement('option');
-		option.value = type.value;
-		option.textContent = type.text;
-		gameTypeSelect.appendChild(option);
-	});
+	function syncGameTypeOptions() {
+		clearNode(gameTypeSelect);
+		const isAdmin = !!(state.state.user && state.state.user.is_admin);
+		const options = [
+			{ value: 'chat', text: 'Chat' },
+			{ value: 'mafia', text: 'Mafia' },
+			{ value: 'diplomacy', text: 'Diplomacy' },
+			{ value: 'rumble', text: 'Rumble' },
+		];
+
+		if (isAdmin) {
+			options.push({ value: 'stub', text: 'Stub' });
+		}
+
+		options.forEach(function eachType(type) {
+			const option = document.createElement('option');
+			option.value = type.value;
+			option.textContent = type.text;
+			gameTypeSelect.appendChild(option);
+		});
+	}
+
+	syncGameTypeOptions();
 
 	gameTypeWrapper.appendChild(gameTypeLabel);
 	gameTypeWrapper.appendChild(gameTypeSelect);
@@ -110,6 +122,7 @@ export function createLandingScreen(deps) {
 	root.appendChild(list);
 
 	function renderGames(games) {
+		syncGameTypeOptions();
 		clearNode(list);
 
 		if (!games || games.length === 0) {
