@@ -59,8 +59,12 @@ Notes:
 
 - `GET /api/games`
 - `POST /api/games`
-  - body: `{ "title": "...", "game_type": "generic" }`
+  - body: `{ "title": "...", "game_type": "chat|mafia|diplomacy|rumble" }`
 - `POST /api/games/{id}/join`
+- `POST /api/games/{id}/observe`
+- `POST /api/games/{id}/start`
+- `POST /api/games/{id}/end`
+- `POST /api/games/{id}/delete`
 - `GET /api/games/{id}`
 
 ### Chat
@@ -68,6 +72,22 @@ Notes:
 - `GET /api/games/{id}/messages?since_id=0`
 - `POST /api/games/{id}/messages`
   - body: `{ "body": "..." }`
+
+Lifecycle rules:
+- before start (`open`): chat is allowed, game actions are blocked
+- in progress (`in_progress`): chat and game actions allowed for active non-observer members
+- ended (`closed`): read-only, no joins/chat/actions
+
+### Actions (Extensible Infrastructure)
+
+- `GET /api/games/{id}/actions?since_id=0`
+- `POST /api/games/{id}/actions`
+  - body: `{ "action_type": "...", "payload": { ... } }`
+- `POST /api/games/{id}/actions/reveal` (diplomacy owner force reveal)
+
+Notes:
+- observers can read but cannot chat or submit actions
+- diplomacy orders stay hidden until reveal
 
 ## Signup Invite Key
 
@@ -107,6 +127,15 @@ This endpoint is currently always enabled for troubleshooting and should be rest
 1. Import `sql/012_migrate_to_srp_auth.sql`
 2. Recreate users via signup (existing users are invalidated by this migration)
 
+### Existing database game-system migration
+
+1. Import `sql/013_update_multi_type_games.sql`
+2. This migration is idempotent and upgrades existing installs with:
+- observer membership role
+- admin user flag for delete permission
+- game state/action/hidden role tables
+- legacy `generic` game type normalized to `chat`
+
 ### Clean chat only
 
 1. Import `sql/010_cleanup_messages.sql`
@@ -135,7 +164,7 @@ This endpoint is currently always enabled for troubleshooting and should be rest
 - No WebSocket server in shared-hosting profile (chat uses polling).
 - No password reset/email flows.
 - No account lockout/rate limiting table yet.
-- Generic game model only (no game-specific rules schema yet).
+- Full Mafia/Diplomacy/Rumble round-resolution engines are still being implemented on top of the new action infrastructure.
 
 ## Hosting: 
 

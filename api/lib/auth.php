@@ -44,7 +44,40 @@ function current_user(): ?array
         'id' => (int)$user['id'],
         'username' => (string)$user['username'],
         'created_at' => (string)$user['created_at'],
+        'is_admin' => user_is_admin((int)$user['id']) ? 1 : 0,
     ];
+}
+
+function users_has_is_admin_column(): bool
+{
+    static $hasColumn = null;
+    if ($hasColumn !== null) {
+        return $hasColumn;
+    }
+
+    $stmt = db()->prepare(
+        'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS '
+        . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name AND COLUMN_NAME = :column_name'
+    );
+    $stmt->execute([
+        'table_name' => 'users',
+        'column_name' => 'is_admin',
+    ]);
+
+    $hasColumn = (int)$stmt->fetchColumn() > 0;
+    return $hasColumn;
+}
+
+function user_is_admin(int $userId): bool
+{
+    if (!users_has_is_admin_column()) {
+        return false;
+    }
+
+    $stmt = db()->prepare('SELECT is_admin FROM users WHERE id = :id LIMIT 1');
+    $stmt->execute(['id' => $userId]);
+
+    return (int)$stmt->fetchColumn() === 1;
 }
 
 function require_user(): array

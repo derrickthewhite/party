@@ -7,6 +7,7 @@ require_once __DIR__ . '/lib/http.php';
 require_once __DIR__ . '/routes/auth.php';
 require_once __DIR__ . '/routes/games.php';
 require_once __DIR__ . '/routes/messages.php';
+require_once __DIR__ . '/routes/actions.php';
 
 handle_cors_and_json_headers();
 
@@ -26,6 +27,10 @@ try {
     if ($prefix === 'games') {
         if (count($segments) === 3 && $segments[2] === 'messages') {
             handle_messages_route($method, $segments);
+        }
+
+        if (count($segments) >= 3 && $segments[2] === 'actions') {
+            handle_actions_route($method, $segments);
         }
 
         handle_games_route($method, $segments);

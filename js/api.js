@@ -44,9 +44,16 @@ function createApiModule() {
 		listGames: () => request('/games', 'GET'),
 		createGame: (title, gameType) => request('/games', 'POST', { title, game_type: gameType }),
 		joinGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/join', 'POST'),
+		observeGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/observe', 'POST'),
+		startGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/start', 'POST'),
+		endGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/end', 'POST'),
+		deleteGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/delete', 'POST'),
 		gameDetail: (gameId) => request('/games/' + encodeURIComponent(gameId), 'GET'),
 		listMessages: (gameId, sinceId) => request('/games/' + encodeURIComponent(gameId) + '/messages?since_id=' + encodeURIComponent(sinceId || 0), 'GET'),
 		sendMessage: (gameId, body) => request('/games/' + encodeURIComponent(gameId) + '/messages', 'POST', { body }),
+		listActions: (gameId, sinceId) => request('/games/' + encodeURIComponent(gameId) + '/actions?since_id=' + encodeURIComponent(sinceId || 0), 'GET'),
+		sendAction: (gameId, actionType, payload) => request('/games/' + encodeURIComponent(gameId) + '/actions', 'POST', { action_type: actionType, payload: payload || {} }),
+		revealActions: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/reveal', 'POST'),
 	};
 }
 

@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/game_access.php';
+require_once __DIR__ . '/../lib/game_types.php';
 
 function handle_games_route(string $method, array $segments): void
 {
@@ -23,6 +25,34 @@ function handle_games_route(string $method, array $segments): void
         games_join((int)$segments[1]);
     }
 
+    if (count($segments) === 3 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'observe') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+        games_observe((int)$segments[1]);
+    }
+
+    if (count($segments) === 3 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'start') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+        games_start((int)$segments[1]);
+    }
+
+    if (count($segments) === 3 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'end') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+        games_end((int)$segments[1]);
+    }
+
+    if (count($segments) === 3 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'delete') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+        games_delete((int)$segments[1]);
+    }
+
     if (count($segments) === 2 && $segments[0] === 'games' && ctype_digit($segments[1])) {
         if ($method !== 'GET') {
             error_response('Method not allowed.', 405);
@@ -35,39 +65,100 @@ function handle_games_route(string $method, array $segments): void
 
 function games_list(): void
 {
-    require_user();
+        $user = require_user();
 
     $sql = <<<SQL
 SELECT
   g.id,
+    g.owner_user_id,
   g.title,
   g.game_type,
   g.status,
   g.created_at,
   u.username AS owner_username,
-  COUNT(DISTINCT gm.user_id) AS member_count
+    COUNT(DISTINCT gm.user_id) AS member_count,
+    SUM(CASE WHEN gm.role = 'observer' THEN 1 ELSE 0 END) AS observer_count,
+    SUM(CASE WHEN gm.role <> 'observer' THEN 1 ELSE 0 END) AS player_count
 FROM games g
 JOIN users u ON u.id = g.owner_user_id
 LEFT JOIN game_members gm ON gm.game_id = g.id
-GROUP BY g.id, g.title, g.game_type, g.status, g.created_at, u.username
+GROUP BY g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, u.username
 ORDER BY g.created_at DESC
 LIMIT 100
 SQL;
 
     $rows = db()->query($sql)->fetchAll();
-    $games = array_map(static function (array $row): array {
+
+    $gameIds = array_map(static fn (array $row): int => (int)$row['id'], $rows);
+    $membersByGame = games_members_by_game($gameIds);
+
+    $games = array_map(static function (array $row) use ($membersByGame, $user): array {
+        $gameId = (int)$row['id'];
+        $members = $membersByGame[$gameId] ?? [];
+        $memberRole = null;
+        foreach ($members as $member) {
+            if ((int)$member['id'] === (int)$user['id']) {
+                $memberRole = (string)$member['role'];
+                break;
+            }
+        }
+
+        $permissions = game_permissions_for_user([
+            'status' => (string)$row['status'],
+        ], $user, $memberRole);
+
         return [
-            'id' => (int)$row['id'],
+            'id' => $gameId,
             'title' => (string)$row['title'],
             'game_type' => (string)$row['game_type'],
             'status' => (string)$row['status'],
             'created_at' => (string)$row['created_at'],
             'owner_username' => (string)$row['owner_username'],
             'member_count' => (int)$row['member_count'],
+            'observer_count' => (int)($row['observer_count'] ?? 0),
+            'player_count' => (int)($row['player_count'] ?? 0),
+            'members' => $members,
+            'is_member' => $memberRole !== null,
+            'member_role' => $memberRole,
+            'permissions' => $permissions,
         ];
     }, $rows);
 
     success_response(['games' => $games]);
+}
+
+function games_members_by_game(array $gameIds): array
+{
+    if (empty($gameIds)) {
+        return [];
+    }
+
+    $placeholders = implode(',', array_fill(0, count($gameIds), '?'));
+    $stmt = db()->prepare(
+        'SELECT gm.game_id, gm.user_id, gm.role, u.username '
+        . 'FROM game_members gm '
+        . 'JOIN users u ON u.id = gm.user_id '
+        . 'WHERE gm.game_id IN (' . $placeholders . ') '
+        . 'ORDER BY gm.game_id ASC, gm.joined_at ASC'
+    );
+    $stmt->execute($gameIds);
+    $rows = $stmt->fetchAll();
+
+    $map = [];
+    foreach ($rows as $row) {
+        $gameId = (int)$row['game_id'];
+        if (!isset($map[$gameId])) {
+            $map[$gameId] = [];
+        }
+
+        $map[$gameId][] = [
+            'id' => (int)$row['user_id'],
+            'username' => (string)$row['username'],
+            'role' => (string)$row['role'],
+        ];
+    }
+
+    return $map;
 }
 
 function games_create(): void
@@ -76,14 +167,14 @@ function games_create(): void
     $body = json_input();
 
     $title = trim((string)($body['title'] ?? ''));
-    $gameType = trim((string)($body['game_type'] ?? 'generic'));
+    $gameType = normalize_game_type((string)($body['game_type'] ?? 'chat'));
 
     if ($title === '' || strlen($title) > 100) {
         error_response('Game title is required and must be at most 100 characters.', 422);
     }
 
-    if ($gameType === '' || strlen($gameType) > 60) {
-        error_response('Game type must be at most 60 characters.', 422);
+    if (!validate_game_type($gameType) || strlen($gameType) > 60) {
+        error_response('Unsupported game type.', 422);
     }
 
     $pdo = db();
@@ -106,6 +197,13 @@ function games_create(): void
             'role' => 'owner',
         ]);
 
+        $stateStmt = $pdo->prepare('INSERT INTO game_state (game_id, phase, current_round) VALUES (:game_id, :phase, :round_number)');
+        $stateStmt->execute([
+            'game_id' => $gameId,
+            'phase' => default_phase_for_game_type($gameType),
+            'round_number' => 1,
+        ]);
+
         $pdo->commit();
     } catch (Throwable $ex) {
         $pdo->rollBack();
@@ -126,9 +224,7 @@ function games_join(int $gameId): void
 {
     $user = require_user();
 
-    $existsStmt = db()->prepare('SELECT id, status FROM games WHERE id = :id LIMIT 1');
-    $existsStmt->execute(['id' => $gameId]);
-    $game = $existsStmt->fetch();
+    $game = game_find_by_id($gameId);
 
     if (!$game) {
         error_response('Game not found.', 404);
@@ -138,14 +234,170 @@ function games_join(int $gameId): void
         error_response('Game is not joinable.', 409);
     }
 
-    $stmt = db()->prepare('INSERT IGNORE INTO game_members (game_id, user_id, role) VALUES (:game_id, :user_id, :role)');
+    $stmt = db()->prepare(
+        'INSERT INTO game_members (game_id, user_id, role) VALUES (:game_id, :user_id, :role) '
+        . 'ON DUPLICATE KEY UPDATE role = CASE WHEN role = :owner_role THEN role ELSE :player_role END'
+    );
     $stmt->execute([
         'game_id' => $gameId,
         'user_id' => $user['id'],
         'role' => 'player',
+        'owner_role' => 'owner',
+        'player_role' => 'player',
     ]);
 
-    success_response(['joined' => true, 'game_id' => $gameId]);
+    success_response(['joined' => true, 'game_id' => $gameId, 'role' => 'player']);
+}
+
+function games_observe(int $gameId): void
+{
+    $user = require_user();
+
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    if ((string)$game['status'] === 'closed') {
+        error_response('Game is not joinable.', 409);
+    }
+
+    $existingRole = game_member_role((int)$user['id'], $gameId);
+    if ($existingRole !== null) {
+        success_response(['joined' => true, 'game_id' => $gameId, 'role' => $existingRole]);
+    }
+
+    $stmt = db()->prepare('INSERT INTO game_members (game_id, user_id, role) VALUES (:game_id, :user_id, :role)');
+    $stmt->execute([
+        'game_id' => $gameId,
+        'user_id' => $user['id'],
+        'role' => 'observer',
+    ]);
+
+    success_response(['joined' => true, 'game_id' => $gameId, 'role' => 'observer']);
+}
+
+function games_start(int $gameId): void
+{
+    $user = require_user();
+
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    $isOwner = (int)$game['owner_user_id'] === (int)$user['id'];
+    $isAdmin = (int)($user['is_admin'] ?? 0) === 1;
+    if (!$isOwner && !$isAdmin) {
+        error_response('Only the game owner or an admin can start the game.', 403);
+    }
+
+    if ((string)$game['status'] !== 'open') {
+        error_response('Only open games can be started.', 409);
+    }
+
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
+        $statusStmt = $pdo->prepare('UPDATE games SET status = :status WHERE id = :id');
+        $statusStmt->execute([
+            'status' => 'in_progress',
+            'id' => $gameId,
+        ]);
+
+        $stateStmt = $pdo->prepare(
+            'INSERT INTO game_state (game_id, phase, current_round, started_at, ended_at) '
+            . 'VALUES (:game_id, :phase, :round_number, NOW(), NULL) '
+            . 'ON DUPLICATE KEY UPDATE started_at = NOW(), ended_at = NULL, phase = :phase_update'
+        );
+        $phase = default_phase_for_game_type((string)$game['game_type']);
+        $stateStmt->execute([
+            'game_id' => $gameId,
+            'phase' => $phase,
+            'round_number' => 1,
+            'phase_update' => $phase,
+        ]);
+
+        if (normalize_game_type((string)$game['game_type']) === 'mafia') {
+            mafia_assign_roles_if_missing($gameId);
+        }
+
+        $pdo->commit();
+    } catch (Throwable $ex) {
+        $pdo->rollBack();
+        throw $ex;
+    }
+
+    success_response(['started' => true, 'game_id' => $gameId]);
+}
+
+function games_end(int $gameId): void
+{
+    $user = require_user();
+
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    $isOwner = (int)$game['owner_user_id'] === (int)$user['id'];
+    $isAdmin = (int)($user['is_admin'] ?? 0) === 1;
+    if (!$isOwner && !$isAdmin) {
+        error_response('Only the game owner or an admin can end the game.', 403);
+    }
+
+    if ((string)$game['status'] === 'closed') {
+        error_response('Game is already ended.', 409);
+    }
+
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
+        $statusStmt = $pdo->prepare('UPDATE games SET status = :status WHERE id = :id');
+        $statusStmt->execute([
+            'status' => 'closed',
+            'id' => $gameId,
+        ]);
+
+        $stateStmt = $pdo->prepare(
+            'INSERT INTO game_state (game_id, phase, current_round, ended_at) '
+            . 'VALUES (:game_id, :phase, :round_number, NOW()) '
+            . 'ON DUPLICATE KEY UPDATE ended_at = NOW()'
+        );
+        $stateStmt->execute([
+            'game_id' => $gameId,
+            'phase' => default_phase_for_game_type((string)$game['game_type']),
+            'round_number' => 1,
+        ]);
+
+        $pdo->commit();
+    } catch (Throwable $ex) {
+        $pdo->rollBack();
+        throw $ex;
+    }
+
+    success_response(['ended' => true, 'game_id' => $gameId]);
+}
+
+function games_delete(int $gameId): void
+{
+    $user = require_user();
+
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    $isOwner = (int)$game['owner_user_id'] === (int)$user['id'];
+    $isAdmin = (int)($user['is_admin'] ?? 0) === 1;
+    if (!$isOwner && !$isAdmin) {
+        error_response('Only the game owner or an admin can delete this game.', 403);
+    }
+
+    $stmt = db()->prepare('DELETE FROM games WHERE id = :id LIMIT 1');
+    $stmt->execute(['id' => $gameId]);
+
+    success_response(['deleted' => true, 'game_id' => $gameId]);
 }
 
 function games_detail(int $gameId): void
@@ -153,8 +405,12 @@ function games_detail(int $gameId): void
     $user = require_user();
 
     $stmt = db()->prepare(
-        'SELECT g.id, g.title, g.game_type, g.status, g.created_at, u.username AS owner_username '
-        . 'FROM games g JOIN users u ON u.id = g.owner_user_id WHERE g.id = :id LIMIT 1'
+        'SELECT g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, u.username AS owner_username, '
+        . 'gs.phase, gs.current_round '
+        . 'FROM games g '
+        . 'JOIN users u ON u.id = g.owner_user_id '
+        . 'LEFT JOIN game_state gs ON gs.game_id = g.id '
+        . 'WHERE g.id = :id LIMIT 1'
     );
     $stmt->execute(['id' => $gameId]);
     $game = $stmt->fetch();
@@ -163,7 +419,8 @@ function games_detail(int $gameId): void
         error_response('Game not found.', 404);
     }
 
-    $isMember = user_is_game_member((int)$user['id'], $gameId);
+    $memberRole = game_member_role((int)$user['id'], $gameId);
+    $permissions = game_permissions_for_user($game, $user, $memberRole);
 
     success_response([
         'game' => [
@@ -173,7 +430,66 @@ function games_detail(int $gameId): void
             'status' => (string)$game['status'],
             'created_at' => (string)$game['created_at'],
             'owner_username' => (string)$game['owner_username'],
-            'is_member' => $isMember,
+            'phase' => (string)($game['phase'] ?? default_phase_for_game_type((string)$game['game_type'])),
+            'current_round' => (int)($game['current_round'] ?? 1),
+            'is_member' => $memberRole !== null,
+            'member_role' => $memberRole,
+            'permissions' => $permissions,
         ],
     ]);
+}
+
+function mafia_assign_roles_if_missing(int $gameId): void
+{
+    $existsStmt = db()->prepare(
+        'SELECT COUNT(*) FROM game_roles WHERE game_id = :game_id AND role_key = :role_key'
+    );
+    $existsStmt->execute([
+        'game_id' => $gameId,
+        'role_key' => 'mafia',
+    ]);
+
+    if ((int)$existsStmt->fetchColumn() > 0) {
+        return;
+    }
+
+    $membersStmt = db()->prepare(
+        'SELECT user_id FROM game_members WHERE game_id = :game_id AND role <> :observer_role ORDER BY user_id ASC'
+    );
+    $membersStmt->execute([
+        'game_id' => $gameId,
+        'observer_role' => 'observer',
+    ]);
+    $memberIds = array_map(static fn (array $row): int => (int)$row['user_id'], $membersStmt->fetchAll());
+    if (empty($memberIds)) {
+        return;
+    }
+
+    $scored = [];
+    foreach ($memberIds as $memberId) {
+        $score = hash('sha256', 'v1:mafia-assign:game:' . $gameId . ':user:' . $memberId);
+        $scored[] = [
+            'user_id' => $memberId,
+            'score' => $score,
+        ];
+    }
+
+    usort($scored, static function (array $a, array $b): int {
+        return strcmp($a['score'], $b['score']);
+    });
+
+    $mafiaCount = max(1, (int)floor(count($memberIds) / 3));
+    $selected = array_slice($scored, 0, $mafiaCount);
+
+    $insertStmt = db()->prepare(
+        'INSERT IGNORE INTO game_roles (game_id, user_id, role_key, is_hidden) VALUES (:game_id, :user_id, :role_key, :is_hidden)'
+    );
+    foreach ($selected as $row) {
+        $insertStmt->execute([
+            'game_id' => $gameId,
+            'user_id' => (int)$row['user_id'],
+            'role_key' => 'mafia',
+            'is_hidden' => 1,
+        ]);
+    }
 }

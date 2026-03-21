@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/game_access.php';
 
 function handle_messages_route(string $method, array $segments): void
 {
@@ -27,8 +28,10 @@ function messages_list(int $gameId): void
 {
     $user = require_user();
 
-    if (!user_is_game_member((int)$user['id'], $gameId)) {
-        error_response('Forbidden.', 403);
+    $role = game_require_member_or_403((int)$user['id'], $gameId);
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
     }
 
     $sinceId = 0;
@@ -72,6 +75,7 @@ function messages_list(int $gameId): void
     success_response([
         'messages' => $messages,
         'last_id' => $lastId,
+        'member_role' => $role,
     ]);
 }
 
@@ -79,8 +83,18 @@ function messages_create(int $gameId): void
 {
     $user = require_user();
 
-    if (!user_is_game_member((int)$user['id'], $gameId)) {
-        error_response('Forbidden.', 403);
+    $role = game_require_member_or_403((int)$user['id'], $gameId);
+    if ($role === 'observer') {
+        error_response('Observers cannot send chat messages.', 403);
+    }
+
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    if ((string)$game['status'] === 'closed') {
+        error_response('Game has ended. Chat is read-only.', 409);
     }
 
     $body = json_input();

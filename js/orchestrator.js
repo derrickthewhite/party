@@ -69,7 +69,7 @@ export function initializePartyApp() {
 		refreshGames,
 		openGame,
 	});
-	gameScreen = createGameScreen({ api, state, chat });
+	gameScreen = createGameScreen({ api, state, chat, refreshGames });
 
 	app.appendChild(welcomeScreen.root);
 	app.appendChild(signupScreen.root);
