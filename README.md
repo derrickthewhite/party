@@ -166,6 +166,114 @@ This endpoint is currently always enabled for troubleshooting and should be rest
 - No account lockout/rate limiting table yet.
 - Full Mafia/Diplomacy/Rumble round-resolution engines are still being implemented on top of the new action infrastructure.
 
+## Game Rules (Site-Specific)
+
+This section documents the intended game rules and current site behavior for each game type.
+
+### Shared game model (all game types)
+
+- Every game has a lifecycle status: `open`, `in_progress`, `closed`.
+- Before start (`open`): chat is allowed, game actions are blocked.
+- In progress (`in_progress`): chat and game actions are allowed for active non-observer members (subject to game-type rules).
+- Ended (`closed`): read-only; no new joins, chat, or game actions.
+- Owner/admin controls:
+  - Start, End, Delete are available in lobby and game view.
+  - Delete is hard-delete (game row and dependent data removed via cascade).
+- Observers:
+  - Can join as observer.
+  - Can read state/chat/revealed game data.
+  - Cannot submit chat messages or game actions.
+- Membership UX:
+  - Lobby Join and Observe buttons are disabled for users already in the game.
+
+### Chat game (`chat`)
+
+Purpose:
+- Baseline social game/chat room model and shared infrastructure anchor.
+
+Rules for this site:
+- Uses the regular game lifecycle and membership rules above.
+- Uses chat feed and owner/admin lifecycle controls.
+- Type-specific action composer is hidden for this game view.
+
+### Stub game (`stub`)
+
+Purpose:
+- Development placeholder for rapid prototyping and experimenting with future game behavior.
+
+Rules for this site:
+- Uses the existing generic/base game interface exactly as-is.
+- Includes generic action composer controls.
+- Stub is a front-end admin-only create option to avoid lobby clutter.
+- Once created, Stub games are visible/joinable by everyone using normal membership rules.
+
+### Diplomacy game (`diplomacy`)
+
+Purpose:
+- Focused on hidden order submission and synchronized reveal.
+
+Rules for this site:
+- Players submit free-text orders as action type `order`.
+- Submitted orders remain hidden until reveal.
+- Reveal behavior:
+  - Automatic reveal when all required non-observer participants have submitted for the round.
+  - Owner/admin can force reveal using End Turn.
+- End Turn behavior:
+  - Allowed for owner/admin.
+  - Reveals unrevealed orders for current round and advances round.
+- Diplomacy view UI:
+  - Order text input.
+  - Send Order button.
+  - End Turn button.
+  - List of revealed orders from the previous round.
+- Observers can see revealed previous-round orders.
+
+### Mafia game (`mafia`)
+
+Purpose:
+- Hidden-team elimination game with day/night cadence.
+
+Intended rules for this site (target behavior):
+- At game start, some players are assigned as mafia privately.
+- Phases:
+  - Day: public discussion and voting to eliminate a player.
+  - Night: mafia selects a target to eliminate.
+- Eliminated players remain as read-only participants (observer-like).
+- Win conditions:
+  - Town wins when all mafia are eliminated.
+  - Mafia wins when mafia are majority among living players.
+
+Determinism policy:
+- Tie outcomes that require random choice should use deterministic replay-safe pseudo-random selection based on stable game/round seed inputs.
+
+Current implementation status:
+- Role assignment scaffolding exists.
+- Full day/night resolution flow and elimination pipeline are still in progress.
+
+### Rumble game (`rumble`)
+
+Purpose:
+- Simultaneous allocation combat game with shrinking power from damage.
+
+Intended rules for this site (target behavior):
+- Two phases conceptually exist:
+  - Bidding phase (placeholder for future use).
+  - Battle phase (primary v1 focus).
+- Each player starts with 100 health.
+- Each round, available power equals current health.
+- Players allocate power across attacks (including self-attack allowed) and defense.
+- Round resolution is simultaneous.
+- Damage taken = `max(0, incoming_attacks - defense)`.
+- Health reduced to `0` or below means elimination.
+- Lower health next round means lower power next round.
+- End conditions:
+  - One player remains alive, or
+  - Draw if all remaining players reach `0` in the same resolution.
+
+Current implementation status:
+- Infrastructure and type routing are present.
+- Full battle resolver and round loop logic are still in progress.
+
 ## Hosting: 
 
 - site is currently hosted on https://party.derrickthewhite.com
