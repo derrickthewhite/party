@@ -1,4 +1,4 @@
-import { clearNode, createStatusNode, setStatus } from './dom.js';
+import { clearNode, createStatusNode, setStatus, showConfirmModal } from './dom.js';
 
 export function createBaseGameScreen(deps, options) {
 	const config = options || {};
@@ -31,6 +31,9 @@ export function createBaseGameScreen(deps, options) {
 	headingRow.appendChild(title);
 	headingRow.appendChild(spacer);
 	headingRow.appendChild(back);
+
+	const userLabel = document.createElement('p');
+	userLabel.className = 'top-user-label';
 
 	const subtitle = document.createElement('p');
 	const modeInfo = document.createElement('p');
@@ -155,6 +158,16 @@ export function createBaseGameScreen(deps, options) {
 			return;
 		}
 
+		const confirmed = await showConfirmModal({
+			title: 'Confirm Start',
+			message: 'Are you sure you want to Start this game?',
+			cancelLabel: 'Cancel',
+			confirmLabel: 'Confirm',
+		});
+		if (!confirmed) {
+			return;
+		}
+
 		try {
 			await api.startGame(activeGame.id);
 			const detail = await api.gameDetail(activeGame.id);
@@ -172,6 +185,16 @@ export function createBaseGameScreen(deps, options) {
 	adminEnd.addEventListener('click', async function onAdminEnd() {
 		const activeGame = state.state.activeGame;
 		if (!activeGame) {
+			return;
+		}
+
+		const confirmed = await showConfirmModal({
+			title: 'Confirm End',
+			message: 'Are you sure you want to End this game?',
+			cancelLabel: 'Cancel',
+			confirmLabel: 'Confirm',
+		});
+		if (!confirmed) {
 			return;
 		}
 
@@ -195,6 +218,16 @@ export function createBaseGameScreen(deps, options) {
 			return;
 		}
 
+		const confirmed = await showConfirmModal({
+			title: 'Confirm Delete',
+			message: 'Are you sure you want to Delete this game?',
+			cancelLabel: 'Cancel',
+			confirmLabel: 'Confirm',
+		});
+		if (!confirmed) {
+			return;
+		}
+
 		try {
 			await api.deleteGame(activeGame.id);
 			chat.stopPolling();
@@ -211,6 +244,7 @@ export function createBaseGameScreen(deps, options) {
 	adminControls.appendChild(adminDelete);
 
 	root.appendChild(headingRow);
+	root.appendChild(userLabel);
 	root.appendChild(subtitle);
 	root.appendChild(modeInfo);
 	root.appendChild(feed);
@@ -221,6 +255,8 @@ export function createBaseGameScreen(deps, options) {
 	root.appendChild(adminControls);
 
 	function setGame(game) {
+		const user = state.state.user || {};
+		userLabel.textContent = user.username ? 'Signed in as: ' + user.username : '';
 		title.textContent = game ? game.title + (config.titleSuffix ? ' (' + config.titleSuffix + ')' : '') : (config.title || 'Game');
 		subtitle.textContent = game
 			? 'Type: ' + game.game_type + ' | Owner: ' + game.owner_username + ' | Status: ' + game.status + ' | Phase: ' + game.phase + ' | Round: ' + game.current_round

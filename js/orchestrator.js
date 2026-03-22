@@ -64,7 +64,9 @@ export function initializePartyApp() {
 	async function openGame(gameId) {
 		try {
 			let detail = await api.gameDetail(gameId);
-			if (!detail.game.is_member) {
+			const role = String((detail.game && detail.game.member_role) || '').toLowerCase();
+			const isObserver = role === 'observer';
+			if (!detail.game.is_member && !isObserver) {
 				await api.joinGame(gameId);
 				detail = await api.gameDetail(gameId);
 			}

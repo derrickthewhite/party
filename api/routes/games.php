@@ -422,6 +422,39 @@ function games_detail(int $gameId): void
     $memberRole = game_member_role((int)$user['id'], $gameId);
     $permissions = game_permissions_for_user($game, $user, $memberRole);
 
+    $orderProgress = null;
+    if (normalize_game_type((string)$game['game_type']) === 'diplomacy') {
+        $roundNumber = (int)($game['current_round'] ?? 1);
+
+        $participantsStmt = db()->prepare(
+            'SELECT COUNT(*) FROM game_members gm '
+            . 'JOIN users u ON u.id = gm.user_id '
+            . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1'
+        );
+        $participantsStmt->execute([
+            'game_id' => $gameId,
+            'observer_role' => 'observer',
+        ]);
+        $participantCount = (int)$participantsStmt->fetchColumn();
+
+        $submittedStmt = db()->prepare(
+            'SELECT COUNT(DISTINCT user_id) FROM game_actions '
+            . 'WHERE game_id = :game_id AND round_number = :round_number AND action_type = :action_type'
+        );
+        $submittedStmt->execute([
+            'game_id' => $gameId,
+            'round_number' => $roundNumber,
+            'action_type' => 'order',
+        ]);
+        $submittedCount = (int)$submittedStmt->fetchColumn();
+
+        $orderProgress = [
+            'round_number' => $roundNumber,
+            'submitted_count' => $submittedCount,
+            'participant_count' => $participantCount,
+        ];
+    }
+
     success_response([
         'game' => [
             'id' => (int)$game['id'],
@@ -435,6 +468,7 @@ function games_detail(int $gameId): void
             'is_member' => $memberRole !== null,
             'member_role' => $memberRole,
             'permissions' => $permissions,
+            'diplomacy_order_progress' => $orderProgress,
         ],
     ]);
 }

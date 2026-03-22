@@ -1,4 +1,4 @@
-import { clearNode, createStatusNode, labelAndInput, setStatus } from './dom.js';
+import { clearNode, createStatusNode, labelAndInput, setStatus, showConfirmModal } from './dom.js';
 
 export function createLandingScreen(deps) {
 	const api = deps.api;
@@ -21,7 +21,25 @@ export function createLandingScreen(deps) {
 
 	const refresh = document.createElement('button');
 	refresh.textContent = 'Refresh';
-	refresh.addEventListener('click', refreshGames);
+	let headingRefreshBusy = false;
+	refresh.addEventListener('click', async function onRefreshHeading() {
+		if (headingRefreshBusy) {
+			return;
+		}
+
+		headingRefreshBusy = true;
+		refresh.disabled = true;
+		refresh.textContent = 'Refreshing...';
+		try {
+			await refreshGames();
+		} catch (err) {
+			setStatus(status, err.message, 'error');
+		} finally {
+			headingRefreshBusy = false;
+			refresh.disabled = false;
+			refresh.textContent = 'Refresh';
+		}
+	});
 
 	const signout = document.createElement('button');
 	signout.className = 'link';
@@ -43,6 +61,9 @@ export function createLandingScreen(deps) {
 	headingRow.appendChild(spacer);
 	headingRow.appendChild(refresh);
 	headingRow.appendChild(signout);
+
+	const userLabel = document.createElement('p');
+	userLabel.className = 'top-user-label';
 
 	const createBlock = document.createElement('div');
 	createBlock.className = 'card';
@@ -108,21 +129,56 @@ export function createLandingScreen(deps) {
 	const status = createStatusNode();
 	status.style.marginTop = '10px';
 
+	const listHeader = document.createElement('div');
+	listHeader.className = 'row';
+	listHeader.style.marginTop = '14px';
+
 	const listTitle = document.createElement('h3');
-	listTitle.style.marginTop = '14px';
 	listTitle.textContent = 'Available games';
+
+	const listHeaderSpacer = document.createElement('div');
+	listHeaderSpacer.style.flex = '1';
+
+	const listRefresh = document.createElement('button');
+	listRefresh.textContent = 'Refresh';
+	let listRefreshBusy = false;
+	listRefresh.addEventListener('click', async function onListRefresh() {
+		if (listRefreshBusy) {
+			return;
+		}
+
+		listRefreshBusy = true;
+		listRefresh.disabled = true;
+		listRefresh.textContent = 'Refreshing...';
+		try {
+			await refreshGames();
+		} catch (err) {
+			setStatus(status, err.message, 'error');
+		} finally {
+			listRefreshBusy = false;
+			listRefresh.disabled = false;
+			listRefresh.textContent = 'Refresh';
+		}
+	});
+
+	listHeader.appendChild(listTitle);
+	listHeader.appendChild(listHeaderSpacer);
+	listHeader.appendChild(listRefresh);
 
 	const list = document.createElement('div');
 	list.className = 'list';
 
 	root.appendChild(headingRow);
+	root.appendChild(userLabel);
 	root.appendChild(createBlock);
 	root.appendChild(status);
-	root.appendChild(listTitle);
+	root.appendChild(listHeader);
 	root.appendChild(list);
 
 	function renderGames(games) {
 		syncGameTypeOptions();
+		const user = state.state.user || {};
+		userLabel.textContent = user.username ? 'Signed in as: ' + user.username : '';
 		clearNode(list);
 
 		if (!games || games.length === 0) {
@@ -155,6 +211,21 @@ export function createLandingScreen(deps) {
 
 			const permissions = game.permissions || {};
 			const alreadyMember = !!game.is_member;
+			const memberRole = String(game.member_role || '').toLowerCase();
+			const observerRole = memberRole === 'observer';
+			const currentUser = state.state.user || {};
+			const inMemberList = (game.members || []).some(function isCurrentMember(member) {
+				if (!member || !currentUser) {
+					return false;
+				}
+
+				if (currentUser.id != null && member.user_id != null && Number(member.user_id) === Number(currentUser.id)) {
+					return true;
+				}
+
+				return !!currentUser.username && member.username === currentUser.username;
+			});
+			const canOpen = alreadyMember || observerRole || inMemberList;
 			const isOwnerOrAdmin = !!permissions.can_delete;
 
 			const join = document.createElement('button');
@@ -195,6 +266,7 @@ export function createLandingScreen(deps) {
 			const open = document.createElement('button');
 			open.className = 'secondary';
 			open.textContent = 'Open';
+			open.style.display = canOpen ? '' : 'none';
 			open.addEventListener('click', async function onOpen() {
 				await openGame(game.id);
 			});
@@ -207,6 +279,17 @@ export function createLandingScreen(deps) {
 				if (start.disabled) {
 					return;
 				}
+
+				const confirmed = await showConfirmModal({
+					title: 'Confirm Start',
+					message: 'Are you sure you want to Start this game?',
+					cancelLabel: 'Cancel',
+					confirmLabel: 'Confirm',
+				});
+				if (!confirmed) {
+					return;
+				}
+
 				try {
 					setStatus(status, 'Starting game...', '');
 					await api.startGame(game.id);
@@ -225,6 +308,17 @@ export function createLandingScreen(deps) {
 				if (end.disabled) {
 					return;
 				}
+
+				const confirmed = await showConfirmModal({
+					title: 'Confirm End',
+					message: 'Are you sure you want to End this game?',
+					cancelLabel: 'Cancel',
+					confirmLabel: 'Confirm',
+				});
+				if (!confirmed) {
+					return;
+				}
+
 				try {
 					setStatus(status, 'Ending game...', '');
 					await api.endGame(game.id);
@@ -243,6 +337,17 @@ export function createLandingScreen(deps) {
 				if (remove.disabled) {
 					return;
 				}
+
+				const confirmed = await showConfirmModal({
+					title: 'Confirm Delete',
+					message: 'Are you sure you want to Delete this game?',
+					cancelLabel: 'Cancel',
+					confirmLabel: 'Confirm',
+				});
+				if (!confirmed) {
+					return;
+				}
+
 				try {
 					setStatus(status, 'Deleting game...', '');
 					await api.deleteGame(game.id);

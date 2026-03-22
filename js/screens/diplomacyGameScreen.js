@@ -6,8 +6,22 @@ export function createDiplomacyGameScreen(deps) {
 	orderPanel.className = 'card';
 	orderPanel.style.marginTop = '8px';
 
+	const orderHeader = document.createElement('div');
+	orderHeader.className = 'row';
+
 	const orderTitle = document.createElement('h3');
 	orderTitle.textContent = 'Diplomacy Orders';
+
+	const orderHeaderSpacer = document.createElement('div');
+	orderHeaderSpacer.style.flex = '1';
+
+	const refreshOrdersBtn = document.createElement('button');
+	refreshOrdersBtn.textContent = 'Refresh';
+	let refreshOrdersBusy = false;
+
+	orderHeader.appendChild(orderTitle);
+	orderHeader.appendChild(orderHeaderSpacer);
+	orderHeader.appendChild(refreshOrdersBtn);
 
 	const orderRow = document.createElement('div');
 	orderRow.className = 'row mobile-stack';
@@ -31,11 +45,16 @@ export function createDiplomacyGameScreen(deps) {
 	revealedTitle.textContent = 'Revealed Orders (Previous Round)';
 	revealedTitle.style.marginTop = '10px';
 
+	const progressText = document.createElement('p');
+	progressText.className = 'top-user-label';
+	progressText.textContent = 'Orders submitted this turn: 0/0';
+
 	const ordersList = document.createElement('div');
 	ordersList.className = 'list';
 
-	orderPanel.appendChild(orderTitle);
+	orderPanel.appendChild(orderHeader);
 	orderPanel.appendChild(orderRow);
+	orderPanel.appendChild(progressText);
 	orderPanel.appendChild(revealedTitle);
 	orderPanel.appendChild(ordersList);
 
@@ -43,6 +62,69 @@ export function createDiplomacyGameScreen(deps) {
 	let lastRound = 1;
 	let lastPerms = {};
 	let setStatusNode = function noop() {};
+	let refreshGameBusy = false;
+	let autoRefreshId = null;
+
+	function updateProgressText(game) {
+		const progress = game && game.diplomacy_order_progress ? game.diplomacy_order_progress : null;
+		const submitted = Number(progress && progress.submitted_count ? progress.submitted_count : 0);
+		const participants = Number(progress && progress.participant_count ? progress.participant_count : 0);
+		const roundNumber = Number(progress && progress.round_number ? progress.round_number : (game && game.current_round ? game.current_round : lastRound));
+		progressText.textContent = 'Round ' + roundNumber + ' orders submitted: ' + submitted + '/' + participants;
+	}
+
+	async function refreshDiplomacyState(options) {
+		if (!lastGameId || refreshGameBusy) {
+			return;
+		}
+
+		const config = options || {};
+		refreshGameBusy = true;
+		refreshOrdersBtn.disabled = true;
+		refreshOrdersBtn.textContent = 'Refreshing...';
+		try {
+			const detail = await deps.api.gameDetail(lastGameId);
+			deps.state.patch({ activeGame: detail.game });
+			screen.setGame(detail.game);
+			if (!config.silent) {
+				setStatusNode('Diplomacy updates refreshed.', 'ok');
+			}
+		} catch (err) {
+			setStatusNode(err.message || 'Unable to refresh diplomacy updates.', 'error');
+		} finally {
+			refreshGameBusy = false;
+			refreshOrdersBtn.disabled = false;
+			refreshOrdersBtn.textContent = 'Refresh';
+		}
+	}
+
+	function stopAutoRefresh() {
+		if (autoRefreshId === null) {
+			return;
+		}
+
+		clearInterval(autoRefreshId);
+		autoRefreshId = null;
+	}
+
+	function startAutoRefresh() {
+		if (autoRefreshId !== null) {
+			return;
+		}
+
+		autoRefreshId = setInterval(function autoRefreshTick() {
+			const current = deps.state.state;
+			const isDiplomacyScreen = current.screen === 'game'
+				&& current.activeGame
+				&& String(current.activeGame.game_type || '').toLowerCase() === 'diplomacy';
+			if (!isDiplomacyScreen) {
+				stopAutoRefresh();
+				return;
+			}
+
+			refreshDiplomacyState({ silent: true });
+		}, 60000);
+	}
 
 	async function refreshPreviousRoundOrders(api) {
 		if (!lastGameId) {
@@ -91,6 +173,7 @@ export function createDiplomacyGameScreen(deps) {
 			lastRound = Number(context.game.current_round || 1);
 			lastPerms = context.game.permissions || {};
 			setStatusNode = context.setStatusNode;
+			updateProgressText(context.game);
 
 			sendOrderBtn.disabled = !lastPerms.can_act;
 			orderInput.disabled = !lastPerms.can_act;
@@ -100,11 +183,21 @@ export function createDiplomacyGameScreen(deps) {
 			context.nodes.composerRow.style.display = '';
 			context.nodes.actionRow.style.display = 'none';
 			screen.setTypePanel(orderPanel);
+			startAutoRefresh();
 
 			refreshPreviousRoundOrders(context.api).catch(function onErr(err) {
 				setStatusNode(err.message || 'Unable to load previous round orders.', 'error');
 			});
 		},
+	});
+
+	deps.state.subscribe(function onStateChanged(current) {
+		const isDiplomacyScreen = current.screen === 'game'
+			&& current.activeGame
+			&& String(current.activeGame.game_type || '').toLowerCase() === 'diplomacy';
+		if (!isDiplomacyScreen) {
+			stopAutoRefresh();
+		}
 	});
 
 	sendOrderBtn.addEventListener('click', async function onSendOrder() {
@@ -121,6 +214,7 @@ export function createDiplomacyGameScreen(deps) {
 		try {
 			await deps.api.sendAction(lastGameId, 'order', { text });
 			orderInput.value = '';
+			await refreshDiplomacyState({ silent: true });
 			setStatusNode('Order submitted.', 'ok');
 		} catch (err) {
 			setStatusNode(err.message || 'Unable to submit order.', 'error');
@@ -134,11 +228,25 @@ export function createDiplomacyGameScreen(deps) {
 
 		try {
 			await deps.api.revealActions(lastGameId);
-			const detail = await deps.api.gameDetail(lastGameId);
-			screen.setGame(detail.game);
+			await refreshDiplomacyState({ silent: true });
 			setStatusNode('Turn ended and orders revealed.', 'ok');
 		} catch (err) {
 			setStatusNode(err.message || 'Unable to end turn.', 'error');
+		}
+	});
+
+	refreshOrdersBtn.addEventListener('click', async function onRefreshOrders() {
+		if (refreshOrdersBusy || !lastGameId) {
+			return;
+		}
+
+		refreshOrdersBusy = true;
+		try {
+			await refreshDiplomacyState({ silent: false });
+		} catch (err) {
+			setStatusNode(err.message || 'Unable to refresh diplomacy updates.', 'error');
+		} finally {
+			refreshOrdersBusy = false;
 		}
 	});
 
