@@ -1,4 +1,4 @@
-import { clearNode, createStatusNode, labelAndInput, setStatus, showConfirmModal } from './dom.js';
+import { createStatusNode, labelAndInput, setStatus, showConfirmModal } from './dom.js';
 
 export function createLandingScreen(deps) {
 	const api = deps.api;
@@ -80,26 +80,34 @@ export function createLandingScreen(deps) {
 	gameTypeLabel.textContent = 'Game type';
 
 	const gameTypeSelect = document.createElement('select');
+	const gameTypeOptions = {
+		chat: null,
+		mafia: null,
+		diplomacy: null,
+		rumble: null,
+		stub: null,
+	};
+
+	function createGameTypeOption(value, text) {
+		const option = document.createElement('option');
+		option.value = value;
+		option.textContent = text;
+		gameTypeSelect.appendChild(option);
+		return option;
+	}
+
+	gameTypeOptions.chat = createGameTypeOption('chat', 'Chat');
+	gameTypeOptions.mafia = createGameTypeOption('mafia', 'Mafia');
+	gameTypeOptions.diplomacy = createGameTypeOption('diplomacy', 'Diplomacy');
+	gameTypeOptions.rumble = createGameTypeOption('rumble', 'Rumble');
+	gameTypeOptions.stub = createGameTypeOption('stub', 'Stub');
+
 	function syncGameTypeOptions() {
-		clearNode(gameTypeSelect);
 		const isAdmin = !!(state.state.user && state.state.user.is_admin);
-		const options = [
-			{ value: 'chat', text: 'Chat' },
-			{ value: 'mafia', text: 'Mafia' },
-			{ value: 'diplomacy', text: 'Diplomacy' },
-			{ value: 'rumble', text: 'Rumble' },
-		];
-
-		if (isAdmin) {
-			options.push({ value: 'stub', text: 'Stub' });
+		gameTypeOptions.stub.hidden = !isAdmin;
+		if (!isAdmin && gameTypeSelect.value === 'stub') {
+			gameTypeSelect.value = 'chat';
 		}
-
-		options.forEach(function eachType(type) {
-			const option = document.createElement('option');
-			option.value = type.value;
-			option.textContent = type.text;
-			gameTypeSelect.appendChild(option);
-		});
 	}
 
 	syncGameTypeOptions();
@@ -167,6 +175,10 @@ export function createLandingScreen(deps) {
 
 	const list = document.createElement('div');
 	list.className = 'list';
+	const gameRowsById = new Map();
+	const emptyListNode = document.createElement('p');
+	emptyListNode.textContent = 'No games yet. Create one to get started.';
+	list.appendChild(emptyListNode);
 
 	root.appendChild(headingRow);
 	root.appendChild(userLabel);
@@ -179,65 +191,38 @@ export function createLandingScreen(deps) {
 		syncGameTypeOptions();
 		const user = state.state.user || {};
 		userLabel.textContent = user.username ? 'Signed in as: ' + user.username : '';
-		clearNode(list);
 
-		if (!games || games.length === 0) {
-			const empty = document.createElement('p');
-			empty.textContent = 'No games yet. Create one to get started.';
-			list.appendChild(empty);
-			return;
-		}
+		const rows = Array.isArray(games) ? games : [];
+		const activeIds = new Set();
 
-		games.forEach(function eachGame(game) {
+		function ensureGameRow(gameId) {
+			const key = String(Number(gameId));
+			if (gameRowsById.has(key)) {
+				return gameRowsById.get(key);
+			}
+
 			const item = document.createElement('div');
 			item.className = 'game-item';
 
 			const name = document.createElement('strong');
-			name.textContent = game.title + ' (' + game.game_type + ')';
-
 			const info = document.createElement('p');
-			info.textContent = 'Owner: ' + game.owner_username + ' | Members: ' + game.member_count + ' | Status: ' + game.status;
-
 			const memberList = document.createElement('p');
-			const memberText = (game.members || [])
-				.map(function eachMember(member) {
-					return member.username + ' [' + member.role + ']';
-				})
-				.join(', ');
-			memberList.textContent = memberText ? 'Members: ' + memberText : 'Members: none';
 
 			const controls = document.createElement('div');
 			controls.className = 'row';
 
-			const permissions = game.permissions || {};
-			const alreadyMember = !!game.is_member;
-			const memberRole = String(game.member_role || '').toLowerCase();
-			const observerRole = memberRole === 'observer';
-			const currentUser = state.state.user || {};
-			const inMemberList = (game.members || []).some(function isCurrentMember(member) {
-				if (!member || !currentUser) {
-					return false;
-				}
-
-				if (currentUser.id != null && member.user_id != null && Number(member.user_id) === Number(currentUser.id)) {
-					return true;
-				}
-
-				return !!currentUser.username && member.username === currentUser.username;
-			});
-			const canOpen = alreadyMember || observerRole || inMemberList;
-			const isOwnerOrAdmin = !!permissions.can_delete;
+			const rowState = { game: null };
 
 			const join = document.createElement('button');
 			join.textContent = 'Join';
-			join.disabled = alreadyMember;
 			join.addEventListener('click', async function onJoin() {
-				if (join.disabled) {
+				const active = rowState.game;
+				if (!active || join.disabled) {
 					return;
 				}
 				try {
 					setStatus(status, 'Joining game...', '');
-					await api.joinGame(game.id);
+					await api.joinGame(active.id);
 					await refreshGames();
 					setStatus(status, 'Joined game.', 'ok');
 				} catch (err) {
@@ -247,15 +232,15 @@ export function createLandingScreen(deps) {
 
 			const observe = document.createElement('button');
 			observe.textContent = 'Observe';
-			observe.disabled = alreadyMember;
 			observe.addEventListener('click', async function onObserve() {
-				if (observe.disabled) {
+				const active = rowState.game;
+				if (!active || observe.disabled) {
 					return;
 				}
 				try {
 					setStatus(status, 'Joining as observer...', '');
-					await api.observeGame(game.id);
-					await openGame(game.id);
+					await api.observeGame(active.id);
+					await openGame(active.id);
 					await refreshGames();
 					setStatus(status, 'Joined as observer.', 'ok');
 				} catch (err) {
@@ -266,17 +251,19 @@ export function createLandingScreen(deps) {
 			const open = document.createElement('button');
 			open.className = 'secondary';
 			open.textContent = 'Open';
-			open.style.display = canOpen ? '' : 'none';
 			open.addEventListener('click', async function onOpen() {
-				await openGame(game.id);
+				const active = rowState.game;
+				if (!active) {
+					return;
+				}
+				await openGame(active.id);
 			});
 
 			const start = document.createElement('button');
 			start.textContent = 'Start';
-			start.style.display = isOwnerOrAdmin ? '' : 'none';
-			start.disabled = !permissions.can_start;
 			start.addEventListener('click', async function onStart() {
-				if (start.disabled) {
+				const active = rowState.game;
+				if (!active || start.disabled) {
 					return;
 				}
 
@@ -292,7 +279,7 @@ export function createLandingScreen(deps) {
 
 				try {
 					setStatus(status, 'Starting game...', '');
-					await api.startGame(game.id);
+					await api.startGame(active.id);
 					await refreshGames();
 					setStatus(status, 'Game started.', 'ok');
 				} catch (err) {
@@ -302,10 +289,9 @@ export function createLandingScreen(deps) {
 
 			const end = document.createElement('button');
 			end.textContent = 'End';
-			end.style.display = isOwnerOrAdmin ? '' : 'none';
-			end.disabled = !permissions.can_end;
 			end.addEventListener('click', async function onEnd() {
-				if (end.disabled) {
+				const active = rowState.game;
+				if (!active || end.disabled) {
 					return;
 				}
 
@@ -321,7 +307,7 @@ export function createLandingScreen(deps) {
 
 				try {
 					setStatus(status, 'Ending game...', '');
-					await api.endGame(game.id);
+					await api.endGame(active.id);
 					await refreshGames();
 					setStatus(status, 'Game ended.', 'ok');
 				} catch (err) {
@@ -331,10 +317,9 @@ export function createLandingScreen(deps) {
 
 			const remove = document.createElement('button');
 			remove.textContent = 'Delete';
-			remove.style.display = isOwnerOrAdmin ? '' : 'none';
-			remove.disabled = !permissions.can_delete;
 			remove.addEventListener('click', async function onDelete() {
-				if (remove.disabled) {
+				const active = rowState.game;
+				if (!active || remove.disabled) {
 					return;
 				}
 
@@ -350,7 +335,7 @@ export function createLandingScreen(deps) {
 
 				try {
 					setStatus(status, 'Deleting game...', '');
-					await api.deleteGame(game.id);
+					await api.deleteGame(active.id);
 					await refreshGames();
 					setStatus(status, 'Game deleted.', 'ok');
 				} catch (err) {
@@ -369,8 +354,80 @@ export function createLandingScreen(deps) {
 			item.appendChild(info);
 			item.appendChild(memberList);
 			item.appendChild(controls);
+
+			const refs = { item, name, info, memberList, join, observe, open, start, end, remove, rowState };
+			gameRowsById.set(key, refs);
 			list.appendChild(item);
+			return refs;
+		}
+
+		rows.forEach(function eachGame(game) {
+			const key = String(Number(game.id));
+			activeIds.add(key);
+			const refs = ensureGameRow(game.id);
+			refs.rowState.game = game;
+
+			refs.name.textContent = game.title + ' (' + game.game_type + ')';
+			refs.info.textContent = 'Owner: ' + game.owner_username + ' | Members: ' + game.member_count + ' | Status: ' + game.status;
+
+			const memberText = (game.members || [])
+				.map(function eachMember(member) {
+					return member.username + ' [' + member.role + ']';
+				})
+				.join(', ');
+			refs.memberList.textContent = memberText ? 'Members: ' + memberText : 'Members: none';
+
+			const permissions = game.permissions || {};
+			const alreadyMember = !!game.is_member;
+			const memberRole = String(game.member_role || '').toLowerCase();
+			const observerRole = memberRole === 'observer';
+			const currentUser = state.state.user || {};
+			const inMemberList = (game.members || []).some(function isCurrentMember(member) {
+				if (!member || !currentUser) {
+					return false;
+				}
+
+				if (currentUser.id != null && member.user_id != null && Number(member.user_id) === Number(currentUser.id)) {
+					return true;
+				}
+
+				return !!currentUser.username && member.username === currentUser.username;
+			});
+
+			const canOpen = alreadyMember || observerRole || inMemberList;
+			const isOwnerOrAdmin = !!permissions.can_delete;
+
+			refs.join.disabled = alreadyMember;
+			refs.observe.disabled = alreadyMember;
+			refs.open.style.display = canOpen ? '' : 'none';
+
+			refs.start.style.display = isOwnerOrAdmin ? '' : 'none';
+			refs.end.style.display = isOwnerOrAdmin ? '' : 'none';
+			refs.remove.style.display = isOwnerOrAdmin ? '' : 'none';
+
+			refs.start.disabled = !permissions.can_start;
+			refs.end.disabled = !permissions.can_end;
+			refs.remove.disabled = !permissions.can_delete;
+
+			list.appendChild(refs.item);
 		});
+
+		Array.from(gameRowsById.keys()).forEach(function eachExisting(key) {
+			if (activeIds.has(key)) {
+				return;
+			}
+
+			const refs = gameRowsById.get(key);
+			if (refs && refs.item.parentNode === list) {
+				list.removeChild(refs.item);
+			}
+			gameRowsById.delete(key);
+		});
+
+		emptyListNode.style.display = rows.length === 0 ? '' : 'none';
+		if (emptyListNode.parentNode !== list) {
+			list.appendChild(emptyListNode);
+		}
 	}
 
 	return {

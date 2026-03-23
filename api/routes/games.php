@@ -246,6 +246,17 @@ function games_join(int $gameId): void
         'player_role' => 'player',
     ]);
 
+    if (normalize_game_type((string)$game['game_type']) === 'rumble') {
+        $stateStmt = db()->prepare(
+            'INSERT INTO rumble_player_state (game_id, user_id, current_health) VALUES (:game_id, :user_id, 100) '
+            . 'ON DUPLICATE KEY UPDATE current_health = current_health'
+        );
+        $stateStmt->execute([
+            'game_id' => $gameId,
+            'user_id' => (int)$user['id'],
+        ]);
+    }
+
     success_response(['joined' => true, 'game_id' => $gameId, 'role' => 'player']);
 }
 
@@ -320,6 +331,10 @@ function games_start(int $gameId): void
 
         if (normalize_game_type((string)$game['game_type']) === 'mafia') {
             mafia_assign_roles_if_missing($gameId);
+        }
+
+        if (normalize_game_type((string)$game['game_type']) === 'rumble') {
+            rumble_initialize_player_state($gameId);
         }
 
         $pdo->commit();
@@ -455,6 +470,150 @@ function games_detail(int $gameId): void
         ];
     }
 
+    $rumbleProgress = null;
+    if (normalize_game_type((string)$game['game_type']) === 'rumble') {
+        $roundNumber = (int)($game['current_round'] ?? 1);
+
+        rumble_initialize_player_state($gameId);
+
+        $participantsStmt = db()->prepare(
+            'SELECT COUNT(*) FROM game_members gm '
+            . 'JOIN users u ON u.id = gm.user_id '
+            . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1'
+        );
+        $participantsStmt->execute([
+            'game_id' => $gameId,
+            'observer_role' => 'observer',
+        ]);
+        $participantCount = (int)$participantsStmt->fetchColumn();
+
+        $submittedStmt = db()->prepare(
+            'SELECT COUNT(DISTINCT user_id) FROM game_actions '
+            . 'WHERE game_id = :game_id AND round_number = :round_number AND action_type = :action_type'
+        );
+        $submittedStmt->execute([
+            'game_id' => $gameId,
+            'round_number' => $roundNumber,
+            'action_type' => 'order',
+        ]);
+        $submittedCount = (int)$submittedStmt->fetchColumn();
+
+        $playersStmt = db()->prepare(
+            'SELECT gm.user_id, u.username, COALESCE(rps.current_health, 100) AS current_health '
+            . 'FROM game_members gm '
+            . 'JOIN users u ON u.id = gm.user_id '
+            . 'LEFT JOIN rumble_player_state rps ON rps.game_id = gm.game_id AND rps.user_id = gm.user_id '
+            . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1 '
+            . 'ORDER BY u.username ASC'
+        );
+        $playersStmt->execute([
+            'game_id' => $gameId,
+            'observer_role' => 'observer',
+        ]);
+        $players = [];
+        foreach ($playersStmt->fetchAll() as $row) {
+            $players[] = [
+                'user_id' => (int)$row['user_id'],
+                'username' => (string)$row['username'],
+                'health' => max(0, (int)$row['current_health']),
+                'is_self' => (int)$row['user_id'] === (int)$user['id'],
+            ];
+        }
+
+        $currentOrderStmt = db()->prepare(
+            'SELECT payload FROM game_actions '
+            . 'WHERE game_id = :game_id AND round_number = :round_number AND action_type = :action_type AND user_id = :user_id '
+            . 'ORDER BY id DESC LIMIT 1'
+        );
+        $currentOrderStmt->execute([
+            'game_id' => $gameId,
+            'round_number' => $roundNumber,
+            'action_type' => 'order',
+            'user_id' => (int)$user['id'],
+        ]);
+        $currentPayloadRaw = $currentOrderStmt->fetchColumn();
+        $currentOrder = null;
+        if ($currentPayloadRaw !== false) {
+            $decoded = json_decode((string)$currentPayloadRaw, true);
+            if (is_array($decoded)) {
+                $attacks = is_array($decoded['attacks'] ?? null) ? $decoded['attacks'] : [];
+                $normalizedAttacks = [];
+                foreach ($attacks as $targetKey => $amountRaw) {
+                    if ((!is_int($targetKey) && !ctype_digit((string)$targetKey)) || (!is_int($amountRaw) && !ctype_digit((string)$amountRaw))) {
+                        continue;
+                    }
+
+                    $amount = (int)$amountRaw;
+                    if ($amount <= 0) {
+                        continue;
+                    }
+
+                    $normalizedAttacks[(string)((int)$targetKey)] = $amount;
+                }
+
+                $defense = $decoded['defense'] ?? 0;
+                $currentOrder = [
+                    'attacks' => $normalizedAttacks,
+                    'defense' => max(0, (int)$defense),
+                ];
+            }
+        }
+
+        $previousRound = max(0, $roundNumber - 1);
+        $previousOrders = [];
+        if ($previousRound > 0) {
+            $previousStmt = db()->prepare(
+                'SELECT a.user_id, u.username, a.payload FROM game_actions a '
+                . 'JOIN users u ON u.id = a.user_id '
+                . 'WHERE a.game_id = :game_id AND a.round_number = :round_number AND a.action_type = :action_type '
+                . 'ORDER BY u.username ASC'
+            );
+            $previousStmt->execute([
+                'game_id' => $gameId,
+                'round_number' => $previousRound,
+                'action_type' => 'order',
+            ]);
+
+            foreach ($previousStmt->fetchAll() as $row) {
+                $decoded = json_decode((string)$row['payload'], true);
+                if (!is_array($decoded)) {
+                    $decoded = [];
+                }
+
+                $attacks = is_array($decoded['attacks'] ?? null) ? $decoded['attacks'] : [];
+                $normalizedAttacks = [];
+                foreach ($attacks as $targetKey => $amountRaw) {
+                    if ((!is_int($targetKey) && !ctype_digit((string)$targetKey)) || (!is_int($amountRaw) && !ctype_digit((string)$amountRaw))) {
+                        continue;
+                    }
+
+                    $amount = (int)$amountRaw;
+                    if ($amount <= 0) {
+                        continue;
+                    }
+
+                    $normalizedAttacks[(string)((int)$targetKey)] = $amount;
+                }
+
+                $previousOrders[] = [
+                    'user_id' => (int)$row['user_id'],
+                    'username' => (string)$row['username'],
+                    'attacks' => $normalizedAttacks,
+                    'defense' => max(0, (int)($decoded['defense'] ?? 0)),
+                ];
+            }
+        }
+
+        $rumbleProgress = [
+            'round_number' => $roundNumber,
+            'submitted_count' => $submittedCount,
+            'participant_count' => $participantCount,
+            'players' => $players,
+            'current_order' => $currentOrder,
+            'previous_round_orders' => $previousOrders,
+        ];
+    }
+
     success_response([
         'game' => [
             'id' => (int)$game['id'],
@@ -469,7 +628,23 @@ function games_detail(int $gameId): void
             'member_role' => $memberRole,
             'permissions' => $permissions,
             'diplomacy_order_progress' => $orderProgress,
+            'rumble_turn_progress' => $rumbleProgress,
         ],
+    ]);
+}
+
+function rumble_initialize_player_state(int $gameId): void
+{
+    $stmt = db()->prepare(
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health) '
+        . 'SELECT gm.game_id, gm.user_id, 100 FROM game_members gm '
+        . 'JOIN users u ON u.id = gm.user_id '
+        . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1 '
+        . 'ON DUPLICATE KEY UPDATE current_health = current_health'
+    );
+    $stmt->execute([
+        'game_id' => $gameId,
+        'observer_role' => 'observer',
     ]);
 }
 

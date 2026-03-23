@@ -84,6 +84,9 @@ Lifecycle rules:
 - `POST /api/games/{id}/actions`
   - body: `{ "action_type": "...", "payload": { ... } }`
 - `POST /api/games/{id}/actions/reveal` (diplomacy owner force reveal)
+- `POST /api/games/{id}/actions/rumble-order`
+  - body: `{ "attacks": { "<target_user_id>": <amount>, ... } }`
+- `POST /api/games/{id}/actions/rumble-order/cancel`
 
 Notes:
 - observers can read but cannot chat or submit actions
@@ -135,6 +138,11 @@ This endpoint is currently always enabled for troubleshooting and should be rest
 - admin user flag for delete permission
 - game state/action/hidden role tables
 - legacy `generic` game type normalized to `chat`
+
+### Existing database rumble-state migration
+
+1. Import `sql/014_add_rumble_player_state.sql`
+2. This migration is idempotent and adds rumble player health state storage and backfill.
 
 ### Clean chat only
 

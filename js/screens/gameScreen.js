@@ -1,4 +1,4 @@
-import { clearNode, createStatusNode, setStatus, showConfirmModal } from './dom.js';
+import { createStatusNode, setStatus, showConfirmModal } from './dom.js';
 
 export function createBaseGameScreen(deps, options) {
 	const config = options || {};
@@ -345,7 +345,9 @@ export function createBaseGameScreen(deps, options) {
 	}
 
 	function clearMessages() {
-		clearNode(feed);
+		while (feed.firstChild) {
+			feed.removeChild(feed.firstChild);
+		}
 	}
 
 	return {
@@ -354,10 +356,21 @@ export function createBaseGameScreen(deps, options) {
 		appendMessages,
 		clearMessages,
 		setTypePanel: function setTypePanel(node) {
-			clearNode(typePanel);
-			if (node) {
-				typePanel.appendChild(node);
+			if (!node) {
+				while (typePanel.firstChild) {
+					typePanel.removeChild(typePanel.firstChild);
+				}
+				return;
 			}
+
+			if (typePanel.firstChild === node && typePanel.childNodes.length === 1) {
+				return;
+			}
+
+			while (typePanel.firstChild) {
+				typePanel.removeChild(typePanel.firstChild);
+			}
+			typePanel.appendChild(node);
 		},
 		setStatus: (text, kind) => setStatus(status, text, kind),
 	};

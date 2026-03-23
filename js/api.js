@@ -54,6 +54,11 @@ function createApiModule() {
 		listActions: (gameId, sinceId) => request('/games/' + encodeURIComponent(gameId) + '/actions?since_id=' + encodeURIComponent(sinceId || 0), 'GET'),
 		sendAction: (gameId, actionType, payload) => request('/games/' + encodeURIComponent(gameId) + '/actions', 'POST', { action_type: actionType, payload: payload || {} }),
 		revealActions: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/reveal', 'POST'),
+		submitRumbleOrder: (gameId, attacks) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-order', 'POST', {
+			attacks: attacks || {},
+		}),
+		cancelRumbleOrder: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-order/cancel', 'POST'),
+		endRumbleTurn: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/reveal', 'POST'),
 	};
 }
 
