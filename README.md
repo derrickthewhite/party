@@ -33,6 +33,26 @@ This project is a lightweight foundation for browser-based multiplayer games.
 3. Serve project root with PHP-enabled web server.
 4. Open `index.html`.
 
+## Routing And Auth UX
+
+- The frontend uses query parameters on `index.html` to restore app state on reload.
+- Supported parameters:
+  - `screen=welcome|signup|signin|landing|game`
+  - `game=<id>` to reopen a selected game
+  - `next=<same-origin-path-or-hash>` to continue to a safe internal target after sign-in
+- Signup redirects to the sign-in screen after account creation.
+- Sign-in prefers reopening the target game from `game=<id>` before falling back to `next=`.
+- Usernames are treated case-insensitively during sign-in by using the canonical stored username for the SRP handshake.
+- Username and password fields now set `autocomplete` hints so browsers can offer credential saving. This is best-effort and still depends on browser and site security context.
+
+### Manual checks
+
+1. Open `index.html?screen=signup` and verify the signup screen shows.
+2. Open `index.html?screen=game&game=1`, sign in, and verify the same game reopens.
+3. Create an account, then verify the app moves to the sign-in screen.
+4. Sign in with a different username casing than the account was created with and verify authentication still succeeds.
+5. Confirm the browser offers to save credentials on sign-in or signup.
+
 ## API Overview
 
 Base path: `/api`

@@ -235,6 +235,7 @@ function auth_signin_start(): void
         success_response([
             'salt' => (string)$signinUser['srp_salt'],
             'server_public' => $serverState['server_public_hex'],
+            'username' => (string)$signinUser['username'],
             'params' => [
                 'group' => 'rfc5054_2048',
                 'hash' => 'sha256',

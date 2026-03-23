@@ -1,5 +1,8 @@
 export function createWelcomeScreen(deps) {
  	const state = deps.state;
+	const navigateToScreen = deps.navigateToScreen || function fallbackNavigate(screen) {
+		state.setScreen(screen);
+	};
 
 	const root = document.createElement('section');
 	root.className = 'screen card';
@@ -17,16 +20,14 @@ export function createWelcomeScreen(deps) {
 	signup.className = 'primary';
 	signup.textContent = 'Create account';
 	signup.addEventListener('click', function onGoSignup() {
-		state.clearStatus();
-		state.setScreen('signup');
+		navigateToScreen('signup');
 	});
 
 	const signin = document.createElement('button');
 	signin.className = 'secondary';
 	signin.textContent = 'Sign in';
 	signin.addEventListener('click', function onGoSignin() {
-		state.clearStatus();
-		state.setScreen('signin');
+		navigateToScreen('signin');
 	});
 
 	buttons.appendChild(signup);

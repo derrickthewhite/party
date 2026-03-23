@@ -8,6 +8,7 @@ import { createMafiaGameScreen } from './screens/mafiaGameScreen.js';
 import { createRumbleGameScreen } from './screens/rumbleGameScreen.js';
 import { createSigninScreen } from './screens/signinScreen.js';
 import { createSignupScreen } from './screens/signupScreen.js';
+import { getInitialRoute, isSafeNext, isValidGameId } from './url-utils.js';
 import { createStubGameScreen } from './screens/stubGameScreen.js';
 import { createWelcomeScreen } from './screens/welcomeScreen.js';
 
@@ -72,6 +73,7 @@ export function initializePartyApp() {
 			}
 
 			const screen = activeGameScreenByGame(detail.game);
+			currentGameId = String(detail.game.id);
 
 			state.patch({ activeGame: detail.game });
 			state.setScreen('game');
@@ -85,9 +87,40 @@ export function initializePartyApp() {
 		}
 	}
 
-	const welcomeScreen = createWelcomeScreen({ state });
-	const signupScreen = createSignupScreen({ state, api });
-	const signinScreen = createSigninScreen({ state, api, refreshGames });
+	const initialRoute = getInitialRoute();
+	let currentNext = isSafeNext(initialRoute.next) ? initialRoute.next : null;
+	let currentGameId = isValidGameId(initialRoute.game) ? initialRoute.game : null;
+
+	function navigateToScreen(screen) {
+		state.clearStatus();
+		state.setScreen(screen);
+	}
+
+	const welcomeScreen = createWelcomeScreen({ state, navigateToScreen });
+	const signupScreen = createSignupScreen({
+		state,
+		api,
+		next: function getNext() {
+			return currentNext;
+		},
+		nextGame: function getNextGame() {
+			return currentGameId;
+		},
+		navigateToScreen,
+	});
+	const signinScreen = createSigninScreen({
+		state,
+		api,
+		refreshGames,
+		next: function getNext() {
+			return currentNext;
+		},
+		nextGame: function getNextGame() {
+			return currentGameId;
+		},
+		openGame,
+		navigateToScreen,
+	});
 	landingScreen = createLandingScreen({
 		api,
 		state,
@@ -124,8 +157,22 @@ export function initializePartyApp() {
 			toggleScreen(screen.root, show);
 		});
 
-		if (current.screen === 'landing') {
+			if (current.screen === 'landing') {
 			landingScreen.renderGames(current.games);
+		}
+
+		// keep URL query in sync with current screen, next and selected game (non-invasive)
+		try {
+			const params = new URLSearchParams();
+			if (current.screen) params.set('screen', current.screen);
+			if (currentNext) params.set('next', currentNext);
+			if (currentGameId) {
+				params.set('game', String(currentGameId));
+			}
+			const qs = params.toString();
+			history.replaceState(null, '', qs ? '?' + qs : location.pathname + location.hash);
+		} catch (e) {
+			// ignore URL update failures
 		}
 	});
 
@@ -134,9 +181,19 @@ export function initializePartyApp() {
 			const result = await api.me();
 			state.patch({ user: result.user });
 			await refreshGames();
-			state.setScreen('landing');
+			// honor initial screen when authenticated,
+			// and if it's a game route, open that game
+			if (initialRoute.screen === 'game' && currentGameId) {
+				await openGame(currentGameId);
+			} else if (initialRoute.screen) {
+				state.setScreen(initialRoute.screen);
+			} else {
+				state.setScreen('landing');
+			}
 		} catch (err) {
-			state.setScreen('welcome');
+			// when not authenticated, honor initial screen (e.g. signup) else welcome
+			if (initialRoute.screen) state.setScreen(initialRoute.screen);
+			else state.setScreen('welcome');
 		}
 	}
 
