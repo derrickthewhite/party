@@ -1,0 +1,36 @@
+# Deny directory listing
+Options -Indexes
+
+# Deny access to dotfiles (hidden files) except allow this .htaccess
+<FilesMatch "^\.">
+  Require all denied
+</FilesMatch>
+<Files ".htaccess">
+  Require all granted
+</Files>
+
+# Deny access to markdown, SQL, env and editor/backup files
+<FilesMatch "\.(md|MD|sql|env|bak|old|swp|swo|~)$">
+  Require all denied
+</FilesMatch>
+
+# Deny access to some config/sample files and lock/manifest files
+<FilesMatch "^(config|config\.local|config\.php|composer\.json|composer\.lock|\.env)$">
+  Require all denied
+</FilesMatch>
+
+# Explicitly prevent access to git internals
+RedirectMatch 404 \/\.git
+
+# Block direct requests to the /sql directory
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule ^sql/ - [F,L,NC]
+</IfModule>
+
+# Security headers (optional, harmless if supported)
+<IfModule mod_headers.c>
+  Header set X-Content-Type-Options "nosniff"
+  Header set X-Frame-Options "SAMEORIGIN"
+  Header set X-XSS-Protection "1; mode=block"
+</IfModule>
