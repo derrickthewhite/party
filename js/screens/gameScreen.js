@@ -290,15 +290,9 @@ export function createBaseGameScreen(deps, options) {
 
 		if (game.status === 'closed') {
 			modeInfo.textContent = 'Game has ended. Everything is read-only.';
-			return;
-		}
-
-		if (memberRole === 'observer') {
+		} else if (memberRole === 'observer') {
 			modeInfo.textContent = 'Observer mode: you can read chat and state, but cannot chat or submit actions.';
-			return;
-		}
-
-		if (game.status === 'open') {
+		} else if (game.status === 'open') {
 			modeInfo.textContent = 'Game has not started yet: chat is enabled, game actions are disabled.';
 		} else {
 			modeInfo.textContent = 'Game in progress: chat and actions are enabled for active players.';

@@ -34,15 +34,16 @@ function game_permissions_for_user(array $game, array $user, ?string $memberRole
     $status = (string)$game['status'];
     $isMember = $memberRole !== null;
     $isObserver = $memberRole === 'observer';
-    $isOwner = $memberRole === 'owner';
+    $isOwner = isset($game['owner_user_id']) && (int)$game['owner_user_id'] === (int)($user['id'] ?? 0);
     $isAdmin = (int)($user['is_admin'] ?? 0) === 1;
 
     return [
         'can_start' => ($isOwner || $isAdmin) && $status === 'open',
         'can_end' => ($isOwner || $isAdmin) && $status !== 'closed',
+        'can_end_turn' => ($isOwner || $isAdmin) && $status === 'in_progress',
         'can_delete' => $isOwner || $isAdmin,
-        'can_join_player' => !$isMember && $status !== 'closed',
-        'can_join_observer' => !$isMember && $status !== 'closed',
+        'can_join_player' => !$isMember && $status === 'open',
+        'can_join_observer' => !$isMember,
         'can_chat' => $isMember && !$isObserver && $status !== 'closed',
         'can_act' => $isMember && !$isObserver && $status === 'in_progress',
     ];

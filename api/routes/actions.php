@@ -287,7 +287,9 @@ function rumble_upsert_order(int $gameId): void
     $targetsStmt = db()->prepare(
         'SELECT gm.user_id FROM game_members gm '
         . 'JOIN users u ON u.id = gm.user_id '
-        . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1 AND gm.user_id <> :self_user_id'
+        . 'LEFT JOIN rumble_player_state rps ON rps.game_id = gm.game_id AND rps.user_id = gm.user_id '
+        . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1 '
+        . 'AND gm.user_id <> :self_user_id AND COALESCE(rps.current_health, 100) > 0'
     );
     $targetsStmt->execute([
         'game_id' => $gameId,
@@ -554,12 +556,25 @@ function rumble_resolve_round_and_advance(int $gameId, int $roundNumber): int
         $updateHealthStmt = $pdo->prepare(
             'UPDATE rumble_player_state SET current_health = :current_health WHERE game_id = :game_id AND user_id = :user_id'
         );
+        $defeatedUserIds = [];
         foreach ($nextHealthByUser as $userId => $nextHealth) {
             $updateHealthStmt->execute([
                 'current_health' => $nextHealth,
                 'game_id' => $gameId,
                 'user_id' => $userId,
             ]);
+
+            if ($nextHealth <= 0) {
+                $defeatedUserIds[] = $userId;
+            }
+        }
+
+        if (!empty($defeatedUserIds)) {
+            $rolePlaceholders = implode(',', array_fill(0, count($defeatedUserIds), '?'));
+            $defeatRoleSql = 'UPDATE game_members SET role = ? WHERE game_id = ? AND user_id IN (' . $rolePlaceholders . ') AND role <> ?';
+            $defeatRoleParams = array_merge(['observer', $gameId], $defeatedUserIds, ['observer']);
+            $defeatRoleStmt = $pdo->prepare($defeatRoleSql);
+            $defeatRoleStmt->execute($defeatRoleParams);
         }
 
         $stateStmt = $pdo->prepare(

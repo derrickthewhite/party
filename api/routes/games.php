@@ -107,6 +107,7 @@ SQL;
         }
 
         $permissions = game_permissions_for_user([
+            'owner_user_id' => (int)$row['owner_user_id'],
             'status' => (string)$row['status'],
         ], $user, $memberRole);
 
@@ -235,7 +236,7 @@ function games_join(int $gameId): void
         error_response('Game not found.', 404);
     }
 
-    if ((string)$game['status'] !== 'open' && (string)$game['status'] !== 'in_progress') {
+    if ((string)$game['status'] !== 'open') {
         error_response('Game is not joinable.', 409);
     }
 
@@ -272,10 +273,6 @@ function games_observe(int $gameId): void
     $game = game_find_by_id($gameId);
     if ($game === null) {
         error_response('Game not found.', 404);
-    }
-
-    if ((string)$game['status'] === 'closed') {
-        error_response('Game is not joinable.', 409);
     }
 
     $existingRole = game_member_role((int)$user['id'], $gameId);
@@ -504,12 +501,13 @@ function games_detail(int $gameId): void
         $submittedCount = (int)$submittedStmt->fetchColumn();
 
         $playersStmt = db()->prepare(
-            'SELECT gm.user_id, u.username, COALESCE(rps.current_health, 100) AS current_health '
+            'SELECT gm.user_id, u.username, COALESCE(rps.current_health, 100) AS current_health, gm.role '
             . 'FROM game_members gm '
             . 'JOIN users u ON u.id = gm.user_id '
             . 'LEFT JOIN rumble_player_state rps ON rps.game_id = gm.game_id AND rps.user_id = gm.user_id '
-            . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1 '
-            . 'ORDER BY u.username ASC'
+            . 'WHERE gm.game_id = :game_id AND u.is_active = 1 '
+            . 'AND (gm.role <> :observer_role OR rps.user_id IS NOT NULL) '
+            . 'ORDER BY COALESCE(rps.current_health, 100) > 0 DESC, u.username ASC'
         );
         $playersStmt->execute([
             'game_id' => $gameId,
@@ -522,6 +520,8 @@ function games_detail(int $gameId): void
                 'username' => (string)$row['username'],
                 'health' => max(0, (int)$row['current_health']),
                 'is_self' => (int)$row['user_id'] === (int)$user['id'],
+                'is_defeated' => (int)$row['current_health'] <= 0,
+                'member_role' => (string)$row['role'],
             ];
         }
 

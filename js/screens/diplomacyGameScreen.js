@@ -144,7 +144,7 @@ export function createDiplomacyGameScreen(deps) {
 		sendOrderBtn.disabled = !perms.can_act;
 		orderInput.disabled = !perms.can_act;
 		endTurnBtn.style.display = perms.can_delete ? '' : 'none';
-		endTurnBtn.disabled = !perms.can_end;
+		endTurnBtn.disabled = !perms.can_end_turn;
 
 		if (localDraft.dirty) {
 			if (orderInput.value !== localDraft.orderText) {
@@ -316,7 +316,7 @@ export function createDiplomacyGameScreen(deps) {
 	});
 
 	endTurnBtn.addEventListener('click', async function onEndTurn() {
-		if (!lastGameId || !lastPerms.can_delete || !lastPerms.can_end) {
+		if (!lastGameId || !lastPerms.can_delete || !lastPerms.can_end_turn) {
 			return;
 		}
 

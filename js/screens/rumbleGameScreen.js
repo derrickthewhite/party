@@ -35,6 +35,10 @@ export function createRumbleGameScreen(deps) {
 	attackHelpText.textContent = 'Attack allocations (enter power to send at each target):';
 	attackHelpText.style.margin = '4px 0 8px 0';
 
+	const validationText = document.createElement('p');
+	validationText.style.margin = '0 0 8px 0';
+	validationText.style.fontWeight = '600';
+
 	const playersList = document.createElement('div');
 	playersList.className = 'list';
 
@@ -71,6 +75,7 @@ export function createRumbleGameScreen(deps) {
 	panel.appendChild(progressText);
 	panel.appendChild(defenseText);
 	panel.appendChild(attackHelpText);
+	panel.appendChild(validationText);
 	panel.appendChild(playersList);
 	panel.appendChild(buttonRow);
 	panel.appendChild(lastTurnTitle);
@@ -153,10 +158,10 @@ export function createRumbleGameScreen(deps) {
 		});
 
 		if (attackParts.length === 0) {
-			return 'Defense ' + Math.max(0, Number(order.defense || 0)) + ' | No attacks';
+			return 'Defense ' + Number(order.defense || 0) + ' | No attacks';
 		}
 
-		return 'Defense ' + Math.max(0, Number(order.defense || 0)) + ' | Attacks ' + attackParts.join(', ');
+		return 'Defense ' + Number(order.defense || 0) + ' | Attacks ' + attackParts.join(', ');
 	}
 
 	function getSelfPlayer() {
@@ -179,20 +184,9 @@ export function createRumbleGameScreen(deps) {
 	}
 
 	function getAttackTotal() {
-		const allowedTargets = {};
-		serverSnapshot.players.forEach(function eachPlayer(player) {
-			if (!player.is_self) {
-				allowedTargets[String(Number(player.user_id))] = true;
-			}
-		});
-
 		let total = 0;
 		const effectiveAttacks = getEffectiveAttacks();
 		Object.keys(effectiveAttacks).forEach(function eachAttack(targetId) {
-			if (!allowedTargets[targetId]) {
-				return;
-			}
-
 			const amount = Number(effectiveAttacks[targetId] || 0);
 			if (!Number.isFinite(amount)) {
 				return;
@@ -203,6 +197,47 @@ export function createRumbleGameScreen(deps) {
 		});
 
 		return Math.max(0, total);
+	}
+
+	function getOrderValidation() {
+		const selfPlayer = getSelfPlayer();
+		if (!lastPerms.can_act) {
+			return {
+				defense: selfPlayer ? Number(selfPlayer.health || 0) : 0,
+				invalidDefense: false,
+				invalidTargets: [],
+			};
+		}
+
+		if (hasSubmittedOrder() && !uiState.isEditing) {
+			return {
+				defense: Number(serverSnapshot.currentOrder ? serverSnapshot.currentOrder.defense || 0 : 0),
+				invalidDefense: false,
+				invalidTargets: [],
+			};
+		}
+
+		const attackableTargets = {};
+		serverSnapshot.players.forEach(function eachPlayer(player) {
+			const key = String(Number(player.user_id));
+			const isDefeated = !!player.is_defeated || Number(player.health || 0) <= 0;
+			if (!player.is_self && !isDefeated) {
+				attackableTargets[key] = true;
+			}
+		});
+
+		const effectiveAttacks = getEffectiveAttacks();
+		const invalidTargets = Object.keys(effectiveAttacks).filter(function eachTarget(targetId) {
+			return !attackableTargets[targetId];
+		});
+		const health = selfPlayer ? Number(selfPlayer.health || 0) : 0;
+		const defense = health - getAttackTotal();
+
+		return {
+			defense,
+			invalidDefense: defense < 0,
+			invalidTargets,
+		};
 	}
 
 	function ensurePlayerRow(player) {
@@ -272,6 +307,7 @@ export function createRumbleGameScreen(deps) {
 			const key = String(Number(player.user_id));
 			active.add(key);
 			const refs = ensurePlayerRow(player);
+			const isDefeated = !!player.is_defeated || Number(player.health || 0) <= 0;
 
 			refs.name.textContent = String(player.username || 'Unknown') + ' | Health: ' + Math.max(0, Number(player.health || 0));
 			if (refs.row.parentNode !== playersList) {
@@ -281,7 +317,21 @@ export function createRumbleGameScreen(deps) {
 			}
 
 			if (player.is_self) {
-				refs.label.textContent = 'You';
+				refs.label.textContent = isDefeated ? 'Defeated' : 'You';
+				refs.label.style.display = '';
+				refs.input.style.display = 'none';
+				return;
+			}
+
+			if (isDefeated) {
+				refs.label.textContent = 'Defeated';
+				refs.label.style.display = '';
+				refs.input.style.display = 'none';
+				return;
+			}
+
+			if (!lastPerms.can_act) {
+				refs.label.textContent = 'Active';
 				refs.label.style.display = '';
 				refs.input.style.display = 'none';
 				return;
@@ -373,32 +423,42 @@ export function createRumbleGameScreen(deps) {
 
 	function reconcileUi() {
 		const selfPlayer = getSelfPlayer();
-		const health = Math.max(0, Number(selfPlayer && selfPlayer.health ? selfPlayer.health : 0));
-		const attackTotal = getAttackTotal();
-		const defense = health - attackTotal;
-		const invalid = defense < 0;
+		const validation = getOrderValidation();
+		const canEditOrders = !!lastPerms.can_act;
 
-		if (invalid) {
-			defenseText.textContent = 'Defense: ' + defense + ' (invalid: defense cannot be negative)';
+		if (!selfPlayer) {
+			defenseText.textContent = 'Defense: n/a';
+			validationText.textContent = '';
+			validationText.style.color = '';
+		} else if (validation.invalidDefense) {
+			defenseText.textContent = 'Defense: ' + validation.defense + ' (invalid: defense cannot be negative)';
+			validationText.textContent = 'Orders are invalid: total attacks exceed your available power.';
+			validationText.style.color = '#b42318';
 		} else {
-			defenseText.textContent = 'Defense: ' + defense;
+			defenseText.textContent = 'Defense: ' + validation.defense;
+			if (validation.invalidTargets.length > 0) {
+				validationText.textContent = 'Orders are invalid: remove attacks assigned to defeated or unavailable players.';
+				validationText.style.color = '#b42318';
+			} else {
+				validationText.textContent = '';
+				validationText.style.color = '';
+			}
 		}
 
 		const hasSubmitted = hasSubmittedOrder();
-		const canEditOrders = !!lastPerms.can_act;
 
-		submitBtn.style.display = hasSubmitted && !uiState.isEditing ? 'none' : '';
+		submitBtn.style.display = canEditOrders && !(hasSubmitted && !uiState.isEditing) ? '' : 'none';
 		submitBtn.textContent = hasSubmitted ? 'Save Orders' : 'Submit Orders';
-		submitBtn.disabled = orderBusy || !canEditOrders || invalid;
+		submitBtn.disabled = orderBusy || !canEditOrders;
 
-		editBtn.style.display = hasSubmitted && !uiState.isEditing ? '' : 'none';
+		editBtn.style.display = canEditOrders && hasSubmitted && !uiState.isEditing ? '' : 'none';
 		editBtn.disabled = orderBusy || !canEditOrders;
 
-		cancelBtn.style.display = hasSubmitted ? '' : 'none';
+		cancelBtn.style.display = canEditOrders && hasSubmitted ? '' : 'none';
 		cancelBtn.disabled = orderBusy || !canEditOrders;
 
 		endTurnBtn.style.display = lastPerms.can_delete ? '' : 'none';
-		endTurnBtn.disabled = orderBusy || !lastPerms.can_end;
+		endTurnBtn.disabled = orderBusy || !lastPerms.can_end_turn;
 
 		reconcilePlayersList();
 		reconcilePreviousOrdersList();
@@ -546,9 +606,13 @@ export function createRumbleGameScreen(deps) {
 		}
 
 		const attacks = normalizeAttacksMap(localDraft.attacks);
-		const selfPlayer = getSelfPlayer();
-		const defense = Math.max(0, Number(selfPlayer && selfPlayer.health ? selfPlayer.health : 0)) - getAttackTotal();
-		if (defense < 0) {
+		const validation = getOrderValidation();
+		if (validation.invalidTargets.length > 0) {
+			setStatusNode('Invalid order: remove attacks assigned to defeated or unavailable players.', 'error');
+			return;
+		}
+
+		if (validation.invalidDefense) {
 			setStatusNode('Invalid order: defense cannot be negative.', 'error');
 			return;
 		}
@@ -557,8 +621,9 @@ export function createRumbleGameScreen(deps) {
 		reconcileUi();
 		try {
 			await deps.api.submitRumbleOrder(lastGameId, attacks);
-			await refreshRumbleState({ silent: true });
+			uiState.isEditing = false;
 			localDraft.dirty = false;
+			await refreshRumbleState({ silent: true });
 			setStatusNode('Orders submitted.', 'ok');
 		} catch (err) {
 			setStatusNode(err.message || 'Unable to submit orders.', 'error');
@@ -602,7 +667,7 @@ export function createRumbleGameScreen(deps) {
 	});
 
 	endTurnBtn.addEventListener('click', async function onEndTurn() {
-		if (!lastGameId || !lastPerms.can_delete || !lastPerms.can_end || orderBusy) {
+		if (!lastGameId || !lastPerms.can_delete || !lastPerms.can_end_turn || orderBusy) {
 			return;
 		}
 

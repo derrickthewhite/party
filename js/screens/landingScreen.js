@@ -136,11 +136,19 @@ export function createLandingScreen(deps) {
 			setStatus(status, err.message, 'error');
 		}
 	});
+	createBtn.style.alignSelf = 'flex-end';
+
+	const createControlsRow = document.createElement('div');
+	createControlsRow.className = 'row mobile-stack';
+	createControlsRow.style.alignItems = 'flex-end';
+	createControlsRow.style.gap = '8px';
+	gameTypeWrapper.style.flex = '1';
+	createControlsRow.appendChild(gameTypeWrapper);
+	createControlsRow.appendChild(createBtn);
 
 	createBlock.appendChild(createTitle);
 	createBlock.appendChild(gameTitleWrapper);
-	createBlock.appendChild(gameTypeWrapper);
-	createBlock.appendChild(createBtn);
+	createBlock.appendChild(createControlsRow);
 
 	const status = createStatusNode();
 	status.style.marginTop = '10px';
@@ -187,6 +195,8 @@ export function createLandingScreen(deps) {
 	const emptyListNode = document.createElement('p');
 	emptyListNode.textContent = 'No games yet. Create one to get started.';
 	list.appendChild(emptyListNode);
+	let autoRefreshId = null;
+	let autoRefreshBusy = false;
 
 	root.appendChild(headingRow);
 	root.appendChild(userLabel);
@@ -194,6 +204,50 @@ export function createLandingScreen(deps) {
 	root.appendChild(status);
 	root.appendChild(listHeader);
 	root.appendChild(list);
+
+	function stopAutoRefresh() {
+		if (autoRefreshId === null) {
+			return;
+		}
+
+		clearInterval(autoRefreshId);
+		autoRefreshId = null;
+	}
+
+	function startAutoRefresh() {
+		if (autoRefreshId !== null) {
+			return;
+		}
+
+		autoRefreshId = setInterval(async function autoRefreshTick() {
+			if (autoRefreshBusy) {
+				return;
+			}
+
+			const current = state.state;
+			if (current.screen !== 'landing' || !current.user) {
+				stopAutoRefresh();
+				return;
+			}
+
+			autoRefreshBusy = true;
+			try {
+				await refreshGames();
+			} catch (err) {
+			} finally {
+				autoRefreshBusy = false;
+			}
+		}, 30000);
+	}
+
+	state.subscribe(function onLandingStateChanged(current) {
+		if (current.screen === 'landing' && current.user) {
+			startAutoRefresh();
+			return;
+		}
+
+		stopAutoRefresh();
+	});
 
 	function renderGames(games) {
 		syncGameTypeOptions();
@@ -217,8 +271,11 @@ export function createLandingScreen(deps) {
 
 			const ownerInfo = document.createElement('span');
 			const ownerSeparator = document.createTextNode(' | ');
-			const memberInfo = document.createElement('span');
-			memberInfo.className = 'game-members-summary';
+			const playersInfo = document.createElement('span');
+			playersInfo.className = 'game-players-summary';
+			const playersSeparator = document.createTextNode(' | ');
+			const observersInfo = document.createElement('span');
+			observersInfo.className = 'game-observers-summary';
 			const statusSeparator = document.createTextNode(' | ');
 			const statusInfo = document.createElement('span');
 			const progressSeparator = document.createTextNode('');
@@ -226,7 +283,9 @@ export function createLandingScreen(deps) {
 
 			info.appendChild(ownerInfo);
 			info.appendChild(ownerSeparator);
-			info.appendChild(memberInfo);
+			info.appendChild(playersInfo);
+			info.appendChild(playersSeparator);
+			info.appendChild(observersInfo);
 			info.appendChild(statusSeparator);
 			info.appendChild(statusInfo);
 			info.appendChild(progressSeparator);
@@ -390,7 +449,8 @@ export function createLandingScreen(deps) {
 				item,
 				name,
 				ownerInfo,
-				memberInfo,
+				playersInfo,
+				observersInfo,
 				statusInfo,
 				progressSeparator,
 				progressInfo,
@@ -415,15 +475,28 @@ export function createLandingScreen(deps) {
 
 			refs.name.textContent = game.title + ' (' + game.game_type + ')';
 			refs.ownerInfo.textContent = 'Owner: ' + game.owner_username;
-			refs.memberInfo.textContent = 'Members: ' + game.member_count;
+			refs.playersInfo.textContent = 'Players: ' + Number(game.player_count || 0);
+			refs.observersInfo.textContent = 'Observers: ' + Number(game.observer_count || 0);
 			refs.statusInfo.textContent = 'Status: ' + game.status;
 
-			const memberText = (game.members || [])
-				.map(function eachMember(member) {
-					return member.username + ' [' + member.role + ']';
-				})
-				.join('\n');
-			refs.memberInfo.title = memberText ? 'Members:\n' + memberText : 'Members: none';
+			const players = (game.members || []).filter(function eachMember(member) {
+				return String(member.role || '').toLowerCase() !== 'observer';
+			});
+			const observers = (game.members || []).filter(function eachMember(member) {
+				return String(member.role || '').toLowerCase() === 'observer';
+			});
+			const playerText = players.length > 0
+				? players.map(function eachPlayer(member) {
+					return member.username;
+				}).join('\n')
+				: 'None';
+			const observerText = observers.length > 0
+				? observers.map(function eachObserver(member) {
+					return member.username;
+				}).join('\n')
+				: 'None';
+			refs.playersInfo.title = 'Players:\n' + playerText;
+			refs.observersInfo.title = 'Observers:\n' + observerText;
 			refs.item.title = '';
 
 			const hasPhase = game.phase != null && String(game.phase).trim() !== '';
