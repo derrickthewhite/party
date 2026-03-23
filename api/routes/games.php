@@ -75,14 +75,17 @@ SELECT
   g.game_type,
   g.status,
   g.created_at,
+    gs.phase,
+    gs.current_round,
   u.username AS owner_username,
     COUNT(DISTINCT gm.user_id) AS member_count,
     SUM(CASE WHEN gm.role = 'observer' THEN 1 ELSE 0 END) AS observer_count,
     SUM(CASE WHEN gm.role <> 'observer' THEN 1 ELSE 0 END) AS player_count
 FROM games g
 JOIN users u ON u.id = g.owner_user_id
+LEFT JOIN game_state gs ON gs.game_id = g.id
 LEFT JOIN game_members gm ON gm.game_id = g.id
-GROUP BY g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, u.username
+GROUP BY g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, gs.phase, gs.current_round, u.username
 ORDER BY g.created_at DESC
 LIMIT 100
 SQL;
@@ -114,6 +117,8 @@ SQL;
             'status' => (string)$row['status'],
             'created_at' => (string)$row['created_at'],
             'owner_username' => (string)$row['owner_username'],
+            'phase' => (string)($row['phase'] ?? default_phase_for_game_type((string)$row['game_type'])),
+            'current_round' => (int)($row['current_round'] ?? 1),
             'member_count' => (int)$row['member_count'],
             'observer_count' => (int)($row['observer_count'] ?? 0),
             'player_count' => (int)($row['player_count'] ?? 0),

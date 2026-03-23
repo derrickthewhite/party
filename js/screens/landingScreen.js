@@ -1,4 +1,4 @@
-import { createStatusNode, labelAndInput, setStatus, showConfirmModal } from './dom.js';
+import { createStatusNode, setStatus, showConfirmModal } from './dom.js';
 
 export function createLandingScreen(deps) {
 	const api = deps.api;
@@ -72,7 +72,15 @@ export function createLandingScreen(deps) {
 	const createTitle = document.createElement('h3');
 	createTitle.textContent = 'Create a game';
 
-	const gameTitle = labelAndInput('Game title', 'text', 'Friday party game');
+	const gameTitleWrapper = document.createElement('div');
+	gameTitleWrapper.className = 'column';
+
+	const gameTitleInput = document.createElement('input');
+	gameTitleInput.type = 'text';
+	gameTitleInput.placeholder = 'Game Title';
+
+	gameTitleWrapper.appendChild(gameTitleInput);
+
 	const gameTypeWrapper = document.createElement('div');
 	gameTypeWrapper.className = 'column';
 
@@ -116,12 +124,12 @@ export function createLandingScreen(deps) {
 	gameTypeWrapper.appendChild(gameTypeSelect);
 
 	const createBtn = document.createElement('button');
-	createBtn.className = 'primary';
+	createBtn.className = 'primary lobby-create-button';
 	createBtn.textContent = 'Create';
 	createBtn.addEventListener('click', async function onCreate() {
 		try {
 			setStatus(status, 'Creating game...', '');
-			await api.createGame(gameTitle.input.value.trim(), gameTypeSelect.value);
+			await api.createGame(gameTitleInput.value.trim(), gameTypeSelect.value);
 			await refreshGames();
 			setStatus(status, 'Game created.', 'ok');
 		} catch (err) {
@@ -130,7 +138,7 @@ export function createLandingScreen(deps) {
 	});
 
 	createBlock.appendChild(createTitle);
-	createBlock.appendChild(gameTitle.wrapper);
+	createBlock.appendChild(gameTitleWrapper);
 	createBlock.appendChild(gameTypeWrapper);
 	createBlock.appendChild(createBtn);
 
@@ -206,10 +214,32 @@ export function createLandingScreen(deps) {
 
 			const name = document.createElement('strong');
 			const info = document.createElement('p');
-			const memberList = document.createElement('p');
+
+			const ownerInfo = document.createElement('span');
+			const ownerSeparator = document.createTextNode(' | ');
+			const memberInfo = document.createElement('span');
+			memberInfo.className = 'game-members-summary';
+			const statusSeparator = document.createTextNode(' | ');
+			const statusInfo = document.createElement('span');
+			const progressSeparator = document.createTextNode('');
+			const progressInfo = document.createElement('span');
+
+			info.appendChild(ownerInfo);
+			info.appendChild(ownerSeparator);
+			info.appendChild(memberInfo);
+			info.appendChild(statusSeparator);
+			info.appendChild(statusInfo);
+			info.appendChild(progressSeparator);
+			info.appendChild(progressInfo);
 
 			const controls = document.createElement('div');
-			controls.className = 'row';
+			controls.className = 'row game-item-bar';
+
+			const primaryControls = document.createElement('div');
+			primaryControls.className = 'row game-item-controls-left';
+
+			const adminControls = document.createElement('div');
+			adminControls.className = 'row game-item-controls-right';
 
 			const rowState = { game: null };
 
@@ -217,7 +247,7 @@ export function createLandingScreen(deps) {
 			join.textContent = 'Join';
 			join.addEventListener('click', async function onJoin() {
 				const active = rowState.game;
-				if (!active || join.disabled) {
+				if (!active || join.style.display === 'none') {
 					return;
 				}
 				try {
@@ -234,7 +264,7 @@ export function createLandingScreen(deps) {
 			observe.textContent = 'Observe';
 			observe.addEventListener('click', async function onObserve() {
 				const active = rowState.game;
-				if (!active || observe.disabled) {
+				if (!active || observe.style.display === 'none') {
 					return;
 				}
 				try {
@@ -343,19 +373,35 @@ export function createLandingScreen(deps) {
 				}
 			});
 
-			controls.appendChild(join);
-			controls.appendChild(observe);
-			controls.appendChild(open);
-			controls.appendChild(start);
-			controls.appendChild(end);
-			controls.appendChild(remove);
+			primaryControls.appendChild(join);
+			primaryControls.appendChild(observe);
+			primaryControls.appendChild(open);
+			adminControls.appendChild(start);
+			adminControls.appendChild(end);
+			adminControls.appendChild(remove);
+			controls.appendChild(primaryControls);
+			controls.appendChild(adminControls);
 
 			item.appendChild(name);
 			item.appendChild(info);
-			item.appendChild(memberList);
 			item.appendChild(controls);
 
-			const refs = { item, name, info, memberList, join, observe, open, start, end, remove, rowState };
+			const refs = {
+				item,
+				name,
+				ownerInfo,
+				memberInfo,
+				statusInfo,
+				progressSeparator,
+				progressInfo,
+				join,
+				observe,
+				open,
+				start,
+				end,
+				remove,
+				rowState,
+			};
 			gameRowsById.set(key, refs);
 			list.appendChild(item);
 			return refs;
@@ -368,14 +414,34 @@ export function createLandingScreen(deps) {
 			refs.rowState.game = game;
 
 			refs.name.textContent = game.title + ' (' + game.game_type + ')';
-			refs.info.textContent = 'Owner: ' + game.owner_username + ' | Members: ' + game.member_count + ' | Status: ' + game.status;
+			refs.ownerInfo.textContent = 'Owner: ' + game.owner_username;
+			refs.memberInfo.textContent = 'Members: ' + game.member_count;
+			refs.statusInfo.textContent = 'Status: ' + game.status;
 
 			const memberText = (game.members || [])
 				.map(function eachMember(member) {
 					return member.username + ' [' + member.role + ']';
 				})
-				.join(', ');
-			refs.memberList.textContent = memberText ? 'Members: ' + memberText : 'Members: none';
+				.join('\n');
+			refs.memberInfo.title = memberText ? 'Members:\n' + memberText : 'Members: none';
+			refs.item.title = '';
+
+			const hasPhase = game.phase != null && String(game.phase).trim() !== '';
+			const hasRound = game.current_round != null && !Number.isNaN(Number(game.current_round));
+			if (hasPhase || hasRound) {
+				const progressParts = [];
+				if (hasPhase) {
+					progressParts.push('Phase: ' + String(game.phase));
+				}
+				if (hasRound) {
+					progressParts.push('Round: ' + String(Number(game.current_round)));
+				}
+				refs.progressSeparator.textContent = ' | ';
+				refs.progressInfo.textContent = progressParts.join(' | ');
+			} else {
+				refs.progressSeparator.textContent = '';
+				refs.progressInfo.textContent = '';
+			}
 
 			const permissions = game.permissions || {};
 			const alreadyMember = !!game.is_member;
@@ -396,9 +462,11 @@ export function createLandingScreen(deps) {
 
 			const canOpen = alreadyMember || observerRole || inMemberList;
 			const isOwnerOrAdmin = !!permissions.can_delete;
+			const canJoinPlayer = !!permissions.can_join_player;
+			const canJoinObserver = !!permissions.can_join_observer;
 
-			refs.join.disabled = alreadyMember;
-			refs.observe.disabled = alreadyMember;
+			refs.join.style.display = canJoinPlayer ? '' : 'none';
+			refs.observe.style.display = canJoinObserver ? '' : 'none';
 			refs.open.style.display = canOpen ? '' : 'none';
 
 			refs.start.style.display = isOwnerOrAdmin ? '' : 'none';

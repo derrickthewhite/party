@@ -1,0 +1,256 @@
+:root {
+  --bg-1: #f7f4ef;
+  --bg-2: #f0e8da;
+  --card: #fffdf8;
+  --ink: #1f2528;
+  --muted: #566168;
+  --accent: #d04a2a;
+  --accent-2: #2f7d8c;
+  --line: #ded4c4;
+  --success: #2d7d57;
+  --danger: #a22727;
+  --radius: 14px;
+  --shadow: 0 10px 30px rgba(43, 36, 21, 0.08);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: "Trebuchet MS", "Segoe UI", sans-serif;
+  color: var(--ink);
+  background:
+    radial-gradient(1000px 600px at 10% -20%, #fff8e6 0%, transparent 60%),
+    radial-gradient(800px 500px at 100% 0%, #e6f7fb 0%, transparent 55%),
+    linear-gradient(180deg, var(--bg-1), var(--bg-2));
+  min-height: 100vh;
+}
+
+#app {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 18px;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+h1, h2, h3 {
+  margin: 0 0 8px;
+  line-height: 1.2;
+}
+
+p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.top-user-label {
+  margin-top: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+
+input, button, select {
+  font: inherit;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+}
+
+input, select {
+  width: 100%;
+  background: #fff;
+}
+
+button {
+  cursor: pointer;
+  background: #fff;
+}
+
+button.primary {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent);
+}
+
+button.secondary {
+  background: var(--accent-2);
+  color: #fff;
+  border-color: var(--accent-2);
+}
+
+button.link {
+  border: none;
+  background: transparent;
+  color: var(--accent);
+  padding: 6px;
+}
+
+button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.screen {
+  animation: fade-in 180ms ease;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.message-feed {
+  height: 320px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+}
+
+.message-item {
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px dashed #eadfce;
+}
+
+.message-item:last-child {
+  border-bottom: none;
+  margin-bottom: 0;
+}
+
+.status {
+  min-height: 22px;
+  color: var(--muted);
+}
+
+.status.error { color: var(--danger); }
+.status.ok { color: var(--success); }
+
+.list {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.game-item {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px;
+  background: #fff;
+}
+
+.game-item-bar {
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-top: 10px;
+}
+
+.game-item-controls-left,
+.game-item-controls-right {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.game-item-controls-right {
+  justify-content: flex-end;
+  margin-left: auto;
+}
+
+.game-members-summary {
+  color: inherit;
+}
+
+.lobby-create-button {
+  margin-top: 3px;
+}
+
+.chat-composer-row {
+  flex-wrap: nowrap;
+  align-items: stretch;
+}
+
+.chat-composer-input {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.chat-composer-send {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1200;
+  background: rgba(20, 18, 14, 0.42);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.modal-card {
+  width: min(460px, 100%);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--card);
+  box-shadow: 0 16px 40px rgba(22, 18, 10, 0.24);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.modal-message {
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 760px) {
+  #app { padding: 14px; }
+  .row.mobile-stack { flex-direction: column; align-items: stretch; }
+  .game-item-bar {
+    align-items: stretch;
+  }
+  .game-item-controls-right {
+    margin-left: 0;
+  }
+  .chat-composer-row {
+    align-items: stretch;
+  }
+}

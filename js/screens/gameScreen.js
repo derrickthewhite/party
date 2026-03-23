@@ -44,16 +44,18 @@ export function createBaseGameScreen(deps, options) {
 	feed.className = 'message-feed';
 
 	const composerRow = document.createElement('div');
-	composerRow.className = 'row mobile-stack';
+	composerRow.className = 'row chat-composer-row';
 	composerRow.style.marginTop = '10px';
 
 	const messageInput = document.createElement('input');
 	messageInput.type = 'text';
 	messageInput.placeholder = 'Type a message';
+	messageInput.className = 'chat-composer-input';
 
 	const sendButton = document.createElement('button');
 	sendButton.className = 'primary';
 	sendButton.textContent = 'Send';
+	sendButton.classList.add('chat-composer-send');
 	sendButton.addEventListener('click', async function onSendClick() {
 		const activeGame = state.state.activeGame;
 		if (!activeGame) {
