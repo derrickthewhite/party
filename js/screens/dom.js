@@ -1,30 +1,45 @@
-export function clearNode(node) {
- 	while (node.firstChild) {
-		node.removeChild(node.firstChild);
+export function createNodeFromHtml(html) {
+	const template = document.createElement('template');
+	template.innerHTML = String(html || '').trim();
+	if (template.content.childElementCount !== 1) {
+		throw new Error('Template HTML must produce exactly one root element.');
 	}
+
+	return template.content.firstElementChild;
 }
 
-export function labelAndInput(labelText, inputType, placeholder) {
-	const wrapper = document.createElement('div');
-	wrapper.className = 'column';
-
-	const label = document.createElement('label');
-	label.textContent = labelText;
-
-	const input = document.createElement('input');
-	input.type = inputType;
-	input.placeholder = placeholder || '';
-
-	wrapper.appendChild(label);
-	wrapper.appendChild(input);
-
-	return { wrapper, input };
+export function createTemplate(html) {
+	const template = document.createElement('template');
+	template.innerHTML = String(html || '').trim();
+	return template;
 }
 
-export function createStatusNode() {
-	const node = document.createElement('div');
-	node.className = 'status';
-	return node;
+export function cloneTemplateNode(template) {
+	if (!template || !template.content || !template.content.firstElementChild) {
+		throw new Error('Template must contain a root element.');
+	}
+
+	return template.content.firstElementChild.cloneNode(true);
+}
+
+export function collectRefs(root) {
+	const refs = {};
+	if (root && root.nodeType === Node.ELEMENT_NODE && root.hasAttribute('data-ref')) {
+		refs[root.getAttribute('data-ref')] = root;
+	}
+
+	if (!root || typeof root.querySelectorAll !== 'function') {
+		return refs;
+	}
+
+	root.querySelectorAll('[data-ref]').forEach(function eachRef(node) {
+		const key = node.getAttribute('data-ref');
+		if (key && !refs[key]) {
+			refs[key] = node;
+		}
+	});
+
+	return refs;
 }
 
 export function setStatus(node, text, kind) {

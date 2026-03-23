@@ -1,4 +1,4 @@
-import { createStatusNode, labelAndInput, setStatus } from './dom.js';
+import { collectRefs, createNodeFromHtml, setStatus } from './dom.js';
 import { startClientHandshake } from '../srpClient.js';
 import { isSafeNext } from '../url-utils.js';
 
@@ -21,35 +21,44 @@ export function createSigninScreen(deps) {
 		state.setScreen(screen);
 	};
 
-	const root = document.createElement('section');
-	root.className = 'screen card';
+	const root = createNodeFromHtml(`
+		<section class="screen card">
+			<h2>Signin</h2>
+			<form data-ref="form">
+				<div class="column">
+					<label for="signin-username">Username</label>
+					<input id="signin-username" type="text" placeholder="Your handle" data-ref="username">
+				</div>
+				<div class="column">
+					<label for="signin-password">Password</label>
+					<input id="signin-password" type="password" placeholder="Password" data-ref="password">
+				</div>
+				<div class="status" data-ref="status"></div>
+				<div class="row mobile-stack">
+					<button class="primary" type="submit" data-ref="submit">Sign in</button>
+					<button class="link" type="button" data-ref="back">Back</button>
+				</div>
+			</form>
+		</section>
+	`);
+	const refs = collectRefs(root);
+	const form = refs.form;
+	const username = refs.username;
+	const password = refs.password;
+	const status = refs.status;
 
-	const title = document.createElement('h2');
-	title.textContent = 'Signin';
+	username.name = 'username';
+	username.autocomplete = 'username';
+	username.autocapitalize = 'off';
+	username.spellcheck = false;
+	password.name = 'password';
+	password.autocomplete = 'current-password';
 
-	const username = labelAndInput('Username', 'text', 'Your handle');
-	const password = labelAndInput('Password', 'password', 'Password');
-	const form = document.createElement('form');
-	const status = createStatusNode();
-
-	const controls = document.createElement('div');
-	controls.className = 'row mobile-stack';
-	username.input.name = 'username';
-	username.input.autocomplete = 'username';
-	username.input.autocapitalize = 'off';
-	username.input.spellcheck = false;
-	password.input.name = 'password';
-	password.input.autocomplete = 'current-password';
-
-	const submit = document.createElement('button');
-	submit.className = 'primary';
-	submit.textContent = 'Sign in';
-	submit.type = 'submit';
 	form.addEventListener('submit', async function onSubmit(event) {
 		event.preventDefault();
 		try {
-			const trimmedUsername = username.input.value.trim();
-			const rawPassword = password.input.value;
+			const trimmedUsername = username.value.trim();
+			const rawPassword = password.value;
 
 			if (trimmedUsername === '' || rawPassword === '') {
 				throw new Error('Username and password are required.');
@@ -65,7 +74,7 @@ export function createSigninScreen(deps) {
 				throw new Error('Unable to verify server auth proof.');
 			}
 
-			password.input.value = '';
+			password.value = '';
 			state.patch({ user: result.user });
 			setStatus(status, '', '');
 			await refreshGames();
@@ -97,24 +106,9 @@ export function createSigninScreen(deps) {
 		}
 	});
 
-	const back = document.createElement('button');
-	back.className = 'link';
-	back.textContent = 'Back';
-	back.type = 'button';
-	back.addEventListener('click', function onBack() {
+	refs.back.addEventListener('click', function onBack() {
 		navigateToScreen('welcome');
 	});
-
-	controls.appendChild(submit);
-	controls.appendChild(back);
-
-	form.appendChild(username.wrapper);
-	form.appendChild(password.wrapper);
-	form.appendChild(status);
-	form.appendChild(controls);
-
-	root.appendChild(title);
-	root.appendChild(form);
 
 	return {
 		root,

@@ -1,61 +1,46 @@
+import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate } from './dom.js';
 import { createBaseGameScreen } from './gameScreen.js';
 
 export function createDiplomacyGameScreen(deps) {
-	const orderPanel = document.createElement('div');
-	orderPanel.className = 'card';
+	const orderPanel = createNodeFromHtml(`
+		<div class="card">
+			<div class="row">
+				<h3>Diplomacy Orders</h3>
+				<div data-ref="orderHeaderSpacer"></div>
+				<button data-ref="refreshOrdersBtn">Refresh</button>
+			</div>
+			<div class="row mobile-stack">
+				<input type="text" placeholder="Enter your order text" data-ref="orderInput">
+				<button class="primary" data-ref="sendOrderBtn">Send Order</button>
+				<button data-ref="endTurnBtn">End Turn</button>
+			</div>
+			<p class="top-user-label" data-ref="progressText">Orders submitted this turn: 0/0</p>
+			<h4 data-ref="revealedTitle">Revealed Orders (Previous Round)</h4>
+			<div class="list" data-ref="ordersList">
+				<p data-ref="emptyOrdersNode">No completed rounds yet.</p>
+			</div>
+		</div>
+	`);
+	const refs = collectRefs(orderPanel);
+	const rowTemplate = createTemplate(`
+		<div class="message-item">
+			<small data-ref="meta"></small>
+			<div data-ref="text"></div>
+		</div>
+	`);
+	const refreshOrdersBtn = refs.refreshOrdersBtn;
+	const orderInput = refs.orderInput;
+	const sendOrderBtn = refs.sendOrderBtn;
+	const endTurnBtn = refs.endTurnBtn;
+	const progressText = refs.progressText;
+	const revealedTitle = refs.revealedTitle;
+	const ordersList = refs.ordersList;
+	const emptyOrdersNode = refs.emptyOrdersNode;
+
 	orderPanel.style.marginTop = '8px';
-
-	const orderHeader = document.createElement('div');
-	orderHeader.className = 'row';
-
-	const orderTitle = document.createElement('h3');
-	orderTitle.textContent = 'Diplomacy Orders';
-
-	const orderHeaderSpacer = document.createElement('div');
-	orderHeaderSpacer.style.flex = '1';
-
-	const refreshOrdersBtn = document.createElement('button');
-	refreshOrdersBtn.textContent = 'Refresh';
+	refs.orderHeaderSpacer.style.flex = '1';
+	refs.revealedTitle.style.marginTop = '10px';
 	let refreshOrdersBusy = false;
-
-	orderHeader.appendChild(orderTitle);
-	orderHeader.appendChild(orderHeaderSpacer);
-	orderHeader.appendChild(refreshOrdersBtn);
-
-	const orderRow = document.createElement('div');
-	orderRow.className = 'row mobile-stack';
-
-	const orderInput = document.createElement('input');
-	orderInput.type = 'text';
-	orderInput.placeholder = 'Enter your order text';
-
-	const sendOrderBtn = document.createElement('button');
-	sendOrderBtn.className = 'primary';
-	sendOrderBtn.textContent = 'Send Order';
-
-	const endTurnBtn = document.createElement('button');
-	endTurnBtn.textContent = 'End Turn';
-
-	orderRow.appendChild(orderInput);
-	orderRow.appendChild(sendOrderBtn);
-	orderRow.appendChild(endTurnBtn);
-
-	const revealedTitle = document.createElement('h4');
-	revealedTitle.textContent = 'Revealed Orders (Previous Round)';
-	revealedTitle.style.marginTop = '10px';
-
-	const progressText = document.createElement('p');
-	progressText.className = 'top-user-label';
-	progressText.textContent = 'Orders submitted this turn: 0/0';
-
-	const ordersList = document.createElement('div');
-	ordersList.className = 'list';
-
-	orderPanel.appendChild(orderHeader);
-	orderPanel.appendChild(orderRow);
-	orderPanel.appendChild(progressText);
-	orderPanel.appendChild(revealedTitle);
-	orderPanel.appendChild(ordersList);
 
 	let lastGameId = null;
 	let lastRound = 1;
@@ -79,9 +64,6 @@ export function createDiplomacyGameScreen(deps) {
 	};
 
 	const previousOrderRowsById = new Map();
-	const emptyOrdersNode = document.createElement('p');
-	emptyOrdersNode.textContent = 'No completed rounds yet.';
-	ordersList.appendChild(emptyOrdersNode);
 
 	function reconcileOrdersList() {
 		const rows = Array.isArray(serverSnapshot.revealedOrders) ? serverSnapshot.revealedOrders : [];
@@ -94,15 +76,9 @@ export function createDiplomacyGameScreen(deps) {
 
 			let refs = previousOrderRowsById.get(key);
 			if (!refs) {
-				const line = document.createElement('div');
-				line.className = 'message-item';
-
-				const meta = document.createElement('small');
-				const text = document.createElement('div');
-
-				line.appendChild(meta);
-				line.appendChild(text);
-				refs = { line, meta, text };
+				const line = cloneTemplateNode(rowTemplate);
+				const rowRefs = collectRefs(line);
+				refs = { line, meta: rowRefs.meta, text: rowRefs.text };
 				previousOrderRowsById.set(key, refs);
 			}
 

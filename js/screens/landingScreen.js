@@ -1,4 +1,4 @@
-import { createStatusNode, setStatus, showConfirmModal } from './dom.js';
+import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate, setStatus, showConfirmModal } from './dom.js';
 
 export function createLandingScreen(deps) {
 	const api = deps.api;
@@ -7,20 +7,94 @@ export function createLandingScreen(deps) {
 	const refreshGames = deps.refreshGames;
 	const openGame = deps.openGame;
 
-	const root = document.createElement('section');
-	root.className = 'screen card';
+	const root = createNodeFromHtml(`
+		<section class="screen card">
+			<div class="row">
+				<h2>Game Lobby</h2>
+				<div data-ref="headingSpacer"></div>
+				<button data-ref="refresh">Refresh</button>
+				<button class="link" data-ref="signout">Sign out</button>
+			</div>
+			<p class="top-user-label" data-ref="userLabel"></p>
+			<div class="card" data-ref="createBlock">
+				<h3>Create a game</h3>
+				<div class="column">
+					<input type="text" placeholder="Game Title" data-ref="gameTitleInput">
+				</div>
+				<div class="row mobile-stack" data-ref="createControlsRow">
+					<div class="column" data-ref="gameTypeWrapper">
+						<label>Game type</label>
+						<select data-ref="gameTypeSelect">
+							<option value="chat">Chat</option>
+							<option value="mafia">Mafia</option>
+							<option value="diplomacy">Diplomacy</option>
+							<option value="rumble">Rumble</option>
+							<option value="stub" data-ref="stubOption">Stub</option>
+						</select>
+					</div>
+					<button class="primary lobby-create-button" data-ref="createBtn">Create</button>
+				</div>
+			</div>
+			<div class="status" data-ref="status"></div>
+			<div class="row" data-ref="listHeader">
+				<h3>Available games</h3>
+				<div data-ref="listHeaderSpacer"></div>
+				<button data-ref="listRefresh">Refresh</button>
+			</div>
+			<div class="list" data-ref="list">
+				<p data-ref="emptyListNode">No games yet. Create one to get started.</p>
+			</div>
+		</section>
+	`);
+	const refs = collectRefs(root);
+	const refresh = refs.refresh;
+	const signout = refs.signout;
+	const userLabel = refs.userLabel;
+	const gameTitleInput = refs.gameTitleInput;
+	const gameTypeSelect = refs.gameTypeSelect;
+	const createBtn = refs.createBtn;
+	const status = refs.status;
+	const listRefresh = refs.listRefresh;
+	const list = refs.list;
+	const emptyListNode = refs.emptyListNode;
+	const rowTemplate = createTemplate(`
+		<div class="game-item">
+			<strong data-ref="name"></strong>
+			<p>
+				<span data-ref="ownerInfo"></span>
+				<span> | </span>
+				<span class="game-players-summary" data-ref="playersInfo"></span>
+				<span> | </span>
+				<span class="game-observers-summary" data-ref="observersInfo"></span>
+				<span> | </span>
+				<span data-ref="statusInfo"></span>
+				<span data-ref="progressSeparator"></span>
+				<span data-ref="progressInfo"></span>
+			</p>
+			<div class="row game-item-bar">
+				<div class="row game-item-controls-left">
+					<button data-ref="join">Join</button>
+					<button data-ref="observe">Observe</button>
+					<button class="secondary" data-ref="open">Open</button>
+				</div>
+				<div class="row game-item-controls-right">
+					<button data-ref="start">Start</button>
+					<button data-ref="end">End</button>
+					<button data-ref="remove">Delete</button>
+				</div>
+			</div>
+		</div>
+	`);
 
-	const headingRow = document.createElement('div');
-	headingRow.className = 'row';
-
-	const title = document.createElement('h2');
-	title.textContent = 'Game Lobby';
-
-	const spacer = document.createElement('div');
-	spacer.style.flex = '1';
-
-	const refresh = document.createElement('button');
-	refresh.textContent = 'Refresh';
+	refs.headingSpacer.style.flex = '1';
+	refs.createBlock.style.marginTop = '12px';
+	refs.createControlsRow.style.alignItems = 'flex-end';
+	refs.createControlsRow.style.gap = '8px';
+	refs.gameTypeWrapper.style.flex = '1';
+	createBtn.style.alignSelf = 'flex-end';
+	status.style.marginTop = '10px';
+	refs.listHeader.style.marginTop = '14px';
+	refs.listHeaderSpacer.style.flex = '1';
 	let headingRefreshBusy = false;
 	refresh.addEventListener('click', async function onRefreshHeading() {
 		if (headingRefreshBusy) {
@@ -40,10 +114,6 @@ export function createLandingScreen(deps) {
 			refresh.textContent = 'Refresh';
 		}
 	});
-
-	const signout = document.createElement('button');
-	signout.className = 'link';
-	signout.textContent = 'Sign out';
 	signout.addEventListener('click', async function onSignout() {
 		try {
 			await api.signout();
@@ -56,59 +126,9 @@ export function createLandingScreen(deps) {
 		});
 		state.setScreen('welcome');
 	});
-
-	headingRow.appendChild(title);
-	headingRow.appendChild(spacer);
-	headingRow.appendChild(refresh);
-	headingRow.appendChild(signout);
-
-	const userLabel = document.createElement('p');
-	userLabel.className = 'top-user-label';
-
-	const createBlock = document.createElement('div');
-	createBlock.className = 'card';
-	createBlock.style.marginTop = '12px';
-
-	const createTitle = document.createElement('h3');
-	createTitle.textContent = 'Create a game';
-
-	const gameTitleWrapper = document.createElement('div');
-	gameTitleWrapper.className = 'column';
-
-	const gameTitleInput = document.createElement('input');
-	gameTitleInput.type = 'text';
-	gameTitleInput.placeholder = 'Game Title';
-
-	gameTitleWrapper.appendChild(gameTitleInput);
-
-	const gameTypeWrapper = document.createElement('div');
-	gameTypeWrapper.className = 'column';
-
-	const gameTypeLabel = document.createElement('label');
-	gameTypeLabel.textContent = 'Game type';
-
-	const gameTypeSelect = document.createElement('select');
 	const gameTypeOptions = {
-		chat: null,
-		mafia: null,
-		diplomacy: null,
-		rumble: null,
-		stub: null,
+		stub: refs.stubOption,
 	};
-
-	function createGameTypeOption(value, text) {
-		const option = document.createElement('option');
-		option.value = value;
-		option.textContent = text;
-		gameTypeSelect.appendChild(option);
-		return option;
-	}
-
-	gameTypeOptions.chat = createGameTypeOption('chat', 'Chat');
-	gameTypeOptions.mafia = createGameTypeOption('mafia', 'Mafia');
-	gameTypeOptions.diplomacy = createGameTypeOption('diplomacy', 'Diplomacy');
-	gameTypeOptions.rumble = createGameTypeOption('rumble', 'Rumble');
-	gameTypeOptions.stub = createGameTypeOption('stub', 'Stub');
 
 	function syncGameTypeOptions() {
 		const isAdmin = !!(state.state.user && state.state.user.is_admin);
@@ -119,13 +139,6 @@ export function createLandingScreen(deps) {
 	}
 
 	syncGameTypeOptions();
-
-	gameTypeWrapper.appendChild(gameTypeLabel);
-	gameTypeWrapper.appendChild(gameTypeSelect);
-
-	const createBtn = document.createElement('button');
-	createBtn.className = 'primary lobby-create-button';
-	createBtn.textContent = 'Create';
 	createBtn.addEventListener('click', async function onCreate() {
 		try {
 			setStatus(status, 'Creating game...', '');
@@ -136,35 +149,6 @@ export function createLandingScreen(deps) {
 			setStatus(status, err.message, 'error');
 		}
 	});
-	createBtn.style.alignSelf = 'flex-end';
-
-	const createControlsRow = document.createElement('div');
-	createControlsRow.className = 'row mobile-stack';
-	createControlsRow.style.alignItems = 'flex-end';
-	createControlsRow.style.gap = '8px';
-	gameTypeWrapper.style.flex = '1';
-	createControlsRow.appendChild(gameTypeWrapper);
-	createControlsRow.appendChild(createBtn);
-
-	createBlock.appendChild(createTitle);
-	createBlock.appendChild(gameTitleWrapper);
-	createBlock.appendChild(createControlsRow);
-
-	const status = createStatusNode();
-	status.style.marginTop = '10px';
-
-	const listHeader = document.createElement('div');
-	listHeader.className = 'row';
-	listHeader.style.marginTop = '14px';
-
-	const listTitle = document.createElement('h3');
-	listTitle.textContent = 'Available games';
-
-	const listHeaderSpacer = document.createElement('div');
-	listHeaderSpacer.style.flex = '1';
-
-	const listRefresh = document.createElement('button');
-	listRefresh.textContent = 'Refresh';
 	let listRefreshBusy = false;
 	listRefresh.addEventListener('click', async function onListRefresh() {
 		if (listRefreshBusy) {
@@ -184,26 +168,9 @@ export function createLandingScreen(deps) {
 			listRefresh.textContent = 'Refresh';
 		}
 	});
-
-	listHeader.appendChild(listTitle);
-	listHeader.appendChild(listHeaderSpacer);
-	listHeader.appendChild(listRefresh);
-
-	const list = document.createElement('div');
-	list.className = 'list';
 	const gameRowsById = new Map();
-	const emptyListNode = document.createElement('p');
-	emptyListNode.textContent = 'No games yet. Create one to get started.';
-	list.appendChild(emptyListNode);
 	let autoRefreshId = null;
 	let autoRefreshBusy = false;
-
-	root.appendChild(headingRow);
-	root.appendChild(userLabel);
-	root.appendChild(createBlock);
-	root.appendChild(status);
-	root.appendChild(listHeader);
-	root.appendChild(list);
 
 	function stopAutoRefresh() {
 		if (autoRefreshId === null) {
@@ -263,47 +230,12 @@ export function createLandingScreen(deps) {
 				return gameRowsById.get(key);
 			}
 
-			const item = document.createElement('div');
-			item.className = 'game-item';
-
-			const name = document.createElement('strong');
-			const info = document.createElement('p');
-
-			const ownerInfo = document.createElement('span');
-			const ownerSeparator = document.createTextNode(' | ');
-			const playersInfo = document.createElement('span');
-			playersInfo.className = 'game-players-summary';
-			const playersSeparator = document.createTextNode(' | ');
-			const observersInfo = document.createElement('span');
-			observersInfo.className = 'game-observers-summary';
-			const statusSeparator = document.createTextNode(' | ');
-			const statusInfo = document.createElement('span');
-			const progressSeparator = document.createTextNode('');
-			const progressInfo = document.createElement('span');
-
-			info.appendChild(ownerInfo);
-			info.appendChild(ownerSeparator);
-			info.appendChild(playersInfo);
-			info.appendChild(playersSeparator);
-			info.appendChild(observersInfo);
-			info.appendChild(statusSeparator);
-			info.appendChild(statusInfo);
-			info.appendChild(progressSeparator);
-			info.appendChild(progressInfo);
-
-			const controls = document.createElement('div');
-			controls.className = 'row game-item-bar';
-
-			const primaryControls = document.createElement('div');
-			primaryControls.className = 'row game-item-controls-left';
-
-			const adminControls = document.createElement('div');
-			adminControls.className = 'row game-item-controls-right';
+			const item = cloneTemplateNode(rowTemplate);
+			const itemRefs = collectRefs(item);
 
 			const rowState = { game: null };
 
-			const join = document.createElement('button');
-			join.textContent = 'Join';
+			const join = itemRefs.join;
 			join.addEventListener('click', async function onJoin() {
 				const active = rowState.game;
 				if (!active || join.style.display === 'none') {
@@ -319,8 +251,7 @@ export function createLandingScreen(deps) {
 				}
 			});
 
-			const observe = document.createElement('button');
-			observe.textContent = 'Observe';
+			const observe = itemRefs.observe;
 			observe.addEventListener('click', async function onObserve() {
 				const active = rowState.game;
 				if (!active || observe.style.display === 'none') {
@@ -337,9 +268,7 @@ export function createLandingScreen(deps) {
 				}
 			});
 
-			const open = document.createElement('button');
-			open.className = 'secondary';
-			open.textContent = 'Open';
+			const open = itemRefs.open;
 			open.addEventListener('click', async function onOpen() {
 				const active = rowState.game;
 				if (!active) {
@@ -348,8 +277,7 @@ export function createLandingScreen(deps) {
 				await openGame(active.id);
 			});
 
-			const start = document.createElement('button');
-			start.textContent = 'Start';
+			const start = itemRefs.start;
 			start.addEventListener('click', async function onStart() {
 				const active = rowState.game;
 				if (!active || start.disabled) {
@@ -376,8 +304,7 @@ export function createLandingScreen(deps) {
 				}
 			});
 
-			const end = document.createElement('button');
-			end.textContent = 'End';
+			const end = itemRefs.end;
 			end.addEventListener('click', async function onEnd() {
 				const active = rowState.game;
 				if (!active || end.disabled) {
@@ -404,8 +331,7 @@ export function createLandingScreen(deps) {
 				}
 			});
 
-			const remove = document.createElement('button');
-			remove.textContent = 'Delete';
+			const remove = itemRefs.remove;
 			remove.addEventListener('click', async function onDelete() {
 				const active = rowState.game;
 				if (!active || remove.disabled) {
@@ -432,28 +358,15 @@ export function createLandingScreen(deps) {
 				}
 			});
 
-			primaryControls.appendChild(join);
-			primaryControls.appendChild(observe);
-			primaryControls.appendChild(open);
-			adminControls.appendChild(start);
-			adminControls.appendChild(end);
-			adminControls.appendChild(remove);
-			controls.appendChild(primaryControls);
-			controls.appendChild(adminControls);
-
-			item.appendChild(name);
-			item.appendChild(info);
-			item.appendChild(controls);
-
 			const refs = {
 				item,
-				name,
-				ownerInfo,
-				playersInfo,
-				observersInfo,
-				statusInfo,
-				progressSeparator,
-				progressInfo,
+				name: itemRefs.name,
+				ownerInfo: itemRefs.ownerInfo,
+				playersInfo: itemRefs.playersInfo,
+				observersInfo: itemRefs.observersInfo,
+				statusInfo: itemRefs.statusInfo,
+				progressSeparator: itemRefs.progressSeparator,
+				progressInfo: itemRefs.progressInfo,
 				join,
 				observe,
 				open,

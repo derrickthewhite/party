@@ -1,85 +1,69 @@
-import { showConfirmModal } from './dom.js';
+import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate, showConfirmModal } from './dom.js';
 import { createBaseGameScreen } from './gameScreen.js';
 
 export function createRumbleGameScreen(deps) {
-	const panel = document.createElement('div');
-	panel.className = 'card';
+	const panel = createNodeFromHtml(`
+		<div class="card">
+			<div class="row">
+				<h3>Rumble Orders</h3>
+				<div data-ref="headerSpacer"></div>
+				<button data-ref="refreshBtn">Refresh</button>
+			</div>
+			<p class="top-user-label" data-ref="progressText">Round 1 players submitted: 0/0</p>
+			<p data-ref="defenseText">Defense: 0</p>
+			<p data-ref="attackHelpText">Attack allocations (enter power to send at each target):</p>
+			<p data-ref="validationText"></p>
+			<div class="list" data-ref="playersList"></div>
+			<div class="row mobile-stack" data-ref="buttonRow">
+				<button class="primary" data-ref="submitBtn">Submit Orders</button>
+				<button data-ref="editBtn">Edit Orders</button>
+				<button data-ref="cancelBtn">Cancel Orders</button>
+				<button data-ref="endTurnBtn">End Turn</button>
+			</div>
+			<h4 data-ref="lastTurnTitle">Last Turn Orders</h4>
+			<div class="list" data-ref="lastTurnList">
+				<p data-ref="emptyPreviousOrdersNode">No previous turn orders yet.</p>
+			</div>
+		</div>
+	`);
+	const refs = collectRefs(panel);
+	const playerRowTemplate = createTemplate(`
+		<div class="row mobile-stack" style="align-items: center; margin-bottom: 6px;">
+			<div style="flex: 1;" data-ref="name"></div>
+			<div style="min-width: 220px;" data-ref="right">
+				<div data-ref="label"></div>
+				<input type="number" min="0" step="1" placeholder="Attack amount" data-ref="input">
+			</div>
+		</div>
+	`);
+	const previousOrderTemplate = createTemplate(`
+		<div class="message-item">
+			<small data-ref="meta"></small>
+			<div data-ref="text"></div>
+		</div>
+	`);
+	const refreshBtn = refs.refreshBtn;
+	const progressText = refs.progressText;
+	const defenseText = refs.defenseText;
+	const attackHelpText = refs.attackHelpText;
+	const validationText = refs.validationText;
+	const playersList = refs.playersList;
+	const submitBtn = refs.submitBtn;
+	const editBtn = refs.editBtn;
+	const cancelBtn = refs.cancelBtn;
+	const endTurnBtn = refs.endTurnBtn;
+	const lastTurnList = refs.lastTurnList;
+	const emptyPreviousOrdersNode = refs.emptyPreviousOrdersNode;
+
 	panel.style.marginTop = '8px';
-
-	const header = document.createElement('div');
-	header.className = 'row';
-
-	const heading = document.createElement('h3');
-	heading.textContent = 'Rumble Orders';
-
-	const headerSpacer = document.createElement('div');
-	headerSpacer.style.flex = '1';
-
-	const refreshBtn = document.createElement('button');
-	refreshBtn.textContent = 'Refresh';
-
-	header.appendChild(heading);
-	header.appendChild(headerSpacer);
-	header.appendChild(refreshBtn);
-
-	const progressText = document.createElement('p');
-	progressText.className = 'top-user-label';
-	progressText.textContent = 'Round 1 players submitted: 0/0';
-
-	const defenseText = document.createElement('p');
+	refs.headerSpacer.style.flex = '1';
 	defenseText.style.margin = '8px 0 6px 0';
 	defenseText.style.fontWeight = '600';
-	defenseText.textContent = 'Defense: 0';
-
-	const attackHelpText = document.createElement('p');
-	attackHelpText.textContent = 'Attack allocations (enter power to send at each target):';
 	attackHelpText.style.margin = '4px 0 8px 0';
-
-	const validationText = document.createElement('p');
 	validationText.style.margin = '0 0 8px 0';
 	validationText.style.fontWeight = '600';
-
-	const playersList = document.createElement('div');
-	playersList.className = 'list';
-
-	const buttonRow = document.createElement('div');
-	buttonRow.className = 'row mobile-stack';
-	buttonRow.style.marginTop = '8px';
-
-	const submitBtn = document.createElement('button');
-	submitBtn.className = 'primary';
-	submitBtn.textContent = 'Submit Orders';
-
-	const editBtn = document.createElement('button');
-	editBtn.textContent = 'Edit Orders';
-
-	const cancelBtn = document.createElement('button');
-	cancelBtn.textContent = 'Cancel Orders';
-
-	const endTurnBtn = document.createElement('button');
-	endTurnBtn.textContent = 'End Turn';
-
-	buttonRow.appendChild(submitBtn);
-	buttonRow.appendChild(editBtn);
-	buttonRow.appendChild(cancelBtn);
-	buttonRow.appendChild(endTurnBtn);
-
-	const lastTurnTitle = document.createElement('h4');
-	lastTurnTitle.textContent = 'Last Turn Orders';
-	lastTurnTitle.style.marginTop = '10px';
-
-	const lastTurnList = document.createElement('div');
-	lastTurnList.className = 'list';
-
-	panel.appendChild(header);
-	panel.appendChild(progressText);
-	panel.appendChild(defenseText);
-	panel.appendChild(attackHelpText);
-	panel.appendChild(validationText);
-	panel.appendChild(playersList);
-	panel.appendChild(buttonRow);
-	panel.appendChild(lastTurnTitle);
-	panel.appendChild(lastTurnList);
+	refs.buttonRow.style.marginTop = '8px';
+	refs.lastTurnTitle.style.marginTop = '10px';
 
 	let lastGameId = null;
 	let lastRound = 1;
@@ -109,9 +93,6 @@ export function createRumbleGameScreen(deps) {
 
 	const playerRowsById = new Map();
 	const previousOrderRowsById = new Map();
-	const emptyPreviousOrdersNode = document.createElement('p');
-	emptyPreviousOrdersNode.textContent = 'No previous turn orders yet.';
-	lastTurnList.appendChild(emptyPreviousOrdersNode);
 
 	function normalizeAttacksMap(input) {
 		const normalized = {};
@@ -246,23 +227,12 @@ export function createRumbleGameScreen(deps) {
 			return playerRowsById.get(key);
 		}
 
-		const row = document.createElement('div');
-		row.className = 'row mobile-stack';
-		row.style.alignItems = 'center';
-		row.style.marginBottom = '6px';
-
-		const name = document.createElement('div');
-		name.style.flex = '1';
-
-		const right = document.createElement('div');
-		right.style.minWidth = '220px';
-
-		const label = document.createElement('div');
-		const input = document.createElement('input');
-		input.type = 'number';
-		input.min = '0';
-		input.step = '1';
-		input.placeholder = 'Attack amount';
+		const row = cloneTemplateNode(playerRowTemplate);
+		const rowRefs = collectRefs(row);
+		const name = rowRefs.name;
+		const right = rowRefs.right;
+		const label = rowRefs.label;
+		const input = rowRefs.input;
 		input.addEventListener('input', function onInput() {
 			const raw = Number(input.value || 0);
 			localDraft.attacks[key] = Math.max(0, Math.floor(Number.isFinite(raw) ? raw : 0));
@@ -270,11 +240,6 @@ export function createRumbleGameScreen(deps) {
 			reconcileUi();
 		});
 
-		right.appendChild(label);
-		right.appendChild(input);
-
-		row.appendChild(name);
-		row.appendChild(right);
 		playersList.appendChild(row);
 
 		const refs = { row, name, right, label, input };
@@ -388,13 +353,9 @@ export function createRumbleGameScreen(deps) {
 
 			let refs = previousOrderRowsById.get(key);
 			if (!refs) {
-				const line = document.createElement('div');
-				line.className = 'message-item';
-				const meta = document.createElement('small');
-				const text = document.createElement('div');
-				line.appendChild(meta);
-				line.appendChild(text);
-				refs = { line, meta, text };
+				const line = cloneTemplateNode(previousOrderTemplate);
+				const rowRefs = collectRefs(line);
+				refs = { line, meta: rowRefs.meta, text: rowRefs.text };
 				previousOrderRowsById.set(key, refs);
 			}
 

@@ -1,42 +1,31 @@
+import { collectRefs, createNodeFromHtml } from './dom.js';
+
 export function createWelcomeScreen(deps) {
- 	const state = deps.state;
+	const state = deps.state;
 	const navigateToScreen = deps.navigateToScreen || function fallbackNavigate(screen) {
 		state.setScreen(screen);
 	};
 
-	const root = document.createElement('section');
-	root.className = 'screen card';
+	const root = createNodeFromHtml(`
+		<section class="screen card">
+			<h1>Party</h1>
+			<p>Create private accounts, make games, join friends, and chat in each game.</p>
+			<hr>
+			<div class="row">
+				<button class="primary" data-ref="signup">Create account</button>
+				<button class="secondary" data-ref="signin">Sign in</button>
+			</div>
+		</section>
+	`);
+	const refs = collectRefs(root);
 
-	const title = document.createElement('h1');
-	title.textContent = 'Party';
-
-	const subtitle = document.createElement('p');
-	subtitle.textContent = 'Create private accounts, make games, join friends, and chat in each game.';
-
-	const buttons = document.createElement('div');
-	buttons.className = 'row';
-
-	const signup = document.createElement('button');
-	signup.className = 'primary';
-	signup.textContent = 'Create account';
-	signup.addEventListener('click', function onGoSignup() {
+	refs.signup.addEventListener('click', function onGoSignup() {
 		navigateToScreen('signup');
 	});
 
-	const signin = document.createElement('button');
-	signin.className = 'secondary';
-	signin.textContent = 'Sign in';
-	signin.addEventListener('click', function onGoSignin() {
+	refs.signin.addEventListener('click', function onGoSignin() {
 		navigateToScreen('signin');
 	});
-
-	buttons.appendChild(signup);
-	buttons.appendChild(signin);
-
-	root.appendChild(title);
-	root.appendChild(subtitle);
-	root.appendChild(document.createElement('hr'));
-	root.appendChild(buttons);
 
 	return { root };
 }

@@ -1,4 +1,4 @@
-import { createStatusNode, setStatus, showConfirmModal } from './dom.js';
+import { collectRefs, createNodeFromHtml, setStatus, showConfirmModal } from './dom.js';
 
 export function createBaseGameScreen(deps, options) {
 	const config = options || {};
@@ -7,55 +7,72 @@ export function createBaseGameScreen(deps, options) {
 	const chat = deps.chat;
 	const refreshGames = deps.refreshGames;
 
-	const root = document.createElement('section');
-	root.className = 'screen card';
+	const root = createNodeFromHtml(`
+		<section class="screen card">
+			<div class="row">
+				<h2 data-ref="title">${config.title || 'Game'}</h2>
+				<div data-ref="headingSpacer"></div>
+				<button class="link" data-ref="back">Back to lobby</button>
+			</div>
+			<p class="top-user-label" data-ref="userLabel"></p>
+			<p data-ref="subtitle"></p>
+			<p data-ref="modeInfo"></p>
+			<div class="message-feed" data-ref="feed"></div>
+			<div class="row chat-composer-row" data-ref="composerRow">
+				<input type="text" placeholder="Type a message" class="chat-composer-input" data-ref="messageInput">
+				<button class="primary chat-composer-send" data-ref="sendButton">Send</button>
+			</div>
+			<div class="row mobile-stack" data-ref="actionRow">
+				<input type="text" placeholder="Action type (example: vote/order/attack)" data-ref="actionType">
+				<input type="text" placeholder="Payload JSON (example: {&quot;target_user_id&quot;: 3})" data-ref="actionPayload">
+				<button data-ref="actionButton">Submit Action</button>
+			</div>
+			<div class="column" data-ref="typePanel"></div>
+			<div class="status" data-ref="status"></div>
+			<div class="row mobile-stack" data-ref="adminControls">
+				<button data-ref="adminStart">Start</button>
+				<button data-ref="adminEnd">End</button>
+				<button data-ref="adminDelete">Delete</button>
+			</div>
+		</section>
+	`);
+	const refs = collectRefs(root);
+	const title = refs.title;
+	const userLabel = refs.userLabel;
+	const subtitle = refs.subtitle;
+	const modeInfo = refs.modeInfo;
+	const feed = refs.feed;
+	const composerRow = refs.composerRow;
+	const messageInput = refs.messageInput;
+	const sendButton = refs.sendButton;
+	const actionRow = refs.actionRow;
+	const actionType = refs.actionType;
+	const actionPayload = refs.actionPayload;
+	const actionButton = refs.actionButton;
+	const typePanel = refs.typePanel;
+	const status = refs.status;
+	const adminControls = refs.adminControls;
+	const adminStart = refs.adminStart;
+	const adminEnd = refs.adminEnd;
+	const adminDelete = refs.adminDelete;
+	let mountedTypePanel = null;
 
-	const headingRow = document.createElement('div');
-	headingRow.className = 'row';
+	refs.headingSpacer.style.flex = '1';
+	modeInfo.style.marginTop = '-6px';
+	modeInfo.style.opacity = '0.8';
+	composerRow.style.marginTop = '10px';
+	actionRow.style.marginTop = '8px';
+	typePanel.style.marginTop = '8px';
+	adminControls.style.marginTop = '12px';
+	adminControls.style.paddingTop = '10px';
+	adminControls.style.borderTop = '1px solid rgba(0, 0, 0, 0.15)';
 
-	const title = document.createElement('h2');
-	title.textContent = config.title || 'Game';
-
-	const spacer = document.createElement('div');
-	spacer.style.flex = '1';
-
-	const back = document.createElement('button');
-	back.className = 'link';
-	back.textContent = 'Back to lobby';
-	back.addEventListener('click', function onBack() {
+	refs.back.addEventListener('click', function onBack() {
 		chat.stopPolling();
 		state.patch({ activeGame: null });
 		state.setScreen('landing');
 	});
 
-	headingRow.appendChild(title);
-	headingRow.appendChild(spacer);
-	headingRow.appendChild(back);
-
-	const userLabel = document.createElement('p');
-	userLabel.className = 'top-user-label';
-
-	const subtitle = document.createElement('p');
-	const modeInfo = document.createElement('p');
-	modeInfo.style.marginTop = '-6px';
-	modeInfo.style.opacity = '0.8';
-
-	const feed = document.createElement('div');
-	feed.className = 'message-feed';
-
-	const composerRow = document.createElement('div');
-	composerRow.className = 'row chat-composer-row';
-	composerRow.style.marginTop = '10px';
-
-	const messageInput = document.createElement('input');
-	messageInput.type = 'text';
-	messageInput.placeholder = 'Type a message';
-	messageInput.className = 'chat-composer-input';
-
-	const sendButton = document.createElement('button');
-	sendButton.className = 'primary';
-	sendButton.textContent = 'Send';
-	sendButton.classList.add('chat-composer-send');
 	sendButton.addEventListener('click', async function onSendClick() {
 		const activeGame = state.state.activeGame;
 		if (!activeGame) {
@@ -82,23 +99,6 @@ export function createBaseGameScreen(deps, options) {
 		}
 	});
 
-	composerRow.appendChild(messageInput);
-	composerRow.appendChild(sendButton);
-
-	const actionRow = document.createElement('div');
-	actionRow.className = 'row mobile-stack';
-	actionRow.style.marginTop = '8px';
-
-	const actionType = document.createElement('input');
-	actionType.type = 'text';
-	actionType.placeholder = 'Action type (example: vote/order/attack)';
-
-	const actionPayload = document.createElement('input');
-	actionPayload.type = 'text';
-	actionPayload.placeholder = 'Payload JSON (example: {"target_user_id": 3})';
-
-	const actionButton = document.createElement('button');
-	actionButton.textContent = 'Submit Action';
 	actionButton.addEventListener('click', async function onActionClick() {
 		const activeGame = state.state.activeGame;
 		if (!activeGame || !activeGame.permissions || !activeGame.permissions.can_act) {
@@ -132,28 +132,10 @@ export function createBaseGameScreen(deps, options) {
 		}
 	});
 
-	actionRow.appendChild(actionType);
-	actionRow.appendChild(actionPayload);
-	actionRow.appendChild(actionButton);
-
 	if (config.showActionComposer === false) {
 		actionRow.style.display = 'none';
 	}
 
-	const typePanel = document.createElement('div');
-	typePanel.className = 'column';
-	typePanel.style.marginTop = '8px';
-
-	const status = createStatusNode();
-
-	const adminControls = document.createElement('div');
-	adminControls.className = 'row mobile-stack';
-	adminControls.style.marginTop = '12px';
-	adminControls.style.paddingTop = '10px';
-	adminControls.style.borderTop = '1px solid rgba(0, 0, 0, 0.15)';
-
-	const adminStart = document.createElement('button');
-	adminStart.textContent = 'Start';
 	adminStart.addEventListener('click', async function onAdminStart() {
 		const activeGame = state.state.activeGame;
 		if (!activeGame) {
@@ -182,8 +164,6 @@ export function createBaseGameScreen(deps, options) {
 		}
 	});
 
-	const adminEnd = document.createElement('button');
-	adminEnd.textContent = 'End';
 	adminEnd.addEventListener('click', async function onAdminEnd() {
 		const activeGame = state.state.activeGame;
 		if (!activeGame) {
@@ -212,8 +192,6 @@ export function createBaseGameScreen(deps, options) {
 		}
 	});
 
-	const adminDelete = document.createElement('button');
-	adminDelete.textContent = 'Delete';
 	adminDelete.addEventListener('click', async function onAdminDelete() {
 		const activeGame = state.state.activeGame;
 		if (!activeGame) {
@@ -240,21 +218,6 @@ export function createBaseGameScreen(deps, options) {
 			setStatus(status, err.message, 'error');
 		}
 	});
-
-	adminControls.appendChild(adminStart);
-	adminControls.appendChild(adminEnd);
-	adminControls.appendChild(adminDelete);
-
-	root.appendChild(headingRow);
-	root.appendChild(userLabel);
-	root.appendChild(subtitle);
-	root.appendChild(modeInfo);
-	root.appendChild(feed);
-	root.appendChild(composerRow);
-	root.appendChild(actionRow);
-	root.appendChild(typePanel);
-	root.appendChild(status);
-	root.appendChild(adminControls);
 
 	function setGame(game) {
 		const user = state.state.user || {};
@@ -352,21 +315,18 @@ export function createBaseGameScreen(deps, options) {
 		appendMessages,
 		clearMessages,
 		setTypePanel: function setTypePanel(node) {
-			if (!node) {
-				while (typePanel.firstChild) {
-					typePanel.removeChild(typePanel.firstChild);
-				}
+			if (mountedTypePanel === node) {
 				return;
 			}
 
-			if (typePanel.firstChild === node && typePanel.childNodes.length === 1) {
-				return;
+			if (mountedTypePanel && mountedTypePanel.parentNode === typePanel) {
+				typePanel.removeChild(mountedTypePanel);
 			}
 
-			while (typePanel.firstChild) {
-				typePanel.removeChild(typePanel.firstChild);
+			mountedTypePanel = node || null;
+			if (mountedTypePanel) {
+				typePanel.appendChild(mountedTypePanel);
 			}
-			typePanel.appendChild(node);
 		},
 		setStatus: (text, kind) => setStatus(status, text, kind),
 	};
