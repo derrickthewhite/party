@@ -67,6 +67,10 @@ function createApiModule() {
 		setRumbleShipName: (gameId, shipName) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-ship-name', 'POST', {
 			ship_name: shipName,
 		}),
+		grantRumbleAbilities: (gameId, userId, abilityIds) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-admin-grant-abilities', 'POST', {
+			user_id: userId,
+			ability_ids: Array.isArray(abilityIds) ? abilityIds : [],
+		}),
 		endRumbleBidding: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-bids/end', 'POST'),
 		endRumbleTurn: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/reveal', 'POST'),
 	};

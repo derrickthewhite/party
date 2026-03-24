@@ -16,6 +16,21 @@ export function createRumbleGameScreen(deps) {
 				<button data-ref="saveShipNameBtn">Save Name</button>
 			</div>
 			<p data-ref="shipNameHint" style="margin: 0 0 8px 0; opacity: 0.85;">Leave blank to use your username.</p>
+			<div data-ref="adminCheatPanel" style="display: none; margin: 0 0 10px 0; padding: 10px; border: 1px dashed rgba(0, 0, 0, 0.25); border-radius: 10px; background: rgba(0, 0, 0, 0.03);">
+				<div class="row mobile-stack" style="align-items: center; margin-bottom: 8px;">
+					<h4 style="margin: 0;">Admin Ability Cheat</h4>
+					<div data-ref="adminCheatSummary" style="margin-left: auto; opacity: 0.85;">Select a player and abilities to grant.</div>
+				</div>
+				<p data-ref="adminCheatHint" style="margin: 0 0 8px 0; opacity: 0.85;">Visible only to admins while Admin UI is enabled.</p>
+				<div class="row mobile-stack" style="align-items: center; margin: 0 0 8px 0; gap: 8px;">
+					<label for="rumble-admin-cheat-target" style="min-width: 100px;">Target player</label>
+					<select id="rumble-admin-cheat-target" data-ref="adminCheatTargetSelect" style="flex: 1;"></select>
+					<button data-ref="adminCheatSubmitBtn">Grant Selected</button>
+					<button data-ref="adminCheatClearBtn">Clear</button>
+				</div>
+				<div class="list" data-ref="adminCheatAbilityList" style="max-height: 260px; overflow: auto; padding-right: 4px;"></div>
+				<p data-ref="adminCheatEmptyText" style="margin: 8px 0 0 0; opacity: 0.85;">No abilities available.</p>
+			</div>
 
 			<div data-ref="biddingPanel">
 				<p data-ref="bidHelpText">Place secret bids for offered abilities. You can overbid your health, but if bidding leaves you at 0 or less you are eliminated before combat.</p>
@@ -111,6 +126,19 @@ export function createRumbleGameScreen(deps) {
 			</div>
 		</div>
 	`);
+	const adminCheatAbilityRowTemplate = createTemplate(`
+		<label class="row mobile-stack" style="align-items: flex-start; margin-bottom: 6px; gap: 8px; cursor: pointer;">
+			<input type="checkbox" data-ref="checkbox" style="width: auto; margin-top: 2px;">
+			<div style="flex: 1; min-width: 0;">
+				<div class="row mobile-stack" style="align-items: center; gap: 8px; margin: 0 0 2px 0;">
+					<div data-ref="name" style="font-weight: 600;"></div>
+					<small data-ref="meta" style="opacity: 0.8;"></small>
+					<small data-ref="status" style="opacity: 0.85;"></small>
+				</div>
+				<div data-ref="description" style="opacity: 0.9;"></div>
+			</div>
+		</label>
+	`);
 	const previousOrderTemplate = createTemplate(`
 		<div class="message-item">
 			<small data-ref="meta"></small>
@@ -130,6 +158,14 @@ export function createRumbleGameScreen(deps) {
 	const shipNameInput = refs.shipNameInput;
 	const saveShipNameBtn = refs.saveShipNameBtn;
 	const shipNameHint = refs.shipNameHint;
+	const adminCheatPanel = refs.adminCheatPanel;
+	const adminCheatSummary = refs.adminCheatSummary;
+	const adminCheatHint = refs.adminCheatHint;
+	const adminCheatTargetSelect = refs.adminCheatTargetSelect;
+	const adminCheatSubmitBtn = refs.adminCheatSubmitBtn;
+	const adminCheatClearBtn = refs.adminCheatClearBtn;
+	const adminCheatAbilityList = refs.adminCheatAbilityList;
+	const adminCheatEmptyText = refs.adminCheatEmptyText;
 	const biddingPanel = refs.biddingPanel;
 	const bidHelpText = refs.bidHelpText;
 	const bidValidationText = refs.bidValidationText;
@@ -186,6 +222,7 @@ export function createRumbleGameScreen(deps) {
 	let refreshBusy = false;
 	let orderBusy = false;
 	let shipNameBusy = false;
+	let adminCheatBusy = false;
 	let autoRefreshId = null;
 
 	const serverSnapshot = {
@@ -194,6 +231,7 @@ export function createRumbleGameScreen(deps) {
 		submittedCount: 0,
 		participantCount: 0,
 		players: [],
+		abilityCatalog: [],
 		offeredAbilities: [],
 		currentBids: null,
 		currentOrder: null,
@@ -212,6 +250,8 @@ export function createRumbleGameScreen(deps) {
 		dirtyBids: false,
 		shipName: '',
 		dirtyShipName: false,
+		adminCheatTargetUserId: '',
+		adminCheatSelections: {},
 	};
 
 	const uiState = {
@@ -221,9 +261,11 @@ export function createRumbleGameScreen(deps) {
 	const abilityRowsById = new Map();
 	const playerRowsById = new Map();
 	const abilityActivationRowsById = new Map();
+	const adminCheatAbilityRowsById = new Map();
 	const previousOrderRowsById = new Map();
 	const currentEventRowsById = new Map();
 	const previousEventRowsById = new Map();
+	const adminCheatTargetOptionByValue = new Map();
 
 	function isBiddingPhase() {
 		return serverSnapshot.phaseMode === 'bidding';
@@ -239,6 +281,33 @@ export function createRumbleGameScreen(deps) {
 		localDraft.dirtyAttacks = false;
 		localDraft.dirtyAbilityActivations = false;
 		localDraft.dirtyBids = false;
+	}
+
+	function isAdminCheatVisible() {
+		const currentState = deps.state.state || {};
+		const user = currentState.user || null;
+		const activeGame = currentState.activeGame || null;
+		return !!(user && user.is_admin)
+			&& !!currentState.adminUiEnabled
+			&& !!lastGameId
+			&& !!activeGame
+			&& String(activeGame.status || '') === 'in_progress';
+	}
+
+	function getCheatEligiblePlayers() {
+		return serverSnapshot.players.filter(function eachPlayer(player) {
+			return String(player.member_role || '').toLowerCase() !== 'observer';
+		});
+	}
+
+	function getSelectedCheatAbilityIds() {
+		return Object.keys(localDraft.adminCheatSelections || {}).filter(function eachAbilityId(abilityId) {
+			return !!localDraft.adminCheatSelections[abilityId];
+		}).sort();
+	}
+
+	function clearAdminCheatSelections() {
+		localDraft.adminCheatSelections = {};
 	}
 
 	function normalizeAttacksMap(input) {
@@ -647,6 +716,18 @@ export function createRumbleGameScreen(deps) {
 	function getSelfPlayer() {
 		const row = serverSnapshot.players.find(function eachPlayer(player) {
 			return !!player.is_self;
+		});
+		return row || null;
+	}
+
+	function getCheatTargetPlayer() {
+		const targetUserId = Number(localDraft.adminCheatTargetUserId || 0);
+		if (!targetUserId) {
+			return null;
+		}
+
+		const row = serverSnapshot.players.find(function eachPlayer(player) {
+			return Number(player.user_id) === targetUserId;
 		});
 		return row || null;
 	}
@@ -1144,6 +1225,132 @@ export function createRumbleGameScreen(deps) {
 		});
 	}
 
+	function ensureAdminCheatAbilityRow(ability) {
+		const key = String(ability.id || '');
+		if (adminCheatAbilityRowsById.has(key)) {
+			return adminCheatAbilityRowsById.get(key);
+		}
+
+		const row = cloneTemplateNode(adminCheatAbilityRowTemplate);
+		const rowRefs = collectRefs(row);
+		const refs = {
+			row,
+			checkbox: rowRefs.checkbox,
+			name: rowRefs.name,
+			meta: rowRefs.meta,
+			description: rowRefs.description,
+			status: rowRefs.status,
+		};
+
+		rowRefs.checkbox.addEventListener('change', function onCheatAbilityToggle() {
+			const nextSelections = Object.assign({}, localDraft.adminCheatSelections || {});
+			nextSelections[key] = !!rowRefs.checkbox.checked;
+			if (!nextSelections[key]) {
+				delete nextSelections[key];
+			}
+			localDraft.adminCheatSelections = nextSelections;
+			reconcileUi();
+		});
+
+		adminCheatAbilityList.appendChild(row);
+		adminCheatAbilityRowsById.set(key, refs);
+		return refs;
+	}
+
+	function reconcileAdminCheatPanel() {
+		const visible = isAdminCheatVisible();
+		adminCheatPanel.style.display = visible ? '' : 'none';
+		if (!visible) {
+			return;
+		}
+
+		const eligiblePlayers = getCheatEligiblePlayers();
+		const options = [{ value: '', label: 'Select player' }].concat(eligiblePlayers.map(function eachPlayer(player) {
+			return {
+				value: String(player.user_id),
+				label: String(player.ship_name || player.username || ('User ' + player.user_id)),
+			};
+		}));
+		reconcileSelectOptions(adminCheatTargetSelect, adminCheatTargetOptionByValue, options);
+
+		const targetStillAvailable = eligiblePlayers.some(function eachPlayer(player) {
+			return String(player.user_id) === String(localDraft.adminCheatTargetUserId || '');
+		});
+		if (!targetStillAvailable) {
+			localDraft.adminCheatTargetUserId = '';
+		}
+		if (adminCheatTargetSelect.value !== String(localDraft.adminCheatTargetUserId || '')) {
+			adminCheatTargetSelect.value = String(localDraft.adminCheatTargetUserId || '');
+		}
+
+		const selectedTarget = getCheatTargetPlayer();
+		const selectedAbilityIds = getSelectedCheatAbilityIds();
+		const ownedSet = {};
+		if (selectedTarget && Array.isArray(selectedTarget.owned_abilities)) {
+			selectedTarget.owned_abilities.forEach(function eachOwnedAbility(ability) {
+				ownedSet[String(ability.id || '')] = true;
+			});
+		}
+
+		let focusedAbilityId = null;
+		const activeEl = document.activeElement;
+		if (activeEl && activeEl.tagName === 'INPUT' && activeEl.type === 'checkbox') {
+			Array.from(adminCheatAbilityRowsById.entries()).forEach(function eachEntry(entry) {
+				if (entry[1].checkbox === activeEl) {
+					focusedAbilityId = entry[0];
+				}
+			});
+		}
+
+		const active = new Set();
+		serverSnapshot.abilityCatalog.forEach(function eachAbility(ability) {
+			const key = String(ability.id || '');
+			active.add(key);
+			const refs = ensureAdminCheatAbilityRow(ability);
+			const checked = !!(localDraft.adminCheatSelections && localDraft.adminCheatSelections[key]);
+			const alreadyOwned = !!ownedSet[key];
+
+			refs.name.textContent = String(ability.title || ability.name || key);
+			refs.meta.textContent = String(ability.template_kind || 'unknown');
+			refs.description.textContent = String(ability.description || '');
+			refs.status.textContent = alreadyOwned ? 'Already owned' : (checked ? 'Will grant' : 'Available');
+			refs.checkbox.disabled = adminCheatBusy;
+			refs.checkbox.checked = checked;
+			adminCheatAbilityList.appendChild(refs.row);
+		});
+
+		Array.from(adminCheatAbilityRowsById.keys()).forEach(function eachExisting(key) {
+			if (active.has(key)) {
+				return;
+			}
+
+			const refs = adminCheatAbilityRowsById.get(key);
+			if (refs && refs.row.parentNode === adminCheatAbilityList) {
+				adminCheatAbilityList.removeChild(refs.row);
+			}
+			adminCheatAbilityRowsById.delete(key);
+		});
+
+		if (focusedAbilityId && adminCheatAbilityRowsById.has(focusedAbilityId)) {
+			const focusedRefs = adminCheatAbilityRowsById.get(focusedAbilityId);
+			if (focusedRefs && !focusedRefs.checkbox.disabled) {
+				focusedRefs.checkbox.focus();
+			}
+		}
+
+		adminCheatHint.textContent = selectedTarget
+			? ('Target: ' + String(selectedTarget.ship_name || selectedTarget.username || ('User ' + selectedTarget.user_id)))
+			: 'Visible only to admins while Admin UI is enabled.';
+		adminCheatSummary.textContent = selectedAbilityIds.length > 0
+			? (selectedAbilityIds.length + ' selected')
+			: 'Select a player and abilities to grant.';
+		adminCheatTargetSelect.disabled = adminCheatBusy || eligiblePlayers.length === 0;
+		adminCheatSubmitBtn.textContent = adminCheatBusy ? 'Granting...' : 'Grant Selected';
+		adminCheatSubmitBtn.disabled = adminCheatBusy || !selectedTarget || selectedAbilityIds.length === 0;
+		adminCheatClearBtn.disabled = adminCheatBusy || selectedAbilityIds.length === 0;
+		adminCheatEmptyText.style.display = serverSnapshot.abilityCatalog.length === 0 ? '' : 'none';
+	}
+
 	function describeActivationReadonly(ability, activationMap) {
 		if (!isActivatedAbility(ability)) {
 			const templateKind = String(ability.template_kind || 'passive');
@@ -1487,6 +1694,7 @@ export function createRumbleGameScreen(deps) {
 		const canAct = !!lastPerms.can_act;
 		const bidding = isBiddingPhase();
 		reconcileShipNameEditor();
+		reconcileAdminCheatPanel();
 
 		biddingPanel.style.display = bidding ? '' : 'none';
 		battlePanel.style.display = bidding ? 'none' : '';
@@ -1615,6 +1823,7 @@ export function createRumbleGameScreen(deps) {
 			return !player.is_self;
 		});
 		const nextPlayers = selfPlayers.concat(otherPlayers);
+		const nextAbilityCatalog = progress && Array.isArray(progress.ability_catalog) ? progress.ability_catalog : [];
 		const nextOfferedAbilities = progress && Array.isArray(progress.offered_abilities) ? progress.offered_abilities : [];
 		const nextBids = progress && progress.current_bids !== null && typeof progress.current_bids === 'object'
 			? normalizeBidsMap(progress.current_bids)
@@ -1643,6 +1852,7 @@ export function createRumbleGameScreen(deps) {
 		serverSnapshot.submittedCount = submittedCount;
 		serverSnapshot.participantCount = participantCount;
 		serverSnapshot.players = nextPlayers;
+		serverSnapshot.abilityCatalog = nextAbilityCatalog;
 		serverSnapshot.offeredAbilities = nextOfferedAbilities;
 		serverSnapshot.currentBids = nextBids;
 		serverSnapshot.currentOrder = hasOrderNow ? {
@@ -1814,6 +2024,65 @@ export function createRumbleGameScreen(deps) {
 
 		event.preventDefault();
 		saveShipNameBtn.click();
+	});
+
+	adminCheatTargetSelect.addEventListener('change', function onAdminCheatTargetChange() {
+		localDraft.adminCheatTargetUserId = String(adminCheatTargetSelect.value || '');
+		reconcileUi();
+	});
+
+	adminCheatClearBtn.addEventListener('click', function onAdminCheatClear() {
+		if (adminCheatBusy) {
+			return;
+		}
+
+		clearAdminCheatSelections();
+		reconcileUi();
+	});
+
+	adminCheatSubmitBtn.addEventListener('click', async function onAdminCheatSubmit() {
+		if (!lastGameId || adminCheatBusy || !isAdminCheatVisible()) {
+			return;
+		}
+
+		const targetPlayer = getCheatTargetPlayer();
+		const selectedAbilityIds = getSelectedCheatAbilityIds();
+		if (!targetPlayer) {
+			setStatusNode('Choose a target player first.', 'error');
+			return;
+		}
+		if (selectedAbilityIds.length === 0) {
+			setStatusNode('Select at least one ability to grant.', 'error');
+			return;
+		}
+
+		const confirmed = await showConfirmModal({
+			title: 'Confirm Ability Grant',
+			message: 'Grant ' + selectedAbilityIds.length + ' selected abilities to ' + String(targetPlayer.ship_name || targetPlayer.username || ('User ' + targetPlayer.user_id)) + '?',
+			cancelLabel: 'Cancel',
+			confirmLabel: 'Grant Abilities',
+		});
+		if (!confirmed) {
+			return;
+		}
+
+		adminCheatBusy = true;
+		reconcileUi();
+		try {
+			const result = await deps.api.grantRumbleAbilities(lastGameId, targetPlayer.user_id, selectedAbilityIds);
+			clearAdminCheatSelections();
+			await refreshRumbleState({ silent: true });
+			if (Array.isArray(result.added_ability_ids) && result.added_ability_ids.length > 0) {
+				setStatusNode('Granted ' + result.added_ability_ids.length + ' abilities to ' + String(result.target_username || targetPlayer.username || targetPlayer.ship_name || ('User ' + targetPlayer.user_id)) + '.', 'ok');
+			} else {
+				setStatusNode(String(result.target_username || targetPlayer.username || targetPlayer.ship_name || ('User ' + targetPlayer.user_id)) + ' already had all selected abilities.', 'ok');
+			}
+		} catch (err) {
+			setStatusNode(err.message || 'Unable to grant abilities.', 'error');
+		} finally {
+			adminCheatBusy = false;
+			reconcileUi();
+		}
 	});
 
 	saveShipNameBtn.addEventListener('click', async function onSaveShipName() {

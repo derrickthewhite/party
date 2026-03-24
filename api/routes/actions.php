@@ -63,6 +63,14 @@ function handle_actions_route(string $method, array $segments): void
         rumble_upsert_ship_name((int)$segments[1]);
     }
 
+    if (count($segments) === 4 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'actions' && $segments[3] === 'rumble-admin-grant-abilities') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+
+        rumble_admin_grant_abilities_route((int)$segments[1]);
+    }
+
     if (count($segments) === 5 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'actions' && $segments[3] === 'rumble-bids' && $segments[4] === 'cancel') {
         if ($method !== 'POST') {
             error_response('Method not allowed.', 405);
@@ -257,6 +265,49 @@ function actions_force_reveal(int $gameId): void
     $revealedCount = diplomacy_reveal_round_and_advance($gameId, $roundNumber);
 
     success_response(['revealed' => true, 'count' => $revealedCount, 'round' => $roundNumber]);
+}
+
+function rumble_admin_grant_abilities_route(int $gameId): void
+{
+    $user = require_user();
+    if ((int)($user['is_admin'] ?? 0) !== 1) {
+        error_response('Only admins can grant rumble abilities.', 403);
+    }
+
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    if (normalize_game_type((string)$game['game_type']) !== 'rumble') {
+        error_response('This endpoint is only available for rumble games.', 409);
+    }
+
+    if ((string)$game['status'] !== 'in_progress') {
+        error_response('Rumble ability grants are only available while the game is in progress.', 409);
+    }
+
+    $body = json_input();
+    $targetRaw = $body['user_id'] ?? null;
+    if (!is_int($targetRaw) && !ctype_digit((string)$targetRaw)) {
+        error_response('A valid target user_id is required.', 422);
+    }
+
+    $abilityIds = $body['ability_ids'] ?? null;
+    if (!is_array($abilityIds)) {
+        error_response('ability_ids must be an array.', 422);
+    }
+
+    $result = rumble_admin_grant_abilities($gameId, (int)$user['id'], (int)$targetRaw, $abilityIds);
+
+    success_response([
+        'granted' => true,
+        'target_user_id' => $result['target_user_id'],
+        'target_username' => $result['target_username'],
+        'added_ability_ids' => $result['added_ability_ids'],
+        'owned_ability_ids' => $result['owned_ability_ids'],
+        'owned_abilities' => $result['owned_abilities'],
+    ]);
 }
 
 function rumble_upsert_order(int $gameId): void
