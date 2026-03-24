@@ -5,21 +5,37 @@ export function createRumbleGameScreen(deps) {
 	const panel = createNodeFromHtml(`
 		<div class="card">
 			<div class="row">
-				<h3>Rumble Orders</h3>
+				<h3 data-ref="phaseTitle">Rumble Bidding</h3>
 				<div data-ref="headerSpacer"></div>
 				<button data-ref="refreshBtn">Refresh</button>
 			</div>
-			<p class="top-user-label" data-ref="progressText">Round 1 players submitted: 0/0</p>
-			<p data-ref="defenseText">Defense: 0</p>
-			<p data-ref="attackHelpText">Attack allocations (enter power to send at each target):</p>
-			<p data-ref="validationText"></p>
-			<div class="list" data-ref="playersList"></div>
-			<div class="row mobile-stack" data-ref="buttonRow">
-				<button class="primary" data-ref="submitBtn">Submit Orders</button>
-				<button data-ref="editBtn">Edit Orders</button>
-				<button data-ref="cancelBtn">Cancel Orders</button>
-				<button data-ref="endTurnBtn">End Turn</button>
+			<p class="top-user-label" data-ref="progressText">Bidding submissions: 0/0</p>
+
+			<div data-ref="biddingPanel">
+				<p data-ref="bidHelpText">Place secret bids for offered abilities. Total bid cannot exceed your current health.</p>
+				<p data-ref="bidValidationText"></p>
+				<div class="row" style="font-weight: 600; margin-bottom: 6px; align-items: center;">
+					<div style="flex: 0 0 180px;">Ability</div>
+					<div style="flex: 1;">Description</div>
+					<div style="width: 220px;">Bid</div>
+				</div>
+				<div class="list" data-ref="abilitiesList"></div>
 			</div>
+
+			<div data-ref="battlePanel">
+				<p data-ref="defenseText">Defense: 0</p>
+				<p data-ref="attackHelpText">Attack allocations (enter power to send at each target):</p>
+				<p data-ref="orderValidationText"></p>
+				<div class="list" data-ref="playersList"></div>
+			</div>
+
+			<div class="row mobile-stack" data-ref="buttonRow">
+				<button class="primary" data-ref="submitBtn">Submit Bids</button>
+				<button data-ref="editBtn">Edit Bids</button>
+				<button data-ref="cancelBtn">Cancel Bids</button>
+				<button data-ref="phaseActionBtn">End Bidding</button>
+			</div>
+
 			<h4 data-ref="lastTurnTitle">Last Turn Orders</h4>
 			<div class="list" data-ref="lastTurnList">
 				<p data-ref="emptyPreviousOrdersNode">No previous turn orders yet.</p>
@@ -27,6 +43,16 @@ export function createRumbleGameScreen(deps) {
 		</div>
 	`);
 	const refs = collectRefs(panel);
+	const abilityRowTemplate = createTemplate(`
+		<div class="row mobile-stack" style="align-items: center; margin-bottom: 6px;">
+			<div style="flex: 0 0 180px;" data-ref="name"></div>
+			<div style="flex: 1;" data-ref="description"></div>
+			<div style="width: 220px;" data-ref="right">
+				<div data-ref="label"></div>
+				<input type="number" min="0" step="1" placeholder="Bid amount" data-ref="input">
+			</div>
+		</div>
+	`);
 	const playerRowTemplate = createTemplate(`
 		<div class="row mobile-stack" style="align-items: center; margin-bottom: 6px;">
 			<div style="flex: 1;" data-ref="name"></div>
@@ -43,25 +69,34 @@ export function createRumbleGameScreen(deps) {
 		</div>
 	`);
 	const refreshBtn = refs.refreshBtn;
+	const phaseTitle = refs.phaseTitle;
 	const progressText = refs.progressText;
+	const biddingPanel = refs.biddingPanel;
+	const bidHelpText = refs.bidHelpText;
+	const bidValidationText = refs.bidValidationText;
+	const abilitiesList = refs.abilitiesList;
+	const battlePanel = refs.battlePanel;
 	const defenseText = refs.defenseText;
 	const attackHelpText = refs.attackHelpText;
-	const validationText = refs.validationText;
+	const orderValidationText = refs.orderValidationText;
 	const playersList = refs.playersList;
 	const submitBtn = refs.submitBtn;
 	const editBtn = refs.editBtn;
 	const cancelBtn = refs.cancelBtn;
-	const endTurnBtn = refs.endTurnBtn;
+	const phaseActionBtn = refs.phaseActionBtn;
 	const lastTurnList = refs.lastTurnList;
 	const emptyPreviousOrdersNode = refs.emptyPreviousOrdersNode;
 
 	panel.style.marginTop = '8px';
 	refs.headerSpacer.style.flex = '1';
+	bidHelpText.style.margin = '4px 0 8px 0';
+	bidValidationText.style.margin = '0 0 8px 0';
+	bidValidationText.style.fontWeight = '600';
 	defenseText.style.margin = '8px 0 6px 0';
 	defenseText.style.fontWeight = '600';
 	attackHelpText.style.margin = '4px 0 8px 0';
-	validationText.style.margin = '0 0 8px 0';
-	validationText.style.fontWeight = '600';
+	orderValidationText.style.margin = '0 0 8px 0';
+	orderValidationText.style.fontWeight = '600';
 	refs.buttonRow.style.marginTop = '8px';
 	refs.lastTurnTitle.style.marginTop = '10px';
 
@@ -74,25 +109,44 @@ export function createRumbleGameScreen(deps) {
 	let autoRefreshId = null;
 
 	const serverSnapshot = {
+		phaseMode: 'bidding',
 		roundNumber: 1,
 		submittedCount: 0,
 		participantCount: 0,
 		players: [],
+		offeredAbilities: [],
+		currentBids: null,
 		currentOrder: null,
 		previousRoundOrders: [],
 	};
 
 	const localDraft = {
 		attacks: {},
-		dirty: false,
+		bids: {},
+		dirtyAttacks: false,
+		dirtyBids: false,
 	};
 
 	const uiState = {
 		isEditing: true,
 	};
 
+	const abilityRowsById = new Map();
 	const playerRowsById = new Map();
 	const previousOrderRowsById = new Map();
+
+	function isBiddingPhase() {
+		return serverSnapshot.phaseMode === 'bidding';
+	}
+
+	function isDraftDirty() {
+		return isBiddingPhase() ? localDraft.dirtyBids : localDraft.dirtyAttacks;
+	}
+
+	function clearDraftDirty() {
+		localDraft.dirtyAttacks = false;
+		localDraft.dirtyBids = false;
+	}
 
 	function normalizeAttacksMap(input) {
 		const normalized = {};
@@ -113,6 +167,30 @@ export function createRumbleGameScreen(deps) {
 			}
 
 			normalized[String(Number(key))] = integer;
+		});
+
+		return normalized;
+	}
+
+	function normalizeBidsMap(input) {
+		const normalized = {};
+		const source = input && typeof input === 'object' ? input : {};
+		Object.keys(source).forEach(function eachKey(key) {
+			if (!/^[a-z0-9_]+$/i.test(String(key))) {
+				return;
+			}
+
+			const amount = Number(source[key]);
+			if (!Number.isFinite(amount)) {
+				return;
+			}
+
+			const integer = Math.max(0, Math.floor(amount));
+			if (integer <= 0) {
+				return;
+			}
+
+			normalized[String(key)] = integer;
 		});
 
 		return normalized;
@@ -156,12 +234,24 @@ export function createRumbleGameScreen(deps) {
 		return !!serverSnapshot.currentOrder;
 	}
 
+	function hasSubmittedBids() {
+		return serverSnapshot.currentBids !== null;
+	}
+
 	function getEffectiveAttacks() {
 		if (hasSubmittedOrder() && !uiState.isEditing) {
 			return normalizeAttacksMap(serverSnapshot.currentOrder.attacks || {});
 		}
 
 		return normalizeAttacksMap(localDraft.attacks || {});
+	}
+
+	function getEffectiveBids() {
+		if (hasSubmittedBids() && !uiState.isEditing) {
+			return normalizeBidsMap(serverSnapshot.currentBids || {});
+		}
+
+		return normalizeBidsMap(localDraft.bids || {});
 	}
 
 	function getAttackTotal() {
@@ -221,6 +311,147 @@ export function createRumbleGameScreen(deps) {
 		};
 	}
 
+	function getBidTotal() {
+		let total = 0;
+		const effectiveBids = getEffectiveBids();
+		Object.keys(effectiveBids).forEach(function eachAbility(abilityId) {
+			const amount = Number(effectiveBids[abilityId] || 0);
+			if (!Number.isFinite(amount)) {
+				return;
+			}
+
+			total += Math.max(0, Math.floor(amount));
+		});
+
+		return total;
+	}
+
+	function getBidValidation() {
+		const selfPlayer = getSelfPlayer();
+		const health = selfPlayer ? Number(selfPlayer.health || 0) : 0;
+		const offeredSet = {};
+		serverSnapshot.offeredAbilities.forEach(function eachAbility(ability) {
+			offeredSet[String(ability.id)] = true;
+		});
+
+		const effectiveBids = getEffectiveBids();
+		const invalidAbilityIds = Object.keys(effectiveBids).filter(function eachId(abilityId) {
+			return !offeredSet[abilityId];
+		});
+
+		const totalBid = getBidTotal();
+		return {
+			totalBid,
+			health,
+			invalidTotal: totalBid > health,
+			invalidAbilityIds,
+		};
+	}
+
+	function ensureAbilityRow(ability) {
+		const key = String(ability.id || '');
+		if (abilityRowsById.has(key)) {
+			return abilityRowsById.get(key);
+		}
+
+		const row = cloneTemplateNode(abilityRowTemplate);
+		const rowRefs = collectRefs(row);
+		const name = rowRefs.name;
+		const description = rowRefs.description;
+		const label = rowRefs.label;
+		const input = rowRefs.input;
+		input.addEventListener('input', function onInput() {
+			const raw = Number(input.value || 0);
+			localDraft.bids[key] = Math.max(0, Math.floor(Number.isFinite(raw) ? raw : 0));
+			localDraft.dirtyBids = true;
+			reconcileUi();
+		});
+
+		abilitiesList.appendChild(row);
+
+		const refs = { row, name, description, label, input };
+		abilityRowsById.set(key, refs);
+		return refs;
+	}
+
+	function reconcileAbilitiesList() {
+		let focusedAbilityId = null;
+		let selectionStart = null;
+		let selectionEnd = null;
+		const activeEl = document.activeElement;
+		if (activeEl && activeEl.tagName === 'INPUT') {
+			Array.from(abilityRowsById.entries()).forEach(function eachEntry(entry) {
+				const key = entry[0];
+				const rowRefs = entry[1];
+				if (rowRefs.input === activeEl) {
+					focusedAbilityId = key;
+					selectionStart = rowRefs.input.selectionStart;
+					selectionEnd = rowRefs.input.selectionEnd;
+				}
+			});
+		}
+
+		const active = new Set();
+		const submittedBids = normalizeBidsMap(serverSnapshot.currentBids || {});
+		const editableBids = normalizeBidsMap(localDraft.bids || {});
+		const canEditBids = !!lastPerms.can_act;
+
+		serverSnapshot.offeredAbilities.forEach(function eachAbility(ability) {
+			const key = String(ability.id || '');
+			active.add(key);
+			const rowRefs = ensureAbilityRow(ability);
+			rowRefs.name.textContent = String(ability.name || key);
+			rowRefs.description.textContent = String(ability.description || '');
+			abilitiesList.appendChild(rowRefs.row);
+
+			if (!canEditBids) {
+				rowRefs.label.textContent = 'No bidding access';
+				rowRefs.label.style.display = '';
+				rowRefs.input.style.display = 'none';
+				return;
+			}
+
+			if (hasSubmittedBids() && !uiState.isEditing) {
+				const submittedAmount = Math.max(0, Number(submittedBids[key] || 0));
+				rowRefs.label.textContent = 'Bid: ' + Math.floor(submittedAmount);
+				rowRefs.label.style.display = '';
+				rowRefs.input.style.display = 'none';
+				return;
+			}
+
+			rowRefs.label.style.display = 'none';
+			rowRefs.input.style.display = '';
+			const nextValue = String(Math.max(0, Number(editableBids[key] || 0)));
+			const isFocused = focusedAbilityId === key && document.activeElement === rowRefs.input;
+			if (!isFocused && rowRefs.input.value !== nextValue) {
+				rowRefs.input.value = nextValue;
+			}
+			rowRefs.input.disabled = !canEditBids || orderBusy;
+		});
+
+		Array.from(abilityRowsById.keys()).forEach(function eachExisting(key) {
+			if (active.has(key)) {
+				return;
+			}
+
+			const rowRefs = abilityRowsById.get(key);
+			if (rowRefs && rowRefs.row.parentNode === abilitiesList) {
+				abilitiesList.removeChild(rowRefs.row);
+			}
+			abilityRowsById.delete(key);
+		});
+
+		if (focusedAbilityId && abilityRowsById.has(focusedAbilityId)) {
+			const rowRefs = abilityRowsById.get(focusedAbilityId);
+			if (rowRefs && rowRefs.input && rowRefs.input.style.display !== 'none' && !rowRefs.input.disabled) {
+				rowRefs.input.focus();
+				if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
+					rowRefs.input.setSelectionRange(selectionStart, selectionEnd);
+				}
+			}
+		}
+	}
+
 	function ensurePlayerRow(player) {
 		const key = String(Number(player.user_id));
 		if (playerRowsById.has(key)) {
@@ -236,7 +467,7 @@ export function createRumbleGameScreen(deps) {
 		input.addEventListener('input', function onInput() {
 			const raw = Number(input.value || 0);
 			localDraft.attacks[key] = Math.max(0, Math.floor(Number.isFinite(raw) ? raw : 0));
-			localDraft.dirty = true;
+			localDraft.dirtyAttacks = true;
 			reconcileUi();
 		});
 
@@ -383,43 +614,91 @@ export function createRumbleGameScreen(deps) {
 	}
 
 	function reconcileUi() {
+		const canAct = !!lastPerms.can_act;
+		const bidding = isBiddingPhase();
+
+		biddingPanel.style.display = bidding ? '' : 'none';
+		battlePanel.style.display = bidding ? 'none' : '';
+		lastTurnList.style.display = bidding ? 'none' : '';
+		refs.lastTurnTitle.style.display = bidding ? 'none' : '';
+
+		if (bidding) {
+			phaseTitle.textContent = 'Rumble Bidding';
+			progressText.textContent = 'Bidding submissions: ' + serverSnapshot.submittedCount + '/' + serverSnapshot.participantCount;
+
+			const bidValidation = getBidValidation();
+			if (bidValidation.invalidTotal) {
+				bidValidationText.textContent = 'Bids are invalid: total bid exceeds your current health.';
+				bidValidationText.style.color = '#b42318';
+			} else if (bidValidation.invalidAbilityIds.length > 0) {
+				bidValidationText.textContent = 'Bids are invalid: one or more offered abilities are unavailable.';
+				bidValidationText.style.color = '#b42318';
+			} else {
+				bidValidationText.textContent = 'Total bid: ' + bidValidation.totalBid + ' / Health ' + bidValidation.health;
+				bidValidationText.style.color = '';
+			}
+
+			const hasSubmitted = hasSubmittedBids();
+			submitBtn.style.display = canAct && !(hasSubmitted && !uiState.isEditing) ? '' : 'none';
+			submitBtn.textContent = hasSubmitted ? 'Save Bids' : 'Submit Bids';
+			submitBtn.disabled = orderBusy || !canAct;
+
+			editBtn.style.display = canAct && hasSubmitted && !uiState.isEditing ? '' : 'none';
+			editBtn.textContent = 'Edit Bids';
+			editBtn.disabled = orderBusy || !canAct;
+
+			cancelBtn.style.display = canAct && hasSubmitted ? '' : 'none';
+			cancelBtn.textContent = 'Cancel Bids';
+			cancelBtn.disabled = orderBusy || !canAct;
+
+			phaseActionBtn.style.display = lastPerms.can_delete ? '' : 'none';
+			phaseActionBtn.textContent = 'End Bidding';
+			phaseActionBtn.disabled = orderBusy || !lastPerms.can_end_turn;
+
+			reconcileAbilitiesList();
+			return;
+		}
+
+		phaseTitle.textContent = 'Rumble Combat';
+		progressText.textContent = 'Round ' + serverSnapshot.roundNumber + ' players submitted: ' + serverSnapshot.submittedCount + '/' + serverSnapshot.participantCount;
+
 		const selfPlayer = getSelfPlayer();
 		const validation = getOrderValidation();
-		const canEditOrders = !!lastPerms.can_act;
-
 		if (!selfPlayer) {
 			defenseText.textContent = 'Defense: n/a';
-			validationText.textContent = '';
-			validationText.style.color = '';
+			orderValidationText.textContent = '';
+			orderValidationText.style.color = '';
 		} else if (validation.invalidDefense) {
 			defenseText.textContent = 'Defense: ' + validation.defense + ' (invalid: defense cannot be negative)';
-			validationText.textContent = 'Orders are invalid: total attacks exceed your available power.';
-			validationText.style.color = '#b42318';
+			orderValidationText.textContent = 'Orders are invalid: total attacks exceed your available power.';
+			orderValidationText.style.color = '#b42318';
 		} else {
 			defenseText.textContent = 'Defense: ' + validation.defense;
 			if (validation.invalidTargets.length > 0) {
-				validationText.textContent = 'Orders are invalid: remove attacks assigned to defeated or unavailable players.';
-				validationText.style.color = '#b42318';
+				orderValidationText.textContent = 'Orders are invalid: remove attacks assigned to defeated or unavailable players.';
+				orderValidationText.style.color = '#b42318';
 			} else {
-				validationText.textContent = '';
-				validationText.style.color = '';
+				orderValidationText.textContent = '';
+				orderValidationText.style.color = '';
 			}
 		}
 
 		const hasSubmitted = hasSubmittedOrder();
-
-		submitBtn.style.display = canEditOrders && !(hasSubmitted && !uiState.isEditing) ? '' : 'none';
+		submitBtn.style.display = canAct && !(hasSubmitted && !uiState.isEditing) ? '' : 'none';
 		submitBtn.textContent = hasSubmitted ? 'Save Orders' : 'Submit Orders';
-		submitBtn.disabled = orderBusy || !canEditOrders;
+		submitBtn.disabled = orderBusy || !canAct;
 
-		editBtn.style.display = canEditOrders && hasSubmitted && !uiState.isEditing ? '' : 'none';
-		editBtn.disabled = orderBusy || !canEditOrders;
+		editBtn.style.display = canAct && hasSubmitted && !uiState.isEditing ? '' : 'none';
+		editBtn.textContent = 'Edit Orders';
+		editBtn.disabled = orderBusy || !canAct;
 
-		cancelBtn.style.display = canEditOrders && hasSubmitted ? '' : 'none';
-		cancelBtn.disabled = orderBusy || !canEditOrders;
+		cancelBtn.style.display = canAct && hasSubmitted ? '' : 'none';
+		cancelBtn.textContent = 'Cancel Orders';
+		cancelBtn.disabled = orderBusy || !canAct;
 
-		endTurnBtn.style.display = lastPerms.can_delete ? '' : 'none';
-		endTurnBtn.disabled = orderBusy || !lastPerms.can_end_turn;
+		phaseActionBtn.style.display = lastPerms.can_delete ? '' : 'none';
+		phaseActionBtn.textContent = 'End Turn';
+		phaseActionBtn.disabled = orderBusy || !lastPerms.can_end_turn;
 
 		reconcilePlayersList();
 		reconcilePreviousOrdersList();
@@ -427,6 +706,7 @@ export function createRumbleGameScreen(deps) {
 
 	function applyServerSnapshot(game) {
 		const progress = game && game.rumble_turn_progress ? game.rumble_turn_progress : null;
+		const phaseMode = String(progress && progress.phase_mode ? progress.phase_mode : (game && game.phase ? game.phase : 'bidding')).toLowerCase() === 'battle' ? 'battle' : 'bidding';
 		const roundNumber = Number(progress && progress.round_number ? progress.round_number : (game && game.current_round ? game.current_round : 1));
 		const submittedCount = Number(progress && progress.submitted_count ? progress.submitted_count : 0);
 		const participantCount = Number(progress && progress.participant_count ? progress.participant_count : 0);
@@ -439,38 +719,72 @@ export function createRumbleGameScreen(deps) {
 			return !player.is_self;
 		});
 		const nextPlayers = selfPlayers.concat(otherPlayers);
+		const nextOfferedAbilities = progress && Array.isArray(progress.offered_abilities) ? progress.offered_abilities : [];
+		const nextBids = progress && progress.current_bids !== null && typeof progress.current_bids === 'object'
+			? normalizeBidsMap(progress.current_bids)
+			: null;
 		const nextOrder = progress && progress.current_order ? progress.current_order : null;
 		const nextPreviousOrders = progress && Array.isArray(progress.previous_round_orders) ? progress.previous_round_orders : [];
 
-		progressText.textContent = 'Round ' + roundNumber + ' players submitted: ' + submittedCount + '/' + participantCount;
+		const phaseChanged = phaseMode !== serverSnapshot.phaseMode;
 
 		const roundChanged = roundNumber !== serverSnapshot.roundNumber;
 		const hadOrder = !!serverSnapshot.currentOrder;
 		const hasOrderNow = !!nextOrder;
+		const hadBids = serverSnapshot.currentBids !== null;
+		const hasBidsNow = nextBids !== null;
 
+		serverSnapshot.phaseMode = phaseMode;
 		serverSnapshot.roundNumber = roundNumber;
 		serverSnapshot.submittedCount = submittedCount;
 		serverSnapshot.participantCount = participantCount;
 		serverSnapshot.players = nextPlayers;
+		serverSnapshot.offeredAbilities = nextOfferedAbilities;
+		serverSnapshot.currentBids = nextBids;
 		serverSnapshot.currentOrder = hasOrderNow ? {
 			attacks: normalizeAttacksMap(nextOrder.attacks || {}),
 			defense: Math.max(0, Number(nextOrder.defense || 0)),
 		} : null;
 		serverSnapshot.previousRoundOrders = nextPreviousOrders;
 
-		if (roundChanged) {
+		if (phaseChanged) {
+			if (isBiddingPhase()) {
+				uiState.isEditing = !hasBidsNow;
+				localDraft.bids = hasBidsNow ? normalizeBidsMap(nextBids || {}) : {};
+			} else {
+				uiState.isEditing = !hasOrderNow;
+				localDraft.attacks = hasOrderNow ? normalizeAttacksMap(nextOrder.attacks || {}) : {};
+			}
+			clearDraftDirty();
+		} else if (isBiddingPhase()) {
+			if (roundChanged) {
+				uiState.isEditing = !hasBidsNow;
+				localDraft.bids = hasBidsNow ? normalizeBidsMap(nextBids || {}) : {};
+				localDraft.dirtyBids = false;
+			} else if (!hadBids && hasBidsNow) {
+				uiState.isEditing = false;
+				localDraft.bids = normalizeBidsMap(nextBids || {});
+				localDraft.dirtyBids = false;
+			} else if (hadBids && !hasBidsNow && !localDraft.dirtyBids) {
+				uiState.isEditing = true;
+				localDraft.bids = {};
+				localDraft.dirtyBids = false;
+			} else if (!localDraft.dirtyBids && uiState.isEditing && hasBidsNow) {
+				localDraft.bids = normalizeBidsMap(nextBids || {});
+			}
+		} else if (roundChanged) {
 			uiState.isEditing = !hasOrderNow;
 			localDraft.attacks = hasOrderNow ? normalizeAttacksMap(nextOrder.attacks || {}) : {};
-			localDraft.dirty = false;
+			localDraft.dirtyAttacks = false;
 		} else if (!hadOrder && hasOrderNow) {
 			uiState.isEditing = false;
 			localDraft.attacks = normalizeAttacksMap(nextOrder.attacks || {});
-			localDraft.dirty = false;
-		} else if (hadOrder && !hasOrderNow && !localDraft.dirty) {
+			localDraft.dirtyAttacks = false;
+		} else if (hadOrder && !hasOrderNow && !localDraft.dirtyAttacks) {
 			uiState.isEditing = true;
 			localDraft.attacks = {};
-			localDraft.dirty = false;
-		} else if (!localDraft.dirty && uiState.isEditing && hasOrderNow) {
+			localDraft.dirtyAttacks = false;
+		} else if (!localDraft.dirtyAttacks && uiState.isEditing && hasOrderNow) {
 			localDraft.attacks = normalizeAttacksMap(nextOrder.attacks || {});
 		}
 
@@ -566,28 +880,48 @@ export function createRumbleGameScreen(deps) {
 			return;
 		}
 
-		const attacks = normalizeAttacksMap(localDraft.attacks);
-		const validation = getOrderValidation();
-		if (validation.invalidTargets.length > 0) {
-			setStatusNode('Invalid order: remove attacks assigned to defeated or unavailable players.', 'error');
-			return;
-		}
-
-		if (validation.invalidDefense) {
-			setStatusNode('Invalid order: defense cannot be negative.', 'error');
-			return;
-		}
-
 		orderBusy = true;
 		reconcileUi();
 		try {
+			if (isBiddingPhase()) {
+				const bids = normalizeBidsMap(localDraft.bids);
+				const bidValidation = getBidValidation();
+				if (bidValidation.invalidAbilityIds.length > 0) {
+					setStatusNode('Invalid bids: one or more offered abilities are unavailable.', 'error');
+					return;
+				}
+				if (bidValidation.invalidTotal) {
+					setStatusNode('Invalid bids: total bid exceeds your health.', 'error');
+					return;
+				}
+
+				await deps.api.submitRumbleBids(lastGameId, bids);
+				uiState.isEditing = false;
+				localDraft.dirtyBids = false;
+				await refreshRumbleState({ silent: true });
+				setStatusNode('Bids submitted.', 'ok');
+				return;
+			}
+
+			const attacks = normalizeAttacksMap(localDraft.attacks);
+			const validation = getOrderValidation();
+			if (validation.invalidTargets.length > 0) {
+				setStatusNode('Invalid order: remove attacks assigned to defeated or unavailable players.', 'error');
+				return;
+			}
+
+			if (validation.invalidDefense) {
+				setStatusNode('Invalid order: defense cannot be negative.', 'error');
+				return;
+			}
+
 			await deps.api.submitRumbleOrder(lastGameId, attacks);
 			uiState.isEditing = false;
-			localDraft.dirty = false;
+			localDraft.dirtyAttacks = false;
 			await refreshRumbleState({ silent: true });
 			setStatusNode('Orders submitted.', 'ok');
 		} catch (err) {
-			setStatusNode(err.message || 'Unable to submit orders.', 'error');
+			setStatusNode(err.message || 'Unable to submit update.', 'error');
 		} finally {
 			orderBusy = false;
 			reconcileUi();
@@ -595,40 +929,101 @@ export function createRumbleGameScreen(deps) {
 	});
 
 	editBtn.addEventListener('click', function onEditOrders() {
-		if (!serverSnapshot.currentOrder || !lastPerms.can_act || orderBusy) {
+		if (!lastPerms.can_act || orderBusy) {
+			return;
+		}
+
+		if (isBiddingPhase()) {
+			if (!hasSubmittedBids()) {
+				return;
+			}
+
+			localDraft.bids = normalizeBidsMap(serverSnapshot.currentBids || {});
+			localDraft.dirtyBids = false;
+			uiState.isEditing = true;
+			reconcileUi();
+			return;
+		}
+
+		if (!serverSnapshot.currentOrder) {
 			return;
 		}
 
 		localDraft.attacks = normalizeAttacksMap(serverSnapshot.currentOrder.attacks || {});
-		localDraft.dirty = false;
+		localDraft.dirtyAttacks = false;
 		uiState.isEditing = true;
 		reconcileUi();
 	});
 
 	cancelBtn.addEventListener('click', async function onCancelOrder() {
-		if (!lastGameId || !serverSnapshot.currentOrder || !lastPerms.can_act || orderBusy) {
+		if (!lastGameId || !lastPerms.can_act || orderBusy) {
 			return;
 		}
 
 		orderBusy = true;
 		reconcileUi();
 		try {
+			if (isBiddingPhase()) {
+				if (!hasSubmittedBids()) {
+					return;
+				}
+
+				await deps.api.cancelRumbleBids(lastGameId);
+				localDraft.bids = {};
+				localDraft.dirtyBids = false;
+				uiState.isEditing = true;
+				await refreshRumbleState({ silent: true });
+				setStatusNode('Bids canceled.', 'ok');
+				return;
+			}
+
+			if (!serverSnapshot.currentOrder) {
+				return;
+			}
+
 			await deps.api.cancelRumbleOrder(lastGameId);
 			localDraft.attacks = {};
-			localDraft.dirty = false;
+			localDraft.dirtyAttacks = false;
 			uiState.isEditing = true;
 			await refreshRumbleState({ silent: true });
 			setStatusNode('Orders canceled.', 'ok');
 		} catch (err) {
-			setStatusNode(err.message || 'Unable to cancel orders.', 'error');
+			setStatusNode(err.message || 'Unable to cancel update.', 'error');
 		} finally {
 			orderBusy = false;
 			reconcileUi();
 		}
 	});
 
-	endTurnBtn.addEventListener('click', async function onEndTurn() {
+	phaseActionBtn.addEventListener('click', async function onPhaseAction() {
 		if (!lastGameId || !lastPerms.can_delete || !lastPerms.can_end_turn || orderBusy) {
+			return;
+		}
+
+		if (isBiddingPhase()) {
+			const confirmedEndBidding = await showConfirmModal({
+				title: 'Confirm End Bidding',
+				message: 'Resolve bidding now and move the game to combat?',
+				cancelLabel: 'Cancel',
+				confirmLabel: 'End Bidding',
+			});
+			if (!confirmedEndBidding) {
+				return;
+			}
+
+			orderBusy = true;
+			reconcileUi();
+			try {
+				await deps.api.endRumbleBidding(lastGameId);
+				clearDraftDirty();
+				await refreshRumbleState({ silent: true });
+				setStatusNode('Bidding ended. Combat phase started.', 'ok');
+			} catch (err) {
+				setStatusNode(err.message || 'Unable to end bidding.', 'error');
+			} finally {
+				orderBusy = false;
+				reconcileUi();
+			}
 			return;
 		}
 
@@ -646,7 +1041,7 @@ export function createRumbleGameScreen(deps) {
 		reconcileUi();
 		try {
 			await deps.api.endRumbleTurn(lastGameId);
-			localDraft.dirty = false;
+			localDraft.dirtyAttacks = false;
 			await refreshRumbleState({ silent: true });
 			setStatusNode('Turn resolved.', 'ok');
 		} catch (err) {

@@ -129,6 +129,7 @@ CREATE TABLE IF NOT EXISTS `rumble_player_state` (
   `game_id` BIGINT UNSIGNED NOT NULL,
   `user_id` BIGINT UNSIGNED NOT NULL,
   `current_health` INT UNSIGNED NOT NULL DEFAULT 100,
+  `owned_abilities_json` JSON NULL,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`game_id`, `user_id`),
   KEY `idx_rumble_player_state_health` (`game_id`, `current_health`),

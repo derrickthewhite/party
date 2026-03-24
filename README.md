@@ -164,6 +164,11 @@ This endpoint is currently always enabled for troubleshooting and should be rest
 1. Import `sql/014_add_rumble_player_state.sql`
 2. This migration is idempotent and adds rumble player health state storage and backfill.
 
+### Existing database rumble-abilities migration
+
+1. Import `sql/015_add_rumble_abilities_state.sql`
+2. This migration is idempotent and adds persistent rumble ability ownership state.
+
 ### Clean chat only
 
 1. Import `sql/010_cleanup_messages.sql`

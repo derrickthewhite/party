@@ -58,6 +58,11 @@ function createApiModule() {
 			attacks: attacks || {},
 		}),
 		cancelRumbleOrder: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-order/cancel', 'POST'),
+		submitRumbleBids: (gameId, bids) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-bids', 'POST', {
+			bids: bids || {},
+		}),
+		cancelRumbleBids: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-bids/cancel', 'POST'),
+		endRumbleBidding: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-bids/end', 'POST'),
 		endRumbleTurn: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/reveal', 'POST'),
 	};
 }

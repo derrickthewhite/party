@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../lib/game_access.php';
 require_once __DIR__ . '/../lib/game_types.php';
+require_once __DIR__ . '/../lib/rumble.php';
 
 function handle_actions_route(string $method, array $segments): void
 {
@@ -43,6 +44,30 @@ function handle_actions_route(string $method, array $segments): void
         }
 
         rumble_cancel_order((int)$segments[1]);
+    }
+
+    if (count($segments) === 4 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'actions' && $segments[3] === 'rumble-bids') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+
+        rumble_upsert_bids((int)$segments[1]);
+    }
+
+    if (count($segments) === 5 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'actions' && $segments[3] === 'rumble-bids' && $segments[4] === 'cancel') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+
+        rumble_cancel_bids((int)$segments[1]);
+    }
+
+    if (count($segments) === 5 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'actions' && $segments[3] === 'rumble-bids' && $segments[4] === 'end') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+
+        rumble_end_bidding((int)$segments[1]);
     }
 
     error_response('Not found.', 404);
@@ -214,12 +239,19 @@ function actions_force_reveal(int $gameId): void
             error_response('Turn resolution is only available for diplomacy and rumble games.', 409);
         }
 
-        $stateStmt = db()->prepare('SELECT current_round FROM game_state WHERE game_id = :game_id LIMIT 1');
+        $stateStmt = db()->prepare('SELECT current_round, phase FROM game_state WHERE game_id = :game_id LIMIT 1');
         $stateStmt->execute(['game_id' => $gameId]);
-        $roundNumber = (int)($stateStmt->fetchColumn() ?: 1);
+        $state = $stateStmt->fetch();
+        $roundNumber = (int)($state['current_round'] ?? 1);
+        $phase = (string)($state['phase'] ?? 'bidding');
+
+        if ($phase === 'bidding') {
+            $resolved = rumble_resolve_bidding_and_enter_battle($gameId, $roundNumber);
+            success_response(['resolved' => true, 'phase' => 'battle', 'count' => $resolved, 'round' => $roundNumber]);
+        }
 
         $resolvedCount = rumble_resolve_round_and_advance($gameId, $roundNumber);
-        success_response(['resolved' => true, 'count' => $resolvedCount, 'round' => $roundNumber]);
+        success_response(['resolved' => true, 'phase' => 'battle', 'count' => $resolvedCount, 'round' => $roundNumber]);
     }
 
     $stateStmt = db()->prepare('SELECT current_round FROM game_state WHERE game_id = :game_id LIMIT 1');
@@ -258,6 +290,9 @@ function rumble_upsert_order(int $gameId): void
 
     $roundNumber = (int)($state['current_round'] ?? 1);
     $phase = (string)($state['phase'] ?? default_phase_for_game_type((string)$game['game_type']));
+    if ($phase !== 'battle') {
+        error_response('Rumble orders are only available during battle phase.', 409);
+    }
 
     $ensureStmt = db()->prepare(
         'INSERT INTO rumble_player_state (game_id, user_id, current_health) VALUES (:game_id, :user_id, 100) '
@@ -385,6 +420,526 @@ function rumble_upsert_order(int $gameId): void
     ], 201);
 }
 
+function rumble_upsert_bids(int $gameId): void
+{
+    $user = require_user();
+    $role = game_require_member_or_403((int)$user['id'], $gameId);
+    if ($role === 'observer') {
+        error_response('Observers cannot submit bids.', 403);
+    }
+
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    if (normalize_game_type((string)$game['game_type']) !== 'rumble') {
+        error_response('This endpoint is only available for rumble games.', 409);
+    }
+
+    if ((string)$game['status'] !== 'in_progress') {
+        error_response('Bids are only allowed while game is in progress.', 409);
+    }
+
+    $stateStmt = db()->prepare('SELECT current_round, phase FROM game_state WHERE game_id = :game_id LIMIT 1');
+    $stateStmt->execute(['game_id' => $gameId]);
+    $state = $stateStmt->fetch();
+    $roundNumber = (int)($state['current_round'] ?? 1);
+    $phase = (string)($state['phase'] ?? default_phase_for_game_type((string)$game['game_type']));
+    if ($phase !== 'bidding') {
+        error_response('Bids are only allowed during bidding phase.', 409);
+    }
+
+    $ensureStmt = db()->prepare(
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health) VALUES (:game_id, :user_id, 100) '
+        . 'ON DUPLICATE KEY UPDATE current_health = current_health'
+    );
+    $ensureStmt->execute([
+        'game_id' => $gameId,
+        'user_id' => (int)$user['id'],
+    ]);
+
+    $healthStmt = db()->prepare('SELECT current_health FROM rumble_player_state WHERE game_id = :game_id AND user_id = :user_id LIMIT 1');
+    $healthStmt->execute([
+        'game_id' => $gameId,
+        'user_id' => (int)$user['id'],
+    ]);
+    $currentHealth = (int)($healthStmt->fetchColumn() ?: 0);
+    if ($currentHealth <= 0) {
+        error_response('Eliminated players cannot submit bids.', 409);
+    }
+
+    $offer = rumble_current_offer($gameId, $roundNumber);
+    if ($offer === null) {
+        error_response('No ability offer is available for this game.', 409);
+    }
+
+    $allowed = [];
+    foreach ($offer['ability_ids'] as $abilityId) {
+        $allowed[$abilityId] = true;
+    }
+
+    $body = json_input();
+    $bidsRaw = $body['bids'] ?? [];
+    if (!is_array($bidsRaw)) {
+        error_response('Bids must be an object keyed by ability id.', 422);
+    }
+
+    $normalized = [];
+    $totalBid = 0;
+    foreach ($bidsRaw as $abilityIdRaw => $amountRaw) {
+        $abilityId = trim((string)$abilityIdRaw);
+        if ($abilityId === '' || !isset($allowed[$abilityId])) {
+            error_response('One or more ability ids are invalid for this offer.', 422);
+        }
+
+        if (!is_int($amountRaw) && !ctype_digit((string)$amountRaw)) {
+            error_response('Bid amounts must be whole non-negative numbers.', 422);
+        }
+
+        $amount = (int)$amountRaw;
+        if ($amount < 0) {
+            error_response('Bid amounts must be non-negative.', 422);
+        }
+
+        if ($amount === 0) {
+            continue;
+        }
+
+        $normalized[$abilityId] = $amount;
+        $totalBid += $amount;
+    }
+
+    if ($totalBid > $currentHealth) {
+        error_response('Invalid bids: total bid cannot exceed current health.', 422);
+    }
+
+    ksort($normalized, SORT_STRING);
+    $payload = [
+        'bids' => $normalized,
+        'total_bid' => $totalBid,
+    ];
+
+    $pdo = db();
+    $pdo->beginTransaction();
+    try {
+        $deleteStmt = $pdo->prepare(
+            'DELETE FROM game_actions WHERE game_id = :game_id AND user_id = :user_id AND round_number = :round_number AND action_type = :action_type'
+        );
+        $deleteStmt->execute([
+            'game_id' => $gameId,
+            'user_id' => (int)$user['id'],
+            'round_number' => $roundNumber,
+            'action_type' => 'bid',
+        ]);
+
+        $insertStmt = $pdo->prepare(
+            'INSERT INTO game_actions (game_id, user_id, action_type, payload, round_number, phase, revealed_at) '
+            . 'VALUES (:game_id, :user_id, :action_type, :payload, :round_number, :phase, :revealed_at)'
+        );
+        $insertStmt->execute([
+            'game_id' => $gameId,
+            'user_id' => (int)$user['id'],
+            'action_type' => 'bid',
+            'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'round_number' => $roundNumber,
+            'phase' => 'bidding',
+            'revealed_at' => null,
+        ]);
+
+        $pdo->commit();
+    } catch (Throwable $ex) {
+        $pdo->rollBack();
+        throw $ex;
+    }
+
+    rumble_maybe_auto_resolve_bidding($gameId, $roundNumber);
+
+    success_response([
+        'submitted' => true,
+        'phase' => 'bidding',
+        'round' => $roundNumber,
+        'total_bid' => $totalBid,
+    ], 201);
+}
+
+function rumble_cancel_bids(int $gameId): void
+{
+    $user = require_user();
+    $role = game_require_member_or_403((int)$user['id'], $gameId);
+    if ($role === 'observer') {
+        error_response('Observers cannot submit bids.', 403);
+    }
+
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    if (normalize_game_type((string)$game['game_type']) !== 'rumble') {
+        error_response('This endpoint is only available for rumble games.', 409);
+    }
+
+    if ((string)$game['status'] !== 'in_progress') {
+        error_response('Bids are only allowed while game is in progress.', 409);
+    }
+
+    $stateStmt = db()->prepare('SELECT current_round, phase FROM game_state WHERE game_id = :game_id LIMIT 1');
+    $stateStmt->execute(['game_id' => $gameId]);
+    $state = $stateStmt->fetch();
+    $roundNumber = (int)($state['current_round'] ?? 1);
+    $phase = (string)($state['phase'] ?? default_phase_for_game_type((string)$game['game_type']));
+    if ($phase !== 'bidding') {
+        error_response('Bids are only allowed during bidding phase.', 409);
+    }
+
+    $deleteStmt = db()->prepare(
+        'DELETE FROM game_actions WHERE game_id = :game_id AND user_id = :user_id AND round_number = :round_number AND action_type = :action_type'
+    );
+    $deleteStmt->execute([
+        'game_id' => $gameId,
+        'user_id' => (int)$user['id'],
+        'round_number' => $roundNumber,
+        'action_type' => 'bid',
+    ]);
+
+    success_response([
+        'canceled' => true,
+        'deleted' => $deleteStmt->rowCount() > 0,
+        'phase' => 'bidding',
+        'round' => $roundNumber,
+    ]);
+}
+
+function rumble_end_bidding(int $gameId): void
+{
+    $user = require_user();
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    $role = game_member_role((int)$user['id'], $gameId);
+    $isOwner = (int)$game['owner_user_id'] === (int)$user['id'];
+    $isAdmin = (int)($user['is_admin'] ?? 0) === 1;
+    if ($role === null && !$isAdmin) {
+        error_response('Only game members can perform this action.', 403);
+    }
+    if (!$isOwner && !$isAdmin) {
+        error_response('Only the game owner or an admin can end bidding.', 403);
+    }
+
+    if (normalize_game_type((string)$game['game_type']) !== 'rumble') {
+        error_response('This endpoint is only available for rumble games.', 409);
+    }
+
+    if ((string)$game['status'] !== 'in_progress') {
+        error_response('Bids are only allowed while game is in progress.', 409);
+    }
+
+    $stateStmt = db()->prepare('SELECT current_round, phase FROM game_state WHERE game_id = :game_id LIMIT 1');
+    $stateStmt->execute(['game_id' => $gameId]);
+    $state = $stateStmt->fetch();
+    $roundNumber = (int)($state['current_round'] ?? 1);
+    $phase = (string)($state['phase'] ?? default_phase_for_game_type((string)$game['game_type']));
+    if ($phase !== 'bidding') {
+        error_response('Bidding is already closed for this round.', 409);
+    }
+
+    $resolved = rumble_resolve_bidding_and_enter_battle($gameId, $roundNumber);
+
+    success_response([
+        'resolved' => true,
+        'phase' => 'battle',
+        'round' => $roundNumber,
+        'assigned_count' => $resolved,
+    ]);
+}
+
+function rumble_maybe_auto_resolve_bidding(int $gameId, int $roundNumber): void
+{
+    $stateStmt = db()->prepare('SELECT phase FROM game_state WHERE game_id = :game_id LIMIT 1');
+    $stateStmt->execute(['game_id' => $gameId]);
+    $phase = (string)($stateStmt->fetchColumn() ?: 'bidding');
+    if ($phase !== 'bidding') {
+        return;
+    }
+
+    $participantsStmt = db()->prepare(
+        'SELECT COUNT(*) FROM game_members gm '
+        . 'JOIN users u ON u.id = gm.user_id '
+        . 'LEFT JOIN rumble_player_state rps ON rps.game_id = gm.game_id AND rps.user_id = gm.user_id '
+        . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1 '
+        . 'AND COALESCE(rps.current_health, 100) > 0'
+    );
+    $participantsStmt->execute([
+        'game_id' => $gameId,
+        'observer_role' => 'observer',
+    ]);
+    $participantCount = (int)$participantsStmt->fetchColumn();
+    if ($participantCount <= 0) {
+        return;
+    }
+
+    $submittedStmt = db()->prepare(
+        'SELECT COUNT(DISTINCT user_id) FROM game_actions '
+        . 'WHERE game_id = :game_id AND round_number = :round_number AND action_type = :action_type'
+    );
+    $submittedStmt->execute([
+        'game_id' => $gameId,
+        'round_number' => $roundNumber,
+        'action_type' => 'bid',
+    ]);
+    $submittedCount = (int)$submittedStmt->fetchColumn();
+    if ($submittedCount < $participantCount) {
+        return;
+    }
+
+    rumble_resolve_bidding_and_enter_battle($gameId, $roundNumber);
+}
+
+function rumble_current_offer(int $gameId, int $roundNumber): ?array
+{
+    $offerStmt = db()->prepare(
+        'SELECT payload FROM game_actions '
+        . 'WHERE game_id = :game_id AND round_number = :round_number AND action_type = :action_type '
+        . 'ORDER BY id DESC LIMIT 1'
+    );
+    $offerStmt->execute([
+        'game_id' => $gameId,
+        'round_number' => $roundNumber,
+        'action_type' => 'ability_offer',
+    ]);
+    $raw = $offerStmt->fetchColumn();
+    if ($raw === false) {
+        return null;
+    }
+
+    $payload = json_decode((string)$raw, true);
+    if (!is_array($payload)) {
+        return null;
+    }
+
+    $idsRaw = isset($payload['ability_ids']) && is_array($payload['ability_ids']) ? $payload['ability_ids'] : [];
+    $ids = [];
+    $seen = [];
+    foreach ($idsRaw as $idRaw) {
+        $id = trim((string)$idRaw);
+        if ($id === '' || isset($seen[$id]) || !rumble_ability_exists($id)) {
+            continue;
+        }
+        $seen[$id] = true;
+        $ids[] = $id;
+    }
+
+    return [
+        'ability_ids' => $ids,
+    ];
+}
+
+function rumble_resolve_bidding_and_enter_battle(int $gameId, int $roundNumber): int
+{
+    $pdo = db();
+
+    $ensureStmt = $pdo->prepare(
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health) '
+        . 'SELECT gm.game_id, gm.user_id, 100 FROM game_members gm '
+        . 'JOIN users u ON u.id = gm.user_id '
+        . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1 '
+        . 'ON DUPLICATE KEY UPDATE current_health = current_health'
+    );
+    $ensureStmt->execute([
+        'game_id' => $gameId,
+        'observer_role' => 'observer',
+    ]);
+
+    $offer = rumble_current_offer($gameId, $roundNumber);
+    if ($offer === null || empty($offer['ability_ids'])) {
+        error_response('No ability offer is available for this game.', 409);
+    }
+
+    $playersStmt = $pdo->prepare(
+        'SELECT gm.user_id, COALESCE(rps.current_health, 100) AS current_health, rps.owned_abilities_json '
+        . 'FROM game_members gm '
+        . 'JOIN users u ON u.id = gm.user_id '
+        . 'LEFT JOIN rumble_player_state rps ON rps.game_id = gm.game_id AND rps.user_id = gm.user_id '
+        . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1 '
+        . 'AND COALESCE(rps.current_health, 100) > 0'
+    );
+    $playersStmt->execute([
+        'game_id' => $gameId,
+        'observer_role' => 'observer',
+    ]);
+    $playerRows = $playersStmt->fetchAll();
+
+    $remainingHealth = [];
+    $ownedByUser = [];
+    foreach ($playerRows as $row) {
+        $userId = (int)$row['user_id'];
+        $remainingHealth[$userId] = max(0, (int)$row['current_health']);
+        $ownedByUser[$userId] = rumble_parse_owned_abilities(isset($row['owned_abilities_json']) ? (string)$row['owned_abilities_json'] : null);
+    }
+
+    if (empty($remainingHealth)) {
+        return 0;
+    }
+
+    $bidStmt = $pdo->prepare(
+        'SELECT user_id, payload FROM game_actions '
+        . 'WHERE game_id = :game_id AND round_number = :round_number AND action_type = :action_type'
+    );
+    $bidStmt->execute([
+        'game_id' => $gameId,
+        'round_number' => $roundNumber,
+        'action_type' => 'bid',
+    ]);
+    $bidRows = $bidStmt->fetchAll();
+
+    $bidsByAbility = [];
+    foreach ($offer['ability_ids'] as $abilityId) {
+        $bidsByAbility[$abilityId] = [];
+    }
+
+    foreach ($bidRows as $row) {
+        $userId = (int)$row['user_id'];
+        if (!isset($remainingHealth[$userId])) {
+            continue;
+        }
+
+        $payload = json_decode((string)$row['payload'], true);
+        if (!is_array($payload)) {
+            continue;
+        }
+
+        $bids = isset($payload['bids']) && is_array($payload['bids']) ? $payload['bids'] : [];
+        foreach ($bids as $abilityIdRaw => $amountRaw) {
+            $abilityId = trim((string)$abilityIdRaw);
+            if (!isset($bidsByAbility[$abilityId])) {
+                continue;
+            }
+            if (!is_int($amountRaw) && !ctype_digit((string)$amountRaw)) {
+                continue;
+            }
+
+            $amount = (int)$amountRaw;
+            if ($amount <= 0) {
+                continue;
+            }
+
+            $bidsByAbility[$abilityId][$userId] = $amount;
+        }
+    }
+
+    $assigned = [];
+    foreach ($offer['ability_ids'] as $abilityId) {
+        $abilityBids = $bidsByAbility[$abilityId] ?? [];
+        if (empty($abilityBids)) {
+            continue;
+        }
+
+        $bidLevels = array_values(array_unique(array_map(static fn ($v): int => (int)$v, array_values($abilityBids))));
+        rsort($bidLevels, SORT_NUMERIC);
+        $winningBid = 0;
+        $candidateIds = [];
+        foreach ($bidLevels as $bidLevel) {
+            if ($bidLevel <= 0) {
+                continue;
+            }
+
+            $eligibleAtLevel = [];
+            foreach ($abilityBids as $userId => $bidAmount) {
+                if ((int)$bidAmount !== (int)$bidLevel) {
+                    continue;
+                }
+
+                if (($remainingHealth[(int)$userId] ?? 0) < (int)$bidLevel) {
+                    continue;
+                }
+
+                $eligibleAtLevel[] = (int)$userId;
+            }
+
+            if (empty($eligibleAtLevel)) {
+                continue;
+            }
+
+            $winningBid = (int)$bidLevel;
+            $candidateIds = $eligibleAtLevel;
+            break;
+        }
+
+        if ($winningBid <= 0 || empty($candidateIds)) {
+            continue;
+        }
+
+        $winnerId = $candidateIds[count($candidateIds) === 1 ? 0 : random_int(0, count($candidateIds) - 1)];
+        $remainingHealth[$winnerId] = max(0, $remainingHealth[$winnerId] - $winningBid);
+        $ownedByUser[$winnerId][] = $abilityId;
+        $assigned[$abilityId] = [
+            'user_id' => $winnerId,
+            'bid' => $winningBid,
+        ];
+    }
+
+    $pdo->beginTransaction();
+    try {
+        $updateStateStmt = $pdo->prepare(
+            'INSERT INTO game_state (game_id, phase, current_round) VALUES (:game_id, :phase, :current_round) '
+            . 'ON DUPLICATE KEY UPDATE phase = :phase_update'
+        );
+        $updateStateStmt->execute([
+            'game_id' => $gameId,
+            'phase' => 'battle',
+            'current_round' => $roundNumber,
+            'phase_update' => 'battle',
+        ]);
+
+        $updatePlayerStmt = $pdo->prepare(
+            'UPDATE rumble_player_state SET current_health = :current_health, owned_abilities_json = :owned_abilities_json '
+            . 'WHERE game_id = :game_id AND user_id = :user_id'
+        );
+        foreach ($remainingHealth as $userId => $health) {
+            $updatePlayerStmt->execute([
+                'current_health' => max(0, (int)$health),
+                'owned_abilities_json' => rumble_encode_owned_abilities($ownedByUser[$userId] ?? []),
+                'game_id' => $gameId,
+                'user_id' => $userId,
+            ]);
+        }
+
+        $deleteAssignmentStmt = $pdo->prepare(
+            'DELETE FROM game_actions WHERE game_id = :game_id AND round_number = :round_number AND action_type = :action_type'
+        );
+        $deleteAssignmentStmt->execute([
+            'game_id' => $gameId,
+            'round_number' => $roundNumber,
+            'action_type' => 'ability_assignment',
+        ]);
+
+        $insertAssignmentStmt = $pdo->prepare(
+            'INSERT INTO game_actions (game_id, user_id, action_type, payload, round_number, phase, revealed_at) '
+            . 'VALUES (:game_id, :user_id, :action_type, :payload, :round_number, :phase, :revealed_at)'
+        );
+        $assignmentActorId = (int)array_key_first($remainingHealth);
+        $insertAssignmentStmt->execute([
+            'game_id' => $gameId,
+            'user_id' => $assignmentActorId,
+            'action_type' => 'ability_assignment',
+            'payload' => json_encode(['assigned' => $assigned], JSON_UNESCAPED_UNICODE),
+            'round_number' => $roundNumber,
+            'phase' => 'bidding',
+            'revealed_at' => gmdate('Y-m-d H:i:s'),
+        ]);
+
+        $pdo->commit();
+    } catch (Throwable $ex) {
+        $pdo->rollBack();
+        throw $ex;
+    }
+
+    return count($assigned);
+}
+
 function rumble_cancel_order(int $gameId): void
 {
     $user = require_user();
@@ -406,9 +961,14 @@ function rumble_cancel_order(int $gameId): void
         error_response('Game actions are only allowed while game is in progress.', 409);
     }
 
-    $stateStmt = db()->prepare('SELECT current_round FROM game_state WHERE game_id = :game_id LIMIT 1');
+    $stateStmt = db()->prepare('SELECT current_round, phase FROM game_state WHERE game_id = :game_id LIMIT 1');
     $stateStmt->execute(['game_id' => $gameId]);
-    $roundNumber = (int)($stateStmt->fetchColumn() ?: 1);
+    $state = $stateStmt->fetch();
+    $roundNumber = (int)($state['current_round'] ?? 1);
+    $phase = (string)($state['phase'] ?? default_phase_for_game_type((string)$game['game_type']));
+    if ($phase !== 'battle') {
+        error_response('Rumble orders are only available during battle phase.', 409);
+    }
 
     $deleteStmt = db()->prepare(
         'DELETE FROM game_actions WHERE game_id = :game_id AND user_id = :user_id AND round_number = :round_number AND action_type = :action_type'
@@ -583,10 +1143,10 @@ function rumble_resolve_round_and_advance(int $gameId, int $roundNumber): int
         );
         $stateStmt->execute([
             'game_id' => $gameId,
-            'phase' => 'bidding',
+            'phase' => 'battle',
             'current_round' => $roundNumber,
             'next_round' => $roundNumber + 1,
-            'phase_update' => 'bidding',
+            'phase_update' => 'battle',
         ]);
 
         $pdo->commit();

@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/game_access.php';
 require_once __DIR__ . '/../lib/game_types.php';
+require_once __DIR__ . '/../lib/rumble.php';
 
 function handle_games_route(string $method, array $segments): void
 {
@@ -337,6 +338,7 @@ function games_start(int $gameId): void
 
         if (normalize_game_type((string)$game['game_type']) === 'rumble') {
             rumble_initialize_player_state($gameId);
+            rumble_ensure_bidding_offer($gameId, 1, (int)$user['id']);
         }
 
         $pdo->commit();
@@ -475,13 +477,19 @@ function games_detail(int $gameId): void
     $rumbleProgress = null;
     if (normalize_game_type((string)$game['game_type']) === 'rumble') {
         $roundNumber = (int)($game['current_round'] ?? 1);
+        $phase = (string)($game['phase'] ?? default_phase_for_game_type((string)$game['game_type']));
 
         rumble_initialize_player_state($gameId);
+        if ($phase === 'bidding') {
+            rumble_ensure_bidding_offer($gameId, $roundNumber, (int)$game['owner_user_id']);
+        }
 
         $participantsStmt = db()->prepare(
             'SELECT COUNT(*) FROM game_members gm '
             . 'JOIN users u ON u.id = gm.user_id '
+            . 'LEFT JOIN rumble_player_state rps ON rps.game_id = gm.game_id AND rps.user_id = gm.user_id '
             . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1'
+            . ' AND COALESCE(rps.current_health, 100) > 0'
         );
         $participantsStmt->execute([
             'game_id' => $gameId,
@@ -489,6 +497,7 @@ function games_detail(int $gameId): void
         ]);
         $participantCount = (int)$participantsStmt->fetchColumn();
 
+        $submittedActionType = $phase === 'bidding' ? 'bid' : 'order';
         $submittedStmt = db()->prepare(
             'SELECT COUNT(DISTINCT user_id) FROM game_actions '
             . 'WHERE game_id = :game_id AND round_number = :round_number AND action_type = :action_type'
@@ -496,12 +505,12 @@ function games_detail(int $gameId): void
         $submittedStmt->execute([
             'game_id' => $gameId,
             'round_number' => $roundNumber,
-            'action_type' => 'order',
+            'action_type' => $submittedActionType,
         ]);
         $submittedCount = (int)$submittedStmt->fetchColumn();
 
         $playersStmt = db()->prepare(
-            'SELECT gm.user_id, u.username, COALESCE(rps.current_health, 100) AS current_health, gm.role '
+            'SELECT gm.user_id, u.username, COALESCE(rps.current_health, 100) AS current_health, gm.role, rps.owned_abilities_json '
             . 'FROM game_members gm '
             . 'JOIN users u ON u.id = gm.user_id '
             . 'LEFT JOIN rumble_player_state rps ON rps.game_id = gm.game_id AND rps.user_id = gm.user_id '
@@ -515,6 +524,16 @@ function games_detail(int $gameId): void
         ]);
         $players = [];
         foreach ($playersStmt->fetchAll() as $row) {
+            $ownedAbilityIds = rumble_parse_owned_abilities(isset($row['owned_abilities_json']) ? (string)$row['owned_abilities_json'] : null);
+            $ownedAbilities = [];
+            foreach ($ownedAbilityIds as $abilityId) {
+                $ability = rumble_ability_by_id($abilityId);
+                if ($ability === null) {
+                    continue;
+                }
+                $ownedAbilities[] = rumble_ability_public_view($ability);
+            }
+
             $players[] = [
                 'user_id' => (int)$row['user_id'],
                 'username' => (string)$row['username'],
@@ -522,7 +541,38 @@ function games_detail(int $gameId): void
                 'is_self' => (int)$row['user_id'] === (int)$user['id'],
                 'is_defeated' => (int)$row['current_health'] <= 0,
                 'member_role' => (string)$row['role'],
+                'owned_abilities' => $ownedAbilities,
             ];
+        }
+
+        $offer = rumble_fetch_offer_payload($gameId, $roundNumber);
+        $offeredAbilities = [];
+        foreach ($offer['ability_ids'] as $abilityId) {
+            $ability = rumble_ability_by_id($abilityId);
+            if ($ability === null) {
+                continue;
+            }
+            $offeredAbilities[] = rumble_ability_public_view($ability);
+        }
+
+        $currentBids = null;
+        if ($phase === 'bidding') {
+            $currentBidStmt = db()->prepare(
+                'SELECT payload FROM game_actions '
+                . 'WHERE game_id = :game_id AND round_number = :round_number AND action_type = :action_type AND user_id = :user_id '
+                . 'ORDER BY id DESC LIMIT 1'
+            );
+            $currentBidStmt->execute([
+                'game_id' => $gameId,
+                'round_number' => $roundNumber,
+                'action_type' => 'bid',
+                'user_id' => (int)$user['id'],
+            ]);
+            $currentBidPayload = $currentBidStmt->fetchColumn();
+            if ($currentBidPayload !== false) {
+                $decodedBid = json_decode((string)$currentBidPayload, true);
+                $currentBids = rumble_normalize_bid_map(isset($decodedBid['bids']) ? $decodedBid['bids'] : []);
+            }
         }
 
         $currentOrderStmt = db()->prepare(
@@ -610,10 +660,13 @@ function games_detail(int $gameId): void
         }
 
         $rumbleProgress = [
+            'phase_mode' => $phase,
             'round_number' => $roundNumber,
             'submitted_count' => $submittedCount,
             'participant_count' => $participantCount,
             'players' => $players,
+            'offered_abilities' => $offeredAbilities,
+            'current_bids' => $currentBids,
             'current_order' => $currentOrder,
             'previous_round_orders' => $previousOrders,
         ];
@@ -641,8 +694,8 @@ function games_detail(int $gameId): void
 function rumble_initialize_player_state(int $gameId): void
 {
     $stmt = db()->prepare(
-        'INSERT INTO rumble_player_state (game_id, user_id, current_health) '
-        . 'SELECT gm.game_id, gm.user_id, 100 FROM game_members gm '
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health, owned_abilities_json) '
+        . 'SELECT gm.game_id, gm.user_id, 100, :owned_abilities_json FROM game_members gm '
         . 'JOIN users u ON u.id = gm.user_id '
         . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1 '
         . 'ON DUPLICATE KEY UPDATE current_health = current_health'
@@ -650,7 +703,123 @@ function rumble_initialize_player_state(int $gameId): void
     $stmt->execute([
         'game_id' => $gameId,
         'observer_role' => 'observer',
+        'owned_abilities_json' => json_encode([], JSON_UNESCAPED_UNICODE),
     ]);
+}
+
+function rumble_ensure_bidding_offer(int $gameId, int $roundNumber, int $actorUserId): void
+{
+    $existingStmt = db()->prepare(
+        'SELECT id FROM game_actions '
+        . 'WHERE game_id = :game_id AND round_number = :round_number AND action_type = :action_type '
+        . 'ORDER BY id DESC LIMIT 1'
+    );
+    $existingStmt->execute([
+        'game_id' => $gameId,
+        'round_number' => $roundNumber,
+        'action_type' => 'ability_offer',
+    ]);
+    if ($existingStmt->fetchColumn() !== false) {
+        return;
+    }
+
+    $participantsStmt = db()->prepare(
+        'SELECT COUNT(*) FROM game_members gm '
+        . 'JOIN users u ON u.id = gm.user_id '
+        . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1'
+    );
+    $participantsStmt->execute([
+        'game_id' => $gameId,
+        'observer_role' => 'observer',
+    ]);
+    $participantCount = max(0, (int)$participantsStmt->fetchColumn());
+
+    $abilityCount = count(rumble_ability_library());
+    $offerCount = min($abilityCount, max(6, $participantCount * 2));
+    $offered = rumble_pick_random_abilities($offerCount);
+
+    $insertStmt = db()->prepare(
+        'INSERT INTO game_actions (game_id, user_id, action_type, payload, round_number, phase, revealed_at) '
+        . 'VALUES (:game_id, :user_id, :action_type, :payload, :round_number, :phase, :revealed_at)'
+    );
+    $insertStmt->execute([
+        'game_id' => $gameId,
+        'user_id' => $actorUserId,
+        'action_type' => 'ability_offer',
+        'payload' => json_encode(['ability_ids' => $offered], JSON_UNESCAPED_UNICODE),
+        'round_number' => $roundNumber,
+        'phase' => 'bidding',
+        'revealed_at' => gmdate('Y-m-d H:i:s'),
+    ]);
+}
+
+function rumble_fetch_offer_payload(int $gameId, int $roundNumber): array
+{
+    $offerStmt = db()->prepare(
+        'SELECT payload FROM game_actions '
+        . 'WHERE game_id = :game_id AND round_number = :round_number AND action_type = :action_type '
+        . 'ORDER BY id DESC LIMIT 1'
+    );
+    $offerStmt->execute([
+        'game_id' => $gameId,
+        'round_number' => $roundNumber,
+        'action_type' => 'ability_offer',
+    ]);
+    $raw = $offerStmt->fetchColumn();
+    if ($raw === false) {
+        return ['ability_ids' => []];
+    }
+
+    $decoded = json_decode((string)$raw, true);
+    if (!is_array($decoded)) {
+        return ['ability_ids' => []];
+    }
+
+    $abilityIdsRaw = is_array($decoded['ability_ids'] ?? null) ? $decoded['ability_ids'] : [];
+    $abilityIds = [];
+    $seen = [];
+    foreach ($abilityIdsRaw as $idRaw) {
+        $id = trim((string)$idRaw);
+        if ($id === '' || isset($seen[$id]) || !rumble_ability_exists($id)) {
+            continue;
+        }
+
+        $seen[$id] = true;
+        $abilityIds[] = $id;
+    }
+
+    return [
+        'ability_ids' => $abilityIds,
+    ];
+}
+
+function rumble_normalize_bid_map($raw): array
+{
+    if (!is_array($raw)) {
+        return [];
+    }
+
+    $normalized = [];
+    foreach ($raw as $abilityIdRaw => $amountRaw) {
+        $abilityId = trim((string)$abilityIdRaw);
+        if ($abilityId === '' || !rumble_ability_exists($abilityId)) {
+            continue;
+        }
+
+        if (!is_int($amountRaw) && !ctype_digit((string)$amountRaw)) {
+            continue;
+        }
+
+        $amount = (int)$amountRaw;
+        if ($amount <= 0) {
+            continue;
+        }
+
+        $normalized[$abilityId] = $amount;
+    }
+
+    ksort($normalized, SORT_STRING);
+    return $normalized;
 }
 
 function mafia_assign_roles_if_missing(int $gameId): void
