@@ -39,3 +39,7 @@ These rules are mandatory for all JavaScript UI changes in this repository.
 - Focused input remains usable after refresh.
 - Round advance applies new server state and resets draft intentionally.
 - Screen updates are keyed and mutation-based, not rebuild-based.
+
+## SQL Migration Consistency Rule
+
+- When adding a new SQL update/migration script in `sql/` (for example `0xx_*.sql`), also update `sql/001_schema.sql` and `sql/099_full_reset.sql` so fresh and reset installs include the same schema/state.

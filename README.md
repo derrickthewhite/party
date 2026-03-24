@@ -169,6 +169,11 @@ This endpoint is currently always enabled for troubleshooting and should be rest
 1. Import `sql/015_add_rumble_abilities_state.sql`
 2. This migration is idempotent and adds persistent rumble ability ownership state.
 
+### Existing database rumble ability-catalog migration
+
+1. Import `sql/018_rumble_ability_catalog_tables.sql`
+2. This migration is idempotent and moves rumble ability definitions/template catalog to database tables.
+
 ### Clean chat only
 
 1. Import `sql/010_cleanup_messages.sql`

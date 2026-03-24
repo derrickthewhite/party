@@ -30,9 +30,15 @@ export function createRumbleGameScreen(deps) {
 
 			<div data-ref="battlePanel">
 				<p data-ref="defenseText">Defense: 0</p>
+				<p data-ref="energyText">Energy: 0 | Attacks: 0 | Abilities: 0 | Remaining: 0</p>
 				<p data-ref="attackHelpText">Attack allocations (enter power to send at each target):</p>
 				<p data-ref="orderValidationText"></p>
 				<div class="list" data-ref="playersList"></div>
+				<div data-ref="abilityActivationPanel" style="margin-top: 8px;">
+					<p data-ref="abilityActivationHelpText">Ability activations (activated abilities consume energy; passive/triggered abilities resolve automatically):</p>
+					<p data-ref="abilityValidationText"></p>
+					<div class="list" data-ref="abilityActivationList"></div>
+				</div>
 			</div>
 
 			<div class="row mobile-stack" data-ref="buttonRow">
@@ -45,6 +51,16 @@ export function createRumbleGameScreen(deps) {
 			<h4 data-ref="lastTurnTitle">Last Turn Orders</h4>
 			<div class="list" data-ref="lastTurnList">
 				<p data-ref="emptyPreviousOrdersNode">No previous turn orders yet.</p>
+			</div>
+
+			<h4 data-ref="currentEventLogTitle">Current Round Events</h4>
+			<div class="list" data-ref="currentEventLogList">
+				<p data-ref="emptyCurrentEventLogNode">No current round events yet.</p>
+			</div>
+
+			<h4 data-ref="previousEventLogTitle">Previous Round Events</h4>
+			<div class="list" data-ref="previousEventLogList">
+				<p data-ref="emptyPreviousEventLogNode">No previous round events yet.</p>
 			</div>
 		</div>
 	`);
@@ -71,7 +87,37 @@ export function createRumbleGameScreen(deps) {
 			</div>
 		</div>
 	`);
+	const abilityActivationRowTemplate = createTemplate(`
+		<div class="row mobile-stack" style="align-items: flex-start; margin-bottom: 6px;">
+			<div style="flex: 1 1 260px; min-width: 220px;">
+				<div data-ref="name" style="font-weight: 600;"></div>
+				<small data-ref="meta" style="opacity: 0.8;"></small>
+				<div data-ref="description" style="margin-top: 3px;"></div>
+			</div>
+			<div style="flex: 1 1 320px; min-width: 240px; display: grid; gap: 6px;" data-ref="controls">
+				<label data-ref="toggleWrap" style="display: inline-flex; align-items: center; gap: 8px;">
+					<input type="checkbox" data-ref="toggleInput" style="width: auto;">
+					<span data-ref="toggleLabel">Activate</span>
+				</label>
+				<div data-ref="targetWrap" class="row" style="margin: 0; gap: 8px;">
+					<label data-ref="targetLabel" style="min-width: 50px;">Target</label>
+					<select data-ref="targetSelect" style="flex: 1;"></select>
+				</div>
+				<div data-ref="xCostWrap" class="row" style="margin: 0; gap: 8px;">
+					<label data-ref="xCostLabel" style="min-width: 50px;">X Cost</label>
+					<input type="number" min="0" step="1" data-ref="xCostInput" placeholder="0" style="flex: 1;">
+				</div>
+				<div data-ref="readonlyText"></div>
+			</div>
+		</div>
+	`);
 	const previousOrderTemplate = createTemplate(`
+		<div class="message-item">
+			<small data-ref="meta"></small>
+			<div data-ref="text"></div>
+		</div>
+	`);
+	const eventLogTemplate = createTemplate(`
 		<div class="message-item">
 			<small data-ref="meta"></small>
 			<div data-ref="text"></div>
@@ -90,15 +136,26 @@ export function createRumbleGameScreen(deps) {
 	const abilitiesList = refs.abilitiesList;
 	const battlePanel = refs.battlePanel;
 	const defenseText = refs.defenseText;
+	const energyText = refs.energyText;
 	const attackHelpText = refs.attackHelpText;
 	const orderValidationText = refs.orderValidationText;
 	const playersList = refs.playersList;
+	const abilityActivationPanel = refs.abilityActivationPanel;
+	const abilityActivationHelpText = refs.abilityActivationHelpText;
+	const abilityValidationText = refs.abilityValidationText;
+	const abilityActivationList = refs.abilityActivationList;
 	const submitBtn = refs.submitBtn;
 	const editBtn = refs.editBtn;
 	const cancelBtn = refs.cancelBtn;
 	const phaseActionBtn = refs.phaseActionBtn;
 	const lastTurnList = refs.lastTurnList;
 	const emptyPreviousOrdersNode = refs.emptyPreviousOrdersNode;
+	const currentEventLogTitle = refs.currentEventLogTitle;
+	const currentEventLogList = refs.currentEventLogList;
+	const emptyCurrentEventLogNode = refs.emptyCurrentEventLogNode;
+	const previousEventLogTitle = refs.previousEventLogTitle;
+	const previousEventLogList = refs.previousEventLogList;
+	const emptyPreviousEventLogNode = refs.emptyPreviousEventLogNode;
 
 	panel.style.marginTop = '8px';
 	refs.headerSpacer.style.flex = '1';
@@ -107,12 +164,19 @@ export function createRumbleGameScreen(deps) {
 	bidValidationText.style.fontWeight = '600';
 	defenseText.style.margin = '8px 0 6px 0';
 	defenseText.style.fontWeight = '600';
+	energyText.style.margin = '0 0 6px 0';
+	energyText.style.fontWeight = '600';
 	shipNameInput.style.flex = '1';
 	attackHelpText.style.margin = '4px 0 8px 0';
 	orderValidationText.style.margin = '0 0 8px 0';
 	orderValidationText.style.fontWeight = '600';
+	abilityActivationHelpText.style.margin = '4px 0 8px 0';
+	abilityValidationText.style.margin = '0 0 8px 0';
+	abilityValidationText.style.fontWeight = '600';
 	refs.buttonRow.style.marginTop = '8px';
 	refs.lastTurnTitle.style.marginTop = '10px';
+	currentEventLogTitle.style.marginTop = '10px';
+	previousEventLogTitle.style.marginTop = '10px';
 
 	let lastGameId = null;
 	let lastRound = 1;
@@ -134,13 +198,17 @@ export function createRumbleGameScreen(deps) {
 		currentBids: null,
 		currentOrder: null,
 		previousRoundOrders: [],
+		currentRoundEventLog: [],
+		previousRoundEventLog: [],
 		selfShipName: '',
 	};
 
 	const localDraft = {
 		attacks: {},
+		abilityActivations: {},
 		bids: {},
 		dirtyAttacks: false,
+		dirtyAbilityActivations: false,
 		dirtyBids: false,
 		shipName: '',
 		dirtyShipName: false,
@@ -152,18 +220,24 @@ export function createRumbleGameScreen(deps) {
 
 	const abilityRowsById = new Map();
 	const playerRowsById = new Map();
+	const abilityActivationRowsById = new Map();
 	const previousOrderRowsById = new Map();
+	const currentEventRowsById = new Map();
+	const previousEventRowsById = new Map();
 
 	function isBiddingPhase() {
 		return serverSnapshot.phaseMode === 'bidding';
 	}
 
 	function isDraftDirty() {
-		return isBiddingPhase() ? localDraft.dirtyBids : localDraft.dirtyAttacks;
+		return isBiddingPhase()
+			? localDraft.dirtyBids
+			: (localDraft.dirtyAttacks || localDraft.dirtyAbilityActivations);
 	}
 
 	function clearDraftDirty() {
 		localDraft.dirtyAttacks = false;
+		localDraft.dirtyAbilityActivations = false;
 		localDraft.dirtyBids = false;
 	}
 
@@ -215,6 +289,313 @@ export function createRumbleGameScreen(deps) {
 		return normalized;
 	}
 
+	function normalizeAbilityActivationMap(input) {
+		const normalized = {};
+		const source = input && typeof input === 'object' ? input : {};
+		Object.keys(source).forEach(function eachKey(key) {
+			if (!/^[a-z0-9_]+$/i.test(String(key))) {
+				return;
+			}
+
+			const item = source[key];
+			if (!item || typeof item !== 'object') {
+				return;
+			}
+
+			const next = {};
+			if (Object.prototype.hasOwnProperty.call(item, 'target_user_id')) {
+				const target = Number(item.target_user_id);
+				if (Number.isFinite(target) && target > 0) {
+					next.target_user_id = Math.floor(target);
+				}
+			}
+
+			if (Object.prototype.hasOwnProperty.call(item, 'x_cost')) {
+				const xCost = Number(item.x_cost);
+				if (Number.isFinite(xCost) && xCost >= 0) {
+					next.x_cost = Math.floor(xCost);
+				}
+			}
+
+			if (Object.prototype.hasOwnProperty.call(item, 'mode')) {
+				const mode = String(item.mode || '').trim();
+				if (mode) {
+					next.mode = mode.slice(0, 40);
+				}
+			}
+
+			next.is_enabled = item.is_enabled !== false;
+			normalized[String(key)] = next;
+		});
+
+		return normalized;
+	}
+
+	function normalizeAbilityActivationArray(input) {
+		if (!Array.isArray(input)) {
+			return [];
+		}
+
+		const normalized = [];
+		input.forEach(function eachActivation(item, index) {
+			if (!item || typeof item !== 'object') {
+				return;
+			}
+
+			const abilityId = String(item.ability_id || '').trim();
+			if (!abilityId) {
+				return;
+			}
+
+			const normalizedEntry = {
+				ability_id: abilityId,
+				client_order_index: Math.max(0, Number.isFinite(Number(item.client_order_index))
+					? Math.floor(Number(item.client_order_index))
+					: index),
+			};
+
+			if (Object.prototype.hasOwnProperty.call(item, 'target_user_id')) {
+				const target = Number(item.target_user_id);
+				if (Number.isFinite(target) && target > 0) {
+					normalizedEntry.target_user_id = Math.floor(target);
+				}
+			}
+
+			if (Object.prototype.hasOwnProperty.call(item, 'x_cost')) {
+				const xCost = Number(item.x_cost);
+				if (Number.isFinite(xCost) && xCost >= 0) {
+					normalizedEntry.x_cost = Math.floor(xCost);
+				}
+			}
+
+			if (Object.prototype.hasOwnProperty.call(item, 'mode')) {
+				const mode = String(item.mode || '').trim();
+				if (mode) {
+					normalizedEntry.mode = mode.slice(0, 40);
+				}
+			}
+
+			if (Object.prototype.hasOwnProperty.call(item, 'is_enabled')) {
+				normalizedEntry.is_enabled = !!item.is_enabled;
+			}
+
+			normalized.push(normalizedEntry);
+		});
+
+		normalized.sort(function sortActivations(a, b) {
+			if (a.client_order_index !== b.client_order_index) {
+				return a.client_order_index - b.client_order_index;
+			}
+			return String(a.ability_id).localeCompare(String(b.ability_id));
+		});
+
+		return normalized;
+	}
+
+	function activationArrayToMap(activations) {
+		const mapped = {};
+		normalizeAbilityActivationArray(activations).forEach(function eachActivation(entry) {
+			mapped[String(entry.ability_id)] = {
+				target_user_id: Object.prototype.hasOwnProperty.call(entry, 'target_user_id') ? entry.target_user_id : undefined,
+				x_cost: Object.prototype.hasOwnProperty.call(entry, 'x_cost') ? entry.x_cost : undefined,
+				mode: Object.prototype.hasOwnProperty.call(entry, 'mode') ? entry.mode : undefined,
+				is_enabled: Object.prototype.hasOwnProperty.call(entry, 'is_enabled') ? !!entry.is_enabled : true,
+			};
+		});
+		return normalizeAbilityActivationMap(mapped);
+	}
+
+	function getSelfOwnedAbilities() {
+		const selfPlayer = getSelfPlayer();
+		if (!selfPlayer || !Array.isArray(selfPlayer.owned_abilities)) {
+			return [];
+		}
+		return selfPlayer.owned_abilities;
+	}
+
+	function isActivatedAbility(ability) {
+		return String(ability && ability.template_kind ? ability.template_kind : '') === 'activated';
+	}
+
+	function getEffectiveAbilityActivationMap() {
+		if (hasSubmittedOrder() && !uiState.isEditing) {
+			const activations = serverSnapshot.currentOrder && Array.isArray(serverSnapshot.currentOrder.ability_activations)
+				? serverSnapshot.currentOrder.ability_activations
+				: [];
+			return activationArrayToMap(activations);
+		}
+
+		return normalizeAbilityActivationMap(localDraft.abilityActivations || {});
+	}
+
+	function evaluateAbilityCostFormula(formula, xCost) {
+		const source = formula && typeof formula === 'object' ? formula : {};
+		const kind = String(source.kind || '');
+		if (kind === 'constant') {
+			return Math.max(0, Math.floor(Number(source.value || 0)));
+		}
+
+		if (kind === 'variable_x') {
+			return Math.max(0, Math.floor(Number(xCost || 0)));
+		}
+
+		if (kind === 'scaled_x') {
+			const multiplier = Math.max(0, Math.floor(Number(source.multiplier || 0)));
+			return Math.max(0, Math.floor(Number(xCost || 0)) * multiplier);
+		}
+
+		return null;
+	}
+
+	function abilityCostFromDraft(ability, draftActivation) {
+		const activation = draftActivation && typeof draftActivation === 'object' ? draftActivation : {};
+		const templateKey = String(ability && ability.template_key ? ability.template_key : '');
+		const params = ability && typeof ability.template_params === 'object' && ability.template_params
+			? ability.template_params
+			: {};
+		const xCost = Math.max(0, Math.floor(Number(activation.x_cost || 0)));
+		const formulaCost = evaluateAbilityCostFormula(params.cost_formula, xCost);
+		if (formulaCost !== null) {
+			return formulaCost;
+		}
+
+		if (templateKey === 'activated_spend_with_target_policy') {
+			if (String(params.cost_mode || '') === 'variable') {
+				return xCost;
+			}
+			return 0;
+		}
+
+		if (templateKey === 'activated_defense_mode') {
+			if (Object.prototype.hasOwnProperty.call(activation, 'x_cost')) {
+				return xCost;
+			}
+			return 0;
+		}
+
+		if (templateKey === 'activated_self_or_toggle') {
+			return xCost;
+		}
+
+		return 0;
+	}
+
+	function getAbilityControlSpec(ability) {
+		const templateKey = String(ability && ability.template_key ? ability.template_key : '');
+		const abilityId = String(ability && ability.id ? ability.id : '');
+		const params = ability && typeof ability.template_params === 'object' && ability.template_params
+			? ability.template_params
+			: {};
+		const templateInputs = ability && typeof ability.template_inputs === 'object' && ability.template_inputs
+			? ability.template_inputs
+			: {};
+
+		if (!isActivatedAbility(ability)) {
+			return {
+				showTarget: false,
+				targetRequired: false,
+				showXCost: false,
+			};
+		}
+
+		if (templateKey === 'activated_spend_with_target_policy') {
+			const targetPolicy = String(params.target_policy || 'optional_target');
+			const showTarget = targetPolicy === 'single_opponent' || targetPolicy === 'optional_target';
+			return {
+				showTarget,
+				targetRequired: targetPolicy === 'single_opponent',
+				showXCost: String(params.cost_mode || '') === 'variable' || abilityId === 'mining_rig',
+			};
+		}
+
+		if (templateKey === 'activated_defense_mode') {
+			return {
+				showTarget: abilityId === 'focused_defense',
+				targetRequired: abilityId === 'focused_defense',
+				showXCost: Object.prototype.hasOwnProperty.call(templateInputs, 'x_cost') && abilityId === 'mine_layer',
+			};
+		}
+
+		if (templateKey === 'activated_self_or_toggle') {
+			return {
+				showTarget: false,
+				targetRequired: false,
+				showXCost: abilityId !== 'hyperdrive' && Object.prototype.hasOwnProperty.call(templateInputs, 'x_cost'),
+			};
+		}
+
+		return {
+			showTarget: Object.prototype.hasOwnProperty.call(templateInputs, 'target_user_id'),
+			targetRequired: Object.prototype.hasOwnProperty.call(templateInputs, 'target_user_id'),
+			showXCost: Object.prototype.hasOwnProperty.call(templateInputs, 'x_cost'),
+		};
+	}
+
+	function getDraftActivationSummary() {
+		if (hasSubmittedOrder() && !uiState.isEditing && serverSnapshot.currentOrder) {
+			return {
+				ability_energy_spent: Math.max(0, Number(serverSnapshot.currentOrder.ability_energy_spent || 0)),
+			};
+		}
+
+		let abilityEnergySpent = 0;
+		const activationMap = getEffectiveAbilityActivationMap();
+		getSelfOwnedAbilities().forEach(function eachAbility(ability) {
+			if (!isActivatedAbility(ability)) {
+				return;
+			}
+
+			const abilityId = String(ability.id || '');
+			const draft = activationMap[abilityId] || { is_enabled: false };
+			if (draft.is_enabled === false) {
+				return;
+			}
+
+			abilityEnergySpent += abilityCostFromDraft(ability, draft);
+		});
+
+		return { ability_energy_spent: abilityEnergySpent };
+	}
+
+	function getEffectiveAbilityActivationArray() {
+		const activationMap = getEffectiveAbilityActivationMap();
+		const activations = [];
+		let orderIndex = 0;
+		getSelfOwnedAbilities().forEach(function eachAbility(ability) {
+			if (!isActivatedAbility(ability)) {
+				return;
+			}
+
+			const abilityId = String(ability.id || '');
+			const draft = activationMap[abilityId] || { is_enabled: false };
+			if (draft.is_enabled === false) {
+				return;
+			}
+
+			const activation = {
+				ability_id: abilityId,
+				client_order_index: orderIndex,
+			};
+			if (Object.prototype.hasOwnProperty.call(draft, 'target_user_id')) {
+				activation.target_user_id = Math.max(1, Math.floor(Number(draft.target_user_id || 0)));
+			}
+			if (Object.prototype.hasOwnProperty.call(draft, 'x_cost')) {
+				activation.x_cost = Math.max(0, Math.floor(Number(draft.x_cost || 0)));
+			}
+			if (Object.prototype.hasOwnProperty.call(draft, 'mode')) {
+				activation.mode = String(draft.mode || '').trim();
+			}
+			if (Object.prototype.hasOwnProperty.call(draft, 'is_enabled')) {
+				activation.is_enabled = draft.is_enabled !== false;
+			}
+
+			activations.push(activation);
+			orderIndex += 1;
+		});
+
+		return normalizeAbilityActivationArray(activations);
+	}
+
 	function playerNameById(userId) {
 		const targetId = Number(userId);
 		const row = serverSnapshot.players.find(function eachPlayer(player) {
@@ -231,17 +612,36 @@ export function createRumbleGameScreen(deps) {
 		}
 
 		const attacks = normalizeAttacksMap(order.attacks || {});
+		const abilityActivations = normalizeAbilityActivationArray(order.ability_activations || []);
 		const attackParts = Object.keys(attacks).sort(function sortNumeric(a, b) {
 			return Number(a) - Number(b);
 		}).map(function eachTarget(targetId) {
 			return playerNameById(targetId) + ': ' + attacks[targetId];
 		});
+		const abilityParts = abilityActivations.map(function eachActivation(activation) {
+			const parts = [String(activation.ability_id || 'ability')];
+			if (Object.prototype.hasOwnProperty.call(activation, 'target_user_id')) {
+				parts.push('target ' + playerNameById(activation.target_user_id));
+			}
+			if (Object.prototype.hasOwnProperty.call(activation, 'x_cost')) {
+				parts.push('x ' + Math.max(0, Number(activation.x_cost || 0)));
+			}
+			return parts.join(' ');
+		});
+
+		const energyBudget = Math.max(0, Number(order.energy_budget || 0));
+		const totalSpent = Math.max(0, Number(order.total_energy_spent || 0));
+		const energyPart = energyBudget > 0
+			? ' | Energy ' + totalSpent + '/' + energyBudget
+			: '';
 
 		if (attackParts.length === 0) {
-			return 'Defense ' + Number(order.defense || 0) + ' | No attacks';
+			const abilityText = abilityParts.length > 0 ? ' | Abilities ' + abilityParts.join(', ') : ' | No abilities';
+			return 'Defense ' + Number(order.defense || 0) + ' | No attacks' + abilityText + energyPart;
 		}
 
-		return 'Defense ' + Number(order.defense || 0) + ' | Attacks ' + attackParts.join(', ');
+		const abilityText = abilityParts.length > 0 ? ' | Abilities ' + abilityParts.join(', ') : ' | No abilities';
+		return 'Defense ' + Number(order.defense || 0) + ' | Attacks ' + attackParts.join(', ') + abilityText + energyPart;
 	}
 
 	function getSelfPlayer() {
@@ -296,16 +696,36 @@ export function createRumbleGameScreen(deps) {
 		if (!lastPerms.can_act) {
 			return {
 				defense: selfPlayer ? Number(selfPlayer.health || 0) : 0,
+				energyBudget: 0,
+				attackEnergySpent: 0,
+				abilityEnergySpent: 0,
+				totalEnergySpent: 0,
+				remainingEnergy: 0,
 				invalidDefense: false,
+				invalidEnergy: false,
 				invalidTargets: [],
+				invalidAbilityTargets: [],
+				missingAbilityTargets: [],
 			};
 		}
 
 		if (hasSubmittedOrder() && !uiState.isEditing) {
+			const energyBudget = Math.max(0, Number(serverSnapshot.currentOrder ? serverSnapshot.currentOrder.energy_budget || 0 : 0));
+			const attackEnergySpent = Math.max(0, Number(serverSnapshot.currentOrder ? serverSnapshot.currentOrder.attack_energy_spent || 0 : 0));
+			const abilityEnergySpent = Math.max(0, Number(serverSnapshot.currentOrder ? serverSnapshot.currentOrder.ability_energy_spent || 0 : 0));
+			const totalEnergySpent = Math.max(0, Number(serverSnapshot.currentOrder ? serverSnapshot.currentOrder.total_energy_spent || 0 : (attackEnergySpent + abilityEnergySpent)));
 			return {
 				defense: Number(serverSnapshot.currentOrder ? serverSnapshot.currentOrder.defense || 0 : 0),
+				energyBudget,
+				attackEnergySpent,
+				abilityEnergySpent,
+				totalEnergySpent,
+				remainingEnergy: energyBudget - totalEnergySpent,
 				invalidDefense: false,
+				invalidEnergy: false,
 				invalidTargets: [],
+				invalidAbilityTargets: [],
+				missingAbilityTargets: [],
 			};
 		}
 
@@ -322,13 +742,63 @@ export function createRumbleGameScreen(deps) {
 		const invalidTargets = Object.keys(effectiveAttacks).filter(function eachTarget(targetId) {
 			return !attackableTargets[targetId];
 		});
+
+		const effectiveActivations = getEffectiveAbilityActivationMap();
+		const invalidAbilityTargets = [];
+		const missingAbilityTargets = [];
+		getSelfOwnedAbilities().forEach(function eachAbility(ability) {
+			if (!isActivatedAbility(ability)) {
+				return;
+			}
+
+			const abilityId = String(ability.id || '');
+			const activation = effectiveActivations[abilityId] || { is_enabled: false };
+			if (activation.is_enabled === false) {
+				return;
+			}
+
+			const controlSpec = getAbilityControlSpec(ability);
+			if (!controlSpec.showTarget) {
+				return;
+			}
+
+			if (!Object.prototype.hasOwnProperty.call(activation, 'target_user_id')) {
+				if (controlSpec.targetRequired) {
+					missingAbilityTargets.push(abilityId);
+				}
+				return;
+			}
+
+			const targetKey = String(Math.max(0, Number(activation.target_user_id || 0)));
+			if (!attackableTargets[targetKey]) {
+				invalidAbilityTargets.push(abilityId);
+			}
+		});
+
+		const activationSummary = getDraftActivationSummary();
+		const attackEnergySpent = Math.max(0, getAttackTotal());
+		const abilityEnergySpent = Math.max(0, Number(activationSummary.ability_energy_spent || 0));
+		const totalEnergySpent = attackEnergySpent + abilityEnergySpent;
+		const ownedAbilityIds = getSelfOwnedAbilities().map(function eachAbility(ability) {
+			return String(ability.id || '');
+		});
+		const energyBudget = Math.max(0, Number(selfPlayer ? selfPlayer.health || 0 : 0))
+			+ (ownedAbilityIds.indexOf('turbo_generator') >= 0 ? 10 : 0);
 		const health = selfPlayer ? Number(selfPlayer.health || 0) : 0;
 		const defense = health - getAttackTotal();
 
 		return {
 			defense,
+			energyBudget,
+			attackEnergySpent,
+			abilityEnergySpent,
+			totalEnergySpent,
+			remainingEnergy: energyBudget - totalEnergySpent,
 			invalidDefense: defense < 0,
+			invalidEnergy: totalEnergySpent > energyBudget,
 			invalidTargets,
+			invalidAbilityTargets,
+			missingAbilityTargets,
 		};
 	}
 
@@ -576,6 +1046,305 @@ export function createRumbleGameScreen(deps) {
 		});
 	}
 
+	function ensureAbilityActivationRow(ability) {
+		const key = String(ability.id || '');
+		if (abilityActivationRowsById.has(key)) {
+			return abilityActivationRowsById.get(key);
+		}
+
+		const row = cloneTemplateNode(abilityActivationRowTemplate);
+		const rowRefs = collectRefs(row);
+		const refs = {
+			row,
+			name: rowRefs.name,
+			meta: rowRefs.meta,
+			description: rowRefs.description,
+			controls: rowRefs.controls,
+			toggleWrap: rowRefs.toggleWrap,
+			toggleInput: rowRefs.toggleInput,
+			toggleLabel: rowRefs.toggleLabel,
+			targetWrap: rowRefs.targetWrap,
+			targetLabel: rowRefs.targetLabel,
+			targetSelect: rowRefs.targetSelect,
+			xCostWrap: rowRefs.xCostWrap,
+			xCostLabel: rowRefs.xCostLabel,
+			xCostInput: rowRefs.xCostInput,
+			readonlyText: rowRefs.readonlyText,
+			targetOptionByValue: new Map(),
+		};
+
+		rowRefs.toggleInput.addEventListener('change', function onToggleChange() {
+			const current = normalizeAbilityActivationMap(localDraft.abilityActivations || {});
+			const nextEntry = current[key] || {};
+			nextEntry.is_enabled = !!rowRefs.toggleInput.checked;
+			current[key] = nextEntry;
+			localDraft.abilityActivations = current;
+			localDraft.dirtyAbilityActivations = true;
+			reconcileUi();
+		});
+
+		rowRefs.targetSelect.addEventListener('change', function onTargetChange() {
+			const current = normalizeAbilityActivationMap(localDraft.abilityActivations || {});
+			const nextEntry = current[key] || {};
+			const selected = String(rowRefs.targetSelect.value || '');
+			if (/^\d+$/.test(selected) && Number(selected) > 0) {
+				nextEntry.target_user_id = Number(selected);
+			} else {
+				delete nextEntry.target_user_id;
+			}
+			nextEntry.is_enabled = nextEntry.is_enabled !== false;
+			current[key] = nextEntry;
+			localDraft.abilityActivations = current;
+			localDraft.dirtyAbilityActivations = true;
+			reconcileUi();
+		});
+
+		rowRefs.xCostInput.addEventListener('input', function onXCostInput() {
+			const current = normalizeAbilityActivationMap(localDraft.abilityActivations || {});
+			const nextEntry = current[key] || {};
+			const raw = Number(rowRefs.xCostInput.value || 0);
+			nextEntry.x_cost = Math.max(0, Math.floor(Number.isFinite(raw) ? raw : 0));
+			nextEntry.is_enabled = nextEntry.is_enabled !== false;
+			current[key] = nextEntry;
+			localDraft.abilityActivations = current;
+			localDraft.dirtyAbilityActivations = true;
+			reconcileUi();
+		});
+
+		abilityActivationList.appendChild(row);
+		abilityActivationRowsById.set(key, refs);
+		return refs;
+	}
+
+	function reconcileSelectOptions(selectNode, optionMap, options) {
+		const active = new Set();
+		options.forEach(function eachOption(option) {
+			const value = String(option.value);
+			active.add(value);
+			let optionNode = optionMap.get(value);
+			if (!optionNode) {
+				optionNode = document.createElement('option');
+				optionMap.set(value, optionNode);
+			}
+			optionNode.value = value;
+			optionNode.textContent = String(option.label);
+			selectNode.appendChild(optionNode);
+		});
+
+		Array.from(optionMap.keys()).forEach(function eachExisting(value) {
+			if (active.has(value)) {
+				return;
+			}
+
+			const node = optionMap.get(value);
+			if (node && node.parentNode === selectNode) {
+				selectNode.removeChild(node);
+			}
+			optionMap.delete(value);
+		});
+	}
+
+	function describeActivationReadonly(ability, activationMap) {
+		if (!isActivatedAbility(ability)) {
+			const templateKind = String(ability.template_kind || 'passive');
+			if (templateKind === 'triggered') {
+				return 'Triggered ability. Resolves automatically when conditions are met.';
+			}
+			if (templateKind === 'condition') {
+				return 'Condition tracker. Evaluated automatically by the round resolver.';
+			}
+			return 'Passive ability. Always applied automatically by the resolver.';
+		}
+
+		const abilityId = String(ability.id || '');
+		const activation = activationMap[abilityId] || null;
+		if (!activation || activation.is_enabled === false) {
+			return 'Not activated this round.';
+		}
+
+		const parts = ['Activated'];
+		if (Object.prototype.hasOwnProperty.call(activation, 'target_user_id')) {
+			parts.push('target: ' + playerNameById(activation.target_user_id));
+		}
+		if (Object.prototype.hasOwnProperty.call(activation, 'x_cost')) {
+			parts.push('x: ' + Math.max(0, Number(activation.x_cost || 0)));
+		}
+		parts.push('cost: ' + abilityCostFromDraft(ability, activation));
+		return parts.join(' | ');
+	}
+
+	function reconcileAbilityActivationList() {
+		const selfOwnedAbilities = getSelfOwnedAbilities();
+		const activationMap = getEffectiveAbilityActivationMap();
+		const canEdit = !!lastPerms.can_act && uiState.isEditing && !orderBusy && !isBiddingPhase();
+
+		let focusedKey = null;
+		let focusedControl = null;
+		let selectionStart = null;
+		let selectionEnd = null;
+		const activeEl = document.activeElement;
+		if (activeEl) {
+			Array.from(abilityActivationRowsById.entries()).forEach(function eachEntry(entry) {
+				const key = entry[0];
+				const refs = entry[1];
+				if (refs.toggleInput === activeEl) {
+					focusedKey = key;
+					focusedControl = 'toggle';
+				} else if (refs.targetSelect === activeEl) {
+					focusedKey = key;
+					focusedControl = 'target';
+				} else if (refs.xCostInput === activeEl) {
+					focusedKey = key;
+					focusedControl = 'x_cost';
+					selectionStart = refs.xCostInput.selectionStart;
+					selectionEnd = refs.xCostInput.selectionEnd;
+				}
+			});
+		}
+
+		const aliveTargets = serverSnapshot.players.filter(function eachPlayer(player) {
+			return !player.is_self && !player.is_defeated && Number(player.health || 0) > 0;
+		});
+
+		const active = new Set();
+		selfOwnedAbilities.forEach(function eachAbility(ability) {
+			const key = String(ability.id || '');
+			active.add(key);
+			const refs = ensureAbilityActivationRow(ability);
+			refs.name.textContent = String(ability.title || ability.name || key);
+			refs.meta.textContent = String(ability.template_kind || 'unknown');
+			refs.description.textContent = String(ability.description || '');
+			abilityActivationList.appendChild(refs.row);
+
+			const isActivated = isActivatedAbility(ability);
+			const controlSpec = getAbilityControlSpec(ability);
+			const hasTarget = controlSpec.showTarget;
+			const hasXCost = controlSpec.showXCost;
+
+			const currentActivation = activationMap[key] || { is_enabled: false };
+			const enabled = currentActivation.is_enabled !== false;
+			refs.readonlyText.textContent = describeActivationReadonly(ability, activationMap);
+
+			const showInteractiveControls = isActivated && canEdit;
+			refs.toggleWrap.style.display = showInteractiveControls ? '' : 'none';
+			refs.targetWrap.style.display = showInteractiveControls && hasTarget ? '' : 'none';
+			refs.xCostWrap.style.display = showInteractiveControls && hasXCost ? '' : 'none';
+			refs.readonlyText.style.display = showInteractiveControls ? 'none' : '';
+
+			if (showInteractiveControls) {
+				refs.toggleInput.disabled = !canEdit;
+				refs.toggleInput.checked = enabled;
+				const estimatedCost = abilityCostFromDraft(ability, currentActivation);
+				refs.toggleLabel.textContent = 'Activate (cost: ' + estimatedCost + ')';
+
+				if (hasTarget) {
+					const options = [{ value: '', label: 'Select target' }].concat(aliveTargets.map(function eachTarget(player) {
+						return {
+							value: String(player.user_id),
+							label: String(player.ship_name || player.username || ('User ' + player.user_id)),
+						};
+					}));
+					reconcileSelectOptions(refs.targetSelect, refs.targetOptionByValue, options);
+					const currentTarget = Object.prototype.hasOwnProperty.call(currentActivation, 'target_user_id')
+						? String(currentActivation.target_user_id)
+						: '';
+					if (refs.targetSelect.value !== currentTarget) {
+						refs.targetSelect.value = currentTarget;
+					}
+					refs.targetSelect.disabled = !enabled || !canEdit;
+				}
+
+				if (hasXCost) {
+					const xValue = String(Math.max(0, Number(currentActivation.x_cost || 0)));
+					if (refs.xCostInput.value !== xValue) {
+						refs.xCostInput.value = xValue;
+					}
+					refs.xCostInput.disabled = !enabled || !canEdit;
+				}
+			}
+		});
+
+		Array.from(abilityActivationRowsById.keys()).forEach(function eachExisting(key) {
+			if (active.has(key)) {
+				return;
+			}
+
+			const refs = abilityActivationRowsById.get(key);
+			if (refs && refs.row.parentNode === abilityActivationList) {
+				abilityActivationList.removeChild(refs.row);
+			}
+			abilityActivationRowsById.delete(key);
+		});
+
+		if (focusedKey && abilityActivationRowsById.has(focusedKey)) {
+			const refs = abilityActivationRowsById.get(focusedKey);
+			if (!refs) {
+				return;
+			}
+
+			if (focusedControl === 'toggle' && refs.toggleWrap.style.display !== 'none') {
+				refs.toggleInput.focus();
+			} else if (focusedControl === 'target' && refs.targetWrap.style.display !== 'none' && !refs.targetSelect.disabled) {
+				refs.targetSelect.focus();
+			} else if (focusedControl === 'x_cost' && refs.xCostWrap.style.display !== 'none' && !refs.xCostInput.disabled) {
+				refs.xCostInput.focus();
+				if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
+					refs.xCostInput.setSelectionRange(selectionStart, selectionEnd);
+				}
+			}
+		}
+	}
+
+	function ensureEventRow(eventListMap, key, listNode) {
+		if (eventListMap.has(key)) {
+			return eventListMap.get(key);
+		}
+
+		const line = cloneTemplateNode(eventLogTemplate);
+		const rowRefs = collectRefs(line);
+		const refs = {
+			line,
+			meta: rowRefs.meta,
+			text: rowRefs.text,
+		};
+		listNode.appendChild(line);
+		eventListMap.set(key, refs);
+		return refs;
+	}
+
+	function reconcileEventLogList(events, listNode, emptyNode, rowMap, labelPrefix) {
+		const list = Array.isArray(events) ? events : [];
+		const active = new Set();
+
+		list.forEach(function eachEvent(event, index) {
+			const idPart = Number(event && event.id ? event.id : 0);
+			const key = idPart > 0 ? String(idPart) : String(index);
+			active.add(key);
+			const refs = ensureEventRow(rowMap, key, listNode);
+			const effectKey = String(event && event.effect_key ? event.effect_key : 'event');
+			refs.meta.textContent = labelPrefix + ' • ' + effectKey;
+			refs.text.textContent = String(event && event.text ? event.text : 'No event details.');
+			listNode.appendChild(refs.line);
+		});
+
+		Array.from(rowMap.keys()).forEach(function eachExisting(key) {
+			if (active.has(key)) {
+				return;
+			}
+
+			const refs = rowMap.get(key);
+			if (refs && refs.line.parentNode === listNode) {
+				listNode.removeChild(refs.line);
+			}
+			rowMap.delete(key);
+		});
+
+		emptyNode.style.display = list.length === 0 ? '' : 'none';
+		if (emptyNode.style.display === '' && emptyNode.parentNode !== listNode) {
+			listNode.appendChild(emptyNode);
+		}
+	}
+
 	function reconcilePlayersList() {
 		let focusedAttackKey = null;
 		let selectionStart = null;
@@ -723,6 +1492,10 @@ export function createRumbleGameScreen(deps) {
 		battlePanel.style.display = bidding ? 'none' : '';
 		lastTurnList.style.display = bidding ? 'none' : '';
 		refs.lastTurnTitle.style.display = bidding ? 'none' : '';
+		currentEventLogTitle.style.display = bidding ? 'none' : '';
+		currentEventLogList.style.display = bidding ? 'none' : '';
+		previousEventLogTitle.style.display = bidding ? 'none' : '';
+		previousEventLogList.style.display = bidding ? 'none' : '';
 
 		if (bidding) {
 			phaseTitle.textContent = 'Rumble Bidding';
@@ -801,6 +1574,30 @@ export function createRumbleGameScreen(deps) {
 
 		reconcilePlayersList();
 		reconcilePreviousOrdersList();
+		reconcileAbilityActivationList();
+		reconcileEventLogList(serverSnapshot.currentRoundEventLog, currentEventLogList, emptyCurrentEventLogNode, currentEventRowsById, 'Current Round');
+		reconcileEventLogList(serverSnapshot.previousRoundEventLog, previousEventLogList, emptyPreviousEventLogNode, previousEventRowsById, 'Previous Round');
+
+		energyText.textContent = 'Energy: ' + validation.energyBudget
+			+ ' | Attacks: ' + validation.attackEnergySpent
+			+ ' | Abilities: ' + validation.abilityEnergySpent
+			+ ' | Remaining: ' + validation.remainingEnergy;
+
+		if (validation.invalidAbilityTargets.length > 0) {
+			abilityValidationText.textContent = 'Ability activation invalid: one or more targets are defeated or unavailable.';
+			abilityValidationText.style.color = '#b42318';
+		} else if (validation.missingAbilityTargets.length > 0) {
+			abilityValidationText.textContent = 'Ability activation invalid: choose targets for enabled targeted abilities.';
+			abilityValidationText.style.color = '#b42318';
+		} else if (validation.invalidEnergy) {
+			abilityValidationText.textContent = 'Energy invalid: total attack + ability spend exceeds your round energy budget.';
+			abilityValidationText.style.color = '#b42318';
+		} else {
+			abilityValidationText.textContent = '';
+			abilityValidationText.style.color = '';
+		}
+
+		abilityActivationPanel.style.display = '';
 	}
 
 	function applyServerSnapshot(game) {
@@ -824,6 +1621,8 @@ export function createRumbleGameScreen(deps) {
 			: null;
 		const nextOrder = progress && progress.current_order ? progress.current_order : null;
 		const nextPreviousOrders = progress && Array.isArray(progress.previous_round_orders) ? progress.previous_round_orders : [];
+		const nextCurrentRoundEvents = progress && Array.isArray(progress.current_round_event_log) ? progress.current_round_event_log : [];
+		const nextPreviousRoundEvents = progress && Array.isArray(progress.previous_round_event_log) ? progress.previous_round_event_log : [];
 		const nextSelfPlayer = nextPlayers.find(function eachPlayer(player) {
 			return !!player.is_self;
 		}) || null;
@@ -848,9 +1647,16 @@ export function createRumbleGameScreen(deps) {
 		serverSnapshot.currentBids = nextBids;
 		serverSnapshot.currentOrder = hasOrderNow ? {
 			attacks: normalizeAttacksMap(nextOrder.attacks || {}),
+			ability_activations: normalizeAbilityActivationArray(nextOrder.ability_activations || []),
 			defense: Math.max(0, Number(nextOrder.defense || 0)),
+			energy_budget: Math.max(0, Number(nextOrder.energy_budget || 0)),
+			attack_energy_spent: Math.max(0, Number(nextOrder.attack_energy_spent || 0)),
+			ability_energy_spent: Math.max(0, Number(nextOrder.ability_energy_spent || 0)),
+			total_energy_spent: Math.max(0, Number(nextOrder.total_energy_spent || 0)),
 		} : null;
 		serverSnapshot.previousRoundOrders = nextPreviousOrders;
+		serverSnapshot.currentRoundEventLog = nextCurrentRoundEvents;
+		serverSnapshot.previousRoundEventLog = nextPreviousRoundEvents;
 		serverSnapshot.selfShipName = nextSelfShipName;
 
 		if (!localDraft.dirtyShipName) {
@@ -864,8 +1670,10 @@ export function createRumbleGameScreen(deps) {
 			} else {
 				uiState.isEditing = !hasOrderNow;
 				localDraft.attacks = hasOrderNow ? normalizeAttacksMap(nextOrder.attacks || {}) : {};
+				localDraft.abilityActivations = hasOrderNow ? activationArrayToMap(nextOrder.ability_activations || []) : {};
 			}
 			clearDraftDirty();
+			localDraft.dirtyAbilityActivations = false;
 		} else if (isBiddingPhase()) {
 			if (roundChanged) {
 				uiState.isEditing = !hasBidsNow;
@@ -886,16 +1694,23 @@ export function createRumbleGameScreen(deps) {
 			uiState.isEditing = !hasOrderNow;
 			localDraft.attacks = hasOrderNow ? normalizeAttacksMap(nextOrder.attacks || {}) : {};
 			localDraft.dirtyAttacks = false;
+			localDraft.abilityActivations = hasOrderNow ? activationArrayToMap(nextOrder.ability_activations || []) : {};
+			localDraft.dirtyAbilityActivations = false;
 		} else if (!hadOrder && hasOrderNow) {
 			uiState.isEditing = false;
 			localDraft.attacks = normalizeAttacksMap(nextOrder.attacks || {});
 			localDraft.dirtyAttacks = false;
-		} else if (hadOrder && !hasOrderNow && !localDraft.dirtyAttacks) {
+			localDraft.abilityActivations = activationArrayToMap(nextOrder.ability_activations || []);
+			localDraft.dirtyAbilityActivations = false;
+		} else if (hadOrder && !hasOrderNow && !localDraft.dirtyAttacks && !localDraft.dirtyAbilityActivations) {
 			uiState.isEditing = true;
 			localDraft.attacks = {};
 			localDraft.dirtyAttacks = false;
-		} else if (!localDraft.dirtyAttacks && uiState.isEditing && hasOrderNow) {
+			localDraft.abilityActivations = {};
+			localDraft.dirtyAbilityActivations = false;
+		} else if (!localDraft.dirtyAttacks && !localDraft.dirtyAbilityActivations && uiState.isEditing && hasOrderNow) {
 			localDraft.attacks = normalizeAttacksMap(nextOrder.attacks || {});
+			localDraft.abilityActivations = activationArrayToMap(nextOrder.ability_activations || []);
 		}
 
 		lastRound = roundNumber;
@@ -1047,9 +1862,15 @@ export function createRumbleGameScreen(deps) {
 			}
 
 			const attacks = normalizeAttacksMap(localDraft.attacks);
+			const abilityActivations = getEffectiveAbilityActivationArray();
 			const validation = getOrderValidation();
 			if (validation.invalidTargets.length > 0) {
 				setStatusNode('Invalid order: remove attacks assigned to defeated or unavailable players.', 'error');
+				return;
+			}
+
+			if (validation.invalidAbilityTargets.length > 0 || validation.missingAbilityTargets.length > 0) {
+				setStatusNode('Invalid ability activations: choose valid living targets for enabled targeted abilities.', 'error');
 				return;
 			}
 
@@ -1058,9 +1879,15 @@ export function createRumbleGameScreen(deps) {
 				return;
 			}
 
-			await deps.api.submitRumbleOrder(lastGameId, attacks);
+			if (validation.invalidEnergy) {
+				setStatusNode('Invalid order: total energy spend exceeds your budget.', 'error');
+				return;
+			}
+
+			await deps.api.submitRumbleOrder(lastGameId, attacks, abilityActivations);
 			uiState.isEditing = false;
 			localDraft.dirtyAttacks = false;
+			localDraft.dirtyAbilityActivations = false;
 			await refreshRumbleState({ silent: true });
 			setStatusNode('Orders submitted.', 'ok');
 		} catch (err) {
@@ -1094,6 +1921,8 @@ export function createRumbleGameScreen(deps) {
 
 		localDraft.attacks = normalizeAttacksMap(serverSnapshot.currentOrder.attacks || {});
 		localDraft.dirtyAttacks = false;
+		localDraft.abilityActivations = activationArrayToMap(serverSnapshot.currentOrder.ability_activations || []);
+		localDraft.dirtyAbilityActivations = false;
 		uiState.isEditing = true;
 		reconcileUi();
 	});
@@ -1127,6 +1956,8 @@ export function createRumbleGameScreen(deps) {
 			await deps.api.cancelRumbleOrder(lastGameId);
 			localDraft.attacks = {};
 			localDraft.dirtyAttacks = false;
+			localDraft.abilityActivations = {};
+			localDraft.dirtyAbilityActivations = false;
 			uiState.isEditing = true;
 			await refreshRumbleState({ silent: true });
 			setStatusNode('Orders canceled.', 'ok');
@@ -1185,6 +2016,7 @@ export function createRumbleGameScreen(deps) {
 		try {
 			await deps.api.endRumbleTurn(lastGameId);
 			localDraft.dirtyAttacks = false;
+			localDraft.dirtyAbilityActivations = false;
 			await refreshRumbleState({ silent: true });
 			setStatusNode('Turn resolved.', 'ok');
 		} catch (err) {

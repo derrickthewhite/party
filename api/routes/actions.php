@@ -311,20 +311,31 @@ function rumble_upsert_order(int $gameId): void
         'user_id' => (int)$user['id'],
     ]);
 
-    $healthStmt = db()->prepare('SELECT current_health FROM rumble_player_state WHERE game_id = :game_id AND user_id = :user_id LIMIT 1');
+    $healthStmt = db()->prepare('SELECT current_health, owned_abilities_json FROM rumble_player_state WHERE game_id = :game_id AND user_id = :user_id LIMIT 1');
     $healthStmt->execute([
         'game_id' => $gameId,
         'user_id' => (int)$user['id'],
     ]);
-    $currentHealth = (int)($healthStmt->fetchColumn() ?: 0);
+    $stateRow = $healthStmt->fetch();
+    $currentHealth = (int)($stateRow['current_health'] ?? 0);
     if ($currentHealth <= 0) {
         error_response('Eliminated players cannot submit orders.', 409);
     }
 
+    $ownedAbilityIds = rumble_parse_owned_abilities(isset($stateRow['owned_abilities_json']) ? (string)$stateRow['owned_abilities_json'] : null);
+    $ownedAbilityMap = array_fill_keys($ownedAbilityIds, true);
+
     $body = json_input();
     $attacksRaw = $body['attacks'] ?? [];
+    $abilityActivationsRaw = $body['ability_activations'] ?? [];
     if (!is_array($attacksRaw)) {
         error_response('Attacks must be an object keyed by target user id.', 422);
+    }
+
+    try {
+        $normalizedAbilityActivations = rumble_normalize_ability_activations($abilityActivationsRaw, true);
+    } catch (InvalidArgumentException $ex) {
+        error_response($ex->getMessage(), 422);
     }
 
     $targetsStmt = db()->prepare(
@@ -377,6 +388,36 @@ function rumble_upsert_order(int $gameId): void
         $totalAttack += $amount;
     }
 
+    foreach ($normalizedAbilityActivations as $activation) {
+        $abilityId = (string)($activation['ability_id'] ?? '');
+        if ($abilityId === '' || !isset($ownedAbilityMap[$abilityId])) {
+            error_response('One or more activated abilities are not owned by this player.', 422);
+        }
+
+        if (array_key_exists('target_user_id', $activation)) {
+            $targetId = (int)$activation['target_user_id'];
+            if (!isset($validTargetMap[$targetId])) {
+                error_response('One or more ability activation targets are invalid.', 422);
+            }
+        }
+    }
+
+    $abilityEnergySpent = 0;
+    foreach ($normalizedAbilityActivations as $activation) {
+        try {
+            $abilityEnergySpent += rumble_activation_energy_cost($activation, true);
+        } catch (InvalidArgumentException $ex) {
+            error_response($ex->getMessage(), 422);
+        }
+    }
+
+    $energyBudget = rumble_player_round_energy_budget($currentHealth, $ownedAbilityIds);
+    $attackEnergySpent = $totalAttack;
+    $totalEnergySpent = $attackEnergySpent + $abilityEnergySpent;
+    if ($totalEnergySpent > $energyBudget) {
+        error_response('Invalid order: total energy spent exceeds your round energy budget.', 422);
+    }
+
     $defense = $currentHealth - $totalAttack;
     if ($defense < 0) {
         error_response('Invalid order: defense cannot be negative.', 422);
@@ -385,7 +426,12 @@ function rumble_upsert_order(int $gameId): void
     ksort($normalizedAttacks, SORT_NUMERIC);
     $payload = [
         'attacks' => $normalizedAttacks,
+        'ability_activations' => $normalizedAbilityActivations,
         'defense' => $defense,
+        'energy_budget' => $energyBudget,
+        'attack_energy_spent' => $attackEnergySpent,
+        'ability_energy_spent' => $abilityEnergySpent,
+        'total_energy_spent' => $totalEnergySpent,
     ];
 
     $pdo = db();
@@ -425,6 +471,10 @@ function rumble_upsert_order(int $gameId): void
         'submitted' => true,
         'round' => $roundNumber,
         'defense' => $defense,
+        'energy_budget' => $energyBudget,
+        'attack_energy_spent' => $attackEnergySpent,
+        'ability_energy_spent' => $abilityEnergySpent,
+        'total_energy_spent' => $totalEnergySpent,
     ], 201);
 }
 
@@ -1061,7 +1111,7 @@ function rumble_resolve_round_and_advance(int $gameId, int $roundNumber): int
     ]);
 
     $playersStmt = $pdo->prepare(
-        'SELECT rps.user_id, rps.current_health FROM rumble_player_state rps '
+        'SELECT rps.user_id, rps.current_health, rps.owned_abilities_json FROM rumble_player_state rps '
         . 'JOIN game_members gm ON gm.game_id = rps.game_id AND gm.user_id = rps.user_id '
         . 'JOIN users u ON u.id = gm.user_id '
         . 'WHERE rps.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1'
@@ -1075,9 +1125,161 @@ function rumble_resolve_round_and_advance(int $gameId, int $roundNumber): int
         return 0;
     }
 
+    // 1) Set round stats.
     $healthByUser = [];
+    $ownedAbilityIdsByUser = [];
+    $ownedAbilitySetByUser = [];
+    $energyBudgetByUser = [];
+    $roundStartDefenseBonusByUser = [];
+    $activatedDefenseBonusByUser = [];
+    $untargetableByUser = [];
+    $armorReductionByUser = [];
+    $nimbleDodgeByUser = [];
+    $focusedDefenseByUser = [];
+    $reflectiveShieldByUser = [];
+    $defeatRestoreHealthByUser = [];
+    $roundEndUpkeepHealthLossByUser = [];
+    $preRoundEffectRows = [];
+
     foreach ($playerRows as $row) {
-        $healthByUser[(int)$row['user_id']] = max(0, (int)$row['current_health']);
+        $userId = (int)$row['user_id'];
+        $health = max(0, (int)$row['current_health']);
+        $ownedAbilityIds = rumble_parse_owned_abilities(isset($row['owned_abilities_json']) ? (string)$row['owned_abilities_json'] : null);
+        $abilitySet = array_fill_keys($ownedAbilityIds, true);
+
+        // 2) Modify round stats from passive/trigger templates.
+        if (isset($abilitySet['automated_repair_systems'])) {
+            $health = min(100, $health + 5);
+            $preRoundEffectRows[] = [
+                'game_id' => $gameId,
+                'round_number' => $roundNumber,
+                'owner_user_id' => $userId,
+                'target_user_id' => null,
+                'ability_instance_id' => null,
+                'effect_key' => 'step2:passive_round_start_heal',
+                'trigger_timing' => 'resolve',
+                'payload' => ['source_ability_id' => 'automated_repair_systems', 'amount' => 5],
+                'is_resolved' => 1,
+                'resolved_at' => gmdate('Y-m-d H:i:s'),
+            ];
+        }
+        if (isset($abilitySet['replicators'])) {
+            $health += 5;
+            $preRoundEffectRows[] = [
+                'game_id' => $gameId,
+                'round_number' => $roundNumber,
+                'owner_user_id' => $userId,
+                'target_user_id' => null,
+                'ability_instance_id' => null,
+                'effect_key' => 'step2:passive_round_start_heal',
+                'trigger_timing' => 'resolve',
+                'payload' => ['source_ability_id' => 'replicators', 'amount' => 5],
+                'is_resolved' => 1,
+                'resolved_at' => gmdate('Y-m-d H:i:s'),
+            ];
+        }
+        if (isset($abilitySet['mcguffin_generator']) && $roundNumber === 3) {
+            $health += 50;
+            $preRoundEffectRows[] = [
+                'game_id' => $gameId,
+                'round_number' => $roundNumber,
+                'owner_user_id' => $userId,
+                'target_user_id' => null,
+                'ability_instance_id' => null,
+                'effect_key' => 'step2:passive_round_start_heal',
+                'trigger_timing' => 'resolve',
+                'payload' => ['source_ability_id' => 'mcguffin_generator', 'amount' => 50],
+                'is_resolved' => 1,
+                'resolved_at' => gmdate('Y-m-d H:i:s'),
+            ];
+        }
+
+        $healthByUser[$userId] = $health;
+        $ownedAbilityIdsByUser[$userId] = $ownedAbilityIds;
+        $ownedAbilitySetByUser[$userId] = $abilitySet;
+        $energyBudgetByUser[$userId] = rumble_player_round_energy_budget($health, $ownedAbilityIds);
+
+        $roundStartDefenseBonusByUser[$userId] = isset($abilitySet['shield_boosters']) ? 20 : 0;
+        $activatedDefenseBonusByUser[$userId] = 0;
+        $untargetableByUser[$userId] = isset($abilitySet['holoship']);
+        $armorReductionByUser[$userId] = isset($abilitySet['heavy_armor']) ? 10 : (isset($abilitySet['armor']) ? 5 : 0);
+        $nimbleDodgeByUser[$userId] = false;
+        $focusedDefenseByUser[$userId] = [];
+        $reflectiveShieldByUser[$userId] = isset($abilitySet['reflective_shield']);
+        $defeatRestoreHealthByUser[$userId] = isset($abilitySet['backup_generator']) ? 30 : (isset($abilitySet['escape_pods']) ? 20 : 0);
+        $roundEndUpkeepHealthLossByUser[$userId] = isset($abilitySet['holoship']) ? 5 : 0;
+
+        $preRoundEffectRows[] = [
+            'game_id' => $gameId,
+            'round_number' => $roundNumber,
+            'owner_user_id' => $userId,
+            'target_user_id' => null,
+            'ability_instance_id' => null,
+            'effect_key' => 'step1:set_round_stats',
+            'trigger_timing' => 'resolve',
+            'payload' => ['health' => $health, 'energy_budget' => $energyBudgetByUser[$userId]],
+            'is_resolved' => 1,
+            'resolved_at' => gmdate('Y-m-d H:i:s'),
+        ];
+
+        if (($roundStartDefenseBonusByUser[$userId] ?? 0) > 0) {
+            $preRoundEffectRows[] = [
+                'game_id' => $gameId,
+                'round_number' => $roundNumber,
+                'owner_user_id' => $userId,
+                'target_user_id' => null,
+                'ability_instance_id' => null,
+                'effect_key' => 'step2:passive_round_start_defense',
+                'trigger_timing' => 'resolve',
+                'payload' => ['source_ability_id' => 'shield_boosters', 'defense_bonus' => (int)$roundStartDefenseBonusByUser[$userId]],
+                'is_resolved' => 1,
+                'resolved_at' => gmdate('Y-m-d H:i:s'),
+            ];
+        }
+    }
+
+    $roundEffectRows = $preRoundEffectRows;
+
+    $pendingRoundStartEffectsStmt = $pdo->prepare(
+        'SELECT id, owner_user_id, payload FROM rumble_round_effects '
+        . 'WHERE game_id = :game_id AND round_number = :round_number AND trigger_timing = :timing AND is_resolved = 0'
+    );
+    $pendingRoundStartEffectsStmt->execute([
+        'game_id' => $gameId,
+        'round_number' => $roundNumber,
+        'timing' => 'round_start',
+    ]);
+    $pendingRoundStartEffects = $pendingRoundStartEffectsStmt->fetchAll();
+    $roundStartEffectIdsToResolve = [];
+    foreach ($pendingRoundStartEffects as $effectRow) {
+        $effectId = (int)($effectRow['id'] ?? 0);
+        $ownerUserId = (int)($effectRow['owner_user_id'] ?? 0);
+        if ($effectId <= 0 || !isset($healthByUser[$ownerUserId])) {
+            continue;
+        }
+
+        $payload = json_decode((string)($effectRow['payload'] ?? '{}'), true);
+        if (!is_array($payload)) {
+            $payload = [];
+        }
+
+        if ((string)($payload['effect'] ?? '') === 'cloaked_until_round_end') {
+            $untargetableByUser[$ownerUserId] = true;
+            $roundEffectRows[] = [
+                'game_id' => $gameId,
+                'round_number' => $roundNumber,
+                'owner_user_id' => $ownerUserId,
+                'target_user_id' => null,
+                'ability_instance_id' => null,
+                'effect_key' => 'step2:scheduled_status',
+                'trigger_timing' => 'resolve',
+                'payload' => ['effect' => 'cloaked_until_round_end'],
+                'is_resolved' => 1,
+                'resolved_at' => gmdate('Y-m-d H:i:s'),
+            ];
+        }
+
+        $roundStartEffectIdsToResolve[] = $effectId;
     }
 
     $ordersStmt = $pdo->prepare(
@@ -1090,14 +1292,27 @@ function rumble_resolve_round_and_advance(int $gameId, int $roundNumber): int
         'action_type' => 'order',
     ]);
     $orderRows = $ordersStmt->fetchAll();
+    usort($orderRows, static function (array $a, array $b): int {
+        return ((int)($a['user_id'] ?? 0)) <=> ((int)($b['user_id'] ?? 0));
+    });
 
-    $incomingByUser = [];
+    $normalIncomingByTargetByAttacker = [];
+    $unblockableIncomingByTargetByAttacker = [];
     $defenseByUser = [];
+    $abilityEnergySpentByUser = [];
+    $attackEnergySpentByUser = [];
+    $totalEnergySpentByUser = [];
+
     foreach ($healthByUser as $userId => $health) {
-        $incomingByUser[$userId] = 0;
-        $defenseByUser[$userId] = $health;
+        $normalIncomingByTargetByAttacker[$userId] = [];
+        $unblockableIncomingByTargetByAttacker[$userId] = [];
+        $defenseByUser[$userId] = max(0, $health + (int)($roundStartDefenseBonusByUser[$userId] ?? 0));
+        $abilityEnergySpentByUser[$userId] = 0;
+        $attackEnergySpentByUser[$userId] = 0;
+        $totalEnergySpentByUser[$userId] = 0;
     }
 
+    // 3) Determine invalid targets and 4) receive orders.
     foreach ($orderRows as $row) {
         $userId = (int)$row['user_id'];
         if (!isset($healthByUser[$userId])) {
@@ -1115,11 +1330,144 @@ function rumble_resolve_round_and_advance(int $gameId, int $roundNumber): int
         }
 
         $attacks = isset($payload['attacks']) && is_array($payload['attacks']) ? $payload['attacks'] : [];
+        $activations = rumble_normalize_ability_activations($payload['ability_activations'] ?? []);
 
-        $remaining = $health;
+        $ownedMap = array_fill_keys($ownedAbilityIdsByUser[$userId] ?? [], true);
+        $energyBudget = max(0, (int)($energyBudgetByUser[$userId] ?? 0));
+        $remainingEnergy = $energyBudget;
+
+        // 5) Trigger activated abilities and apply their round effects.
+        foreach ($activations as $activation) {
+            $abilityId = (string)($activation['ability_id'] ?? '');
+            if ($abilityId === '' || !isset($ownedMap[$abilityId])) {
+                continue;
+            }
+
+            try {
+                $activationCost = rumble_activation_energy_cost($activation, true);
+            } catch (InvalidArgumentException $ex) {
+                continue;
+            }
+
+            if ($activationCost > $remainingEnergy) {
+                continue;
+            }
+
+            $ability = rumble_ability_by_id($abilityId);
+            if ($ability === null) {
+                continue;
+            }
+
+            $targetId = array_key_exists('target_user_id', $activation) ? (int)$activation['target_user_id'] : 0;
+            if ($targetId > 0 && (!isset($healthByUser[$targetId]) || $targetId === $userId || $healthByUser[$targetId] <= 0)) {
+                continue;
+            }
+            if ($targetId > 0 && !empty($untargetableByUser[$targetId])) {
+                continue;
+            }
+
+            $remainingEnergy -= $activationCost;
+            $abilityEnergySpentByUser[$userId] += $activationCost;
+
+            $templateKey = rumble_ability_template_key($ability);
+            $templateParams = rumble_ability_template_params($ability);
+            $effectPayload = ['ability_id' => $abilityId, 'activation' => $activation, 'cost' => $activationCost];
+
+            if ($templateKey === 'activated_spend_with_target_policy') {
+                $effectFormula = (array)($templateParams['effect_formula'] ?? []);
+                $effectKind = (string)($effectFormula['kind'] ?? '');
+                if ($effectKind === 'damage_constant' && $targetId > 0) {
+                    $damage = max(0, (int)($effectFormula['value'] ?? 0));
+                    $channel = (string)($effectFormula['channel'] ?? 'normal');
+                    if ($channel === 'unblockable') {
+                        $unblockableIncomingByTargetByAttacker[$targetId][$userId] = max(0, (int)($unblockableIncomingByTargetByAttacker[$targetId][$userId] ?? 0)) + $damage;
+                    } else {
+                        $normalIncomingByTargetByAttacker[$targetId][$userId] = max(0, (int)($normalIncomingByTargetByAttacker[$targetId][$userId] ?? 0)) + $damage;
+                    }
+                    $effectPayload['applied_damage'] = $damage;
+                    $effectPayload['channel'] = $channel;
+                } elseif ($effectKind === 'damage_floor_half_x') {
+                    $x = max(0, (int)($activation['x_cost'] ?? 0));
+                    $damage = (int)floor($x / 2);
+                    if ($damage > 0) {
+                        foreach ($healthByUser as $candidateId => $candidateHealth) {
+                            if ($candidateId === $userId || $candidateHealth <= 0) {
+                                continue;
+                            }
+                            if (!empty($untargetableByUser[$candidateId])) {
+                                continue;
+                            }
+                            $normalIncomingByTargetByAttacker[$candidateId][$userId] = max(0, (int)($normalIncomingByTargetByAttacker[$candidateId][$userId] ?? 0)) + $damage;
+                        }
+                    }
+                    $effectPayload['applied_damage_each'] = $damage;
+                }
+            } elseif ($templateKey === 'activated_defense_mode') {
+                if ($abilityId === 'shield_capacitors') {
+                    $activatedDefenseBonusByUser[$userId] = max(0, (int)($activatedDefenseBonusByUser[$userId] ?? 0)) + 20;
+                    $effectPayload['applied_defense_bonus'] = 20;
+                } elseif ($abilityId === 'nimble_dodge') {
+                    $nimbleDodgeByUser[$userId] = true;
+                    $effectPayload['enabled'] = true;
+                } elseif ($abilityId === 'focused_defense' && $targetId > 0) {
+                    $focusedDefenseByUser[$userId][$targetId] = true;
+                    $effectPayload['focused_attacker_user_id'] = $targetId;
+                } elseif ($abilityId === 'cloaking_system') {
+                    $roundEffectRows[] = [
+                        'game_id' => $gameId,
+                        'round_number' => $roundNumber + 1,
+                        'owner_user_id' => $userId,
+                        'target_user_id' => null,
+                        'ability_instance_id' => null,
+                        'effect_key' => 'status:cloaked',
+                        'trigger_timing' => 'round_start',
+                        'payload' => ['effect' => 'cloaked_until_round_end', 'source_ability_id' => $abilityId],
+                        'is_resolved' => 0,
+                        'resolved_at' => null,
+                    ];
+                    $effectPayload['scheduled_for_round'] = $roundNumber + 1;
+                }
+            }
+
+            $roundEffectRows[] = [
+                'game_id' => $gameId,
+                'round_number' => $roundNumber,
+                'owner_user_id' => $userId,
+                'target_user_id' => $targetId > 0 ? $targetId : null,
+                'ability_instance_id' => null,
+                'effect_key' => 'activation:' . $abilityId,
+                'trigger_timing' => 'resolve',
+                'payload' => $effectPayload,
+                'is_resolved' => 1,
+                'resolved_at' => gmdate('Y-m-d H:i:s'),
+            ];
+        }
+
+        $defenseByUser[$userId] += max(0, (int)($activatedDefenseBonusByUser[$userId] ?? 0));
+
+        $remaining = min($health, $remainingEnergy);
         $used = 0;
+        $attackableTargetCount = 0;
         $orderedTargets = array_keys($attacks);
         sort($orderedTargets, SORT_NUMERIC);
+        foreach ($orderedTargets as $targetKey) {
+            if (!is_int($targetKey) && !ctype_digit((string)$targetKey)) {
+                continue;
+            }
+            $targetId = (int)$targetKey;
+            if (!isset($healthByUser[$targetId]) || $targetId === $userId || $healthByUser[$targetId] <= 0 || !empty($untargetableByUser[$targetId])) {
+                continue;
+            }
+            $amountRaw = $attacks[$targetKey] ?? 0;
+            if (!is_int($amountRaw) && !ctype_digit((string)$amountRaw)) {
+                continue;
+            }
+            if ((int)$amountRaw > 0) {
+                $attackableTargetCount++;
+            }
+        }
+        $singleAttackBonusApplies = isset($ownedMap['death_ray']) && $attackableTargetCount === 1;
+
         foreach ($orderedTargets as $targetKey) {
             if ($remaining <= 0) {
                 break;
@@ -1131,6 +1479,9 @@ function rumble_resolve_round_and_advance(int $gameId, int $roundNumber): int
 
             $targetId = (int)$targetKey;
             if (!isset($healthByUser[$targetId]) || $targetId === $userId) {
+                continue;
+            }
+            if (!empty($untargetableByUser[$targetId])) {
                 continue;
             }
 
@@ -1149,34 +1500,241 @@ function rumble_resolve_round_and_advance(int $gameId, int $roundNumber): int
                 continue;
             }
 
-            $incomingByUser[$targetId] += $spend;
+            $attackDamage = $spend;
+            if (isset($ownedMap['heavy_guns'])) {
+                $attackDamage += 10;
+            }
+            if ($singleAttackBonusApplies) {
+                $attackDamage = (int)floor($attackDamage * 1.5);
+            }
+
+            if (!empty($focusedDefenseByUser[$targetId][$userId])) {
+                $attackDamage = (int)floor($attackDamage / 2);
+            }
+
+            if ($attackDamage > 0) {
+                $normalIncomingByTargetByAttacker[$targetId][$userId] = max(0, (int)($normalIncomingByTargetByAttacker[$targetId][$userId] ?? 0)) + $attackDamage;
+            }
             $used += $spend;
             $remaining -= $spend;
         }
 
+        $attackEnergySpentByUser[$userId] = $used;
+        $totalEnergySpentByUser[$userId] = $attackEnergySpentByUser[$userId] + $abilityEnergySpentByUser[$userId];
         $defenseByUser[$userId] = max(0, $health - $used);
+        $defenseByUser[$userId] += max(0, (int)($roundStartDefenseBonusByUser[$userId] ?? 0)) + max(0, (int)($activatedDefenseBonusByUser[$userId] ?? 0));
+
+        $roundEffectRows[] = [
+            'game_id' => $gameId,
+            'round_number' => $roundNumber,
+            'owner_user_id' => $userId,
+            'target_user_id' => null,
+            'ability_instance_id' => null,
+            'effect_key' => 'step4:energy_summary',
+            'trigger_timing' => 'resolve',
+            'payload' => [
+                'energy_budget' => $energyBudget,
+                'attack_energy_spent' => $attackEnergySpentByUser[$userId],
+                'ability_energy_spent' => $abilityEnergySpentByUser[$userId],
+                'total_energy_spent' => $totalEnergySpentByUser[$userId],
+                'energy_remaining' => max(0, $energyBudget - $totalEnergySpentByUser[$userId]),
+            ],
+            'is_resolved' => 1,
+            'resolved_at' => gmdate('Y-m-d H:i:s'),
+        ];
+    }
+
+    // 6) Calculate decreases in health and effects that carry to next round.
+    foreach ($normalIncomingByTargetByAttacker as $targetId => $attackerMap) {
+        if (empty($attackerMap)) {
+            continue;
+        }
+
+        if (!empty($nimbleDodgeByUser[$targetId])) {
+            $largestAttackerId = null;
+            $largestAmount = -1;
+            foreach ($attackerMap as $attackerId => $amount) {
+                $amountInt = max(0, (int)$amount);
+                if ($amountInt > $largestAmount || ($amountInt === $largestAmount && (int)$attackerId < (int)$largestAttackerId)) {
+                    $largestAmount = $amountInt;
+                    $largestAttackerId = (int)$attackerId;
+                }
+            }
+            if ($largestAttackerId !== null && $largestAmount > 0) {
+                $normalIncomingByTargetByAttacker[$targetId][$largestAttackerId] = 0;
+                $roundEffectRows[] = [
+                    'game_id' => $gameId,
+                    'round_number' => $roundNumber,
+                    'owner_user_id' => (int)$targetId,
+                    'target_user_id' => $largestAttackerId,
+                    'ability_instance_id' => null,
+                    'effect_key' => 'trigger:nimble_dodge',
+                    'trigger_timing' => 'resolve',
+                    'payload' => ['negated_attack' => $largestAmount],
+                    'is_resolved' => 1,
+                    'resolved_at' => gmdate('Y-m-d H:i:s'),
+                ];
+            }
+        }
+
+        $reduction = max(0, (int)($armorReductionByUser[$targetId] ?? 0));
+        if ($reduction > 0) {
+            foreach ($attackerMap as $attackerId => $amount) {
+                $normalIncomingByTargetByAttacker[$targetId][$attackerId] = max(0, (int)$amount - $reduction);
+            }
+        }
     }
 
     $nextHealthByUser = [];
+    $retaliationDamageByUser = [];
+    foreach ($healthByUser as $userId => $health) {
+        $retaliationDamageByUser[$userId] = 0;
+    }
+
     foreach ($healthByUser as $userId => $health) {
         if ($health <= 0) {
             $nextHealthByUser[$userId] = 0;
             continue;
         }
 
-        $damage = max(0, $incomingByUser[$userId] - $defenseByUser[$userId]);
+        $normalByAttacker = $normalIncomingByTargetByAttacker[$userId] ?? [];
+        $unblockableByAttacker = $unblockableIncomingByTargetByAttacker[$userId] ?? [];
+        ksort($normalByAttacker, SORT_NUMERIC);
+        ksort($unblockableByAttacker, SORT_NUMERIC);
+
+        $remainingDefense = max(0, (int)($defenseByUser[$userId] ?? 0));
+        $damageByAttacker = [];
+
+        foreach ($normalByAttacker as $attackerId => $amount) {
+            $normalAmount = max(0, (int)$amount);
+            if ($normalAmount <= 0) {
+                continue;
+            }
+
+            $absorbed = min($remainingDefense, $normalAmount);
+            $remainingDefense -= $absorbed;
+            $postDefense = $normalAmount - $absorbed;
+            if ($postDefense > 0) {
+                $damageByAttacker[(int)$attackerId] = max(0, (int)($damageByAttacker[(int)$attackerId] ?? 0)) + $postDefense;
+            }
+        }
+
+        foreach ($unblockableByAttacker as $attackerId => $amount) {
+            $unblockableAmount = max(0, (int)$amount);
+            if ($unblockableAmount <= 0) {
+                continue;
+            }
+            $damageByAttacker[(int)$attackerId] = max(0, (int)($damageByAttacker[(int)$attackerId] ?? 0)) + $unblockableAmount;
+        }
+
+        $damage = 0;
+        foreach ($damageByAttacker as $attackerId => $amount) {
+            $damage += max(0, (int)$amount);
+            if (!empty($reflectiveShieldByUser[$userId]) && isset($retaliationDamageByUser[(int)$attackerId])) {
+                $retaliationDamageByUser[(int)$attackerId] += (int)floor(max(0, (int)$amount) / 2);
+            }
+        }
+
         $nextHealthByUser[$userId] = max(0, $health - $damage);
+
+        $normalIncomingTotal = 0;
+        foreach ($normalByAttacker as $v) {
+            $normalIncomingTotal += max(0, (int)$v);
+        }
+        $unblockableIncomingTotal = 0;
+        foreach ($unblockableByAttacker as $v) {
+            $unblockableIncomingTotal += max(0, (int)$v);
+        }
+        $roundEffectRows[] = [
+            'game_id' => $gameId,
+            'round_number' => $roundNumber,
+            'owner_user_id' => $userId,
+            'target_user_id' => null,
+            'ability_instance_id' => null,
+            'effect_key' => 'step6:damage_resolution',
+            'trigger_timing' => 'resolve',
+            'payload' => [
+                'normal_incoming' => $normalIncomingTotal,
+                'unblockable_incoming' => $unblockableIncomingTotal,
+                'defense_available' => max(0, (int)($defenseByUser[$userId] ?? 0)),
+                'final_damage' => $damage,
+                'next_health' => $nextHealthByUser[$userId],
+            ],
+            'is_resolved' => 1,
+            'resolved_at' => gmdate('Y-m-d H:i:s'),
+        ];
     }
 
+    foreach ($retaliationDamageByUser as $userId => $retaliationDamage) {
+        if (!isset($nextHealthByUser[$userId]) || $retaliationDamage <= 0) {
+            continue;
+        }
+        $nextHealthByUser[$userId] = max(0, (int)$nextHealthByUser[$userId] - $retaliationDamage);
+    }
+
+    foreach ($nextHealthByUser as $userId => $nextHealth) {
+        $upkeepLoss = max(0, (int)($roundEndUpkeepHealthLossByUser[$userId] ?? 0));
+        if ($upkeepLoss > 0 && $nextHealth > 0) {
+            $nextHealthByUser[$userId] = max(0, $nextHealth - $upkeepLoss);
+            $roundEffectRows[] = [
+                'game_id' => $gameId,
+                'round_number' => $roundNumber,
+                'owner_user_id' => $userId,
+                'target_user_id' => null,
+                'ability_instance_id' => null,
+                'effect_key' => 'step7:upkeep_cost',
+                'trigger_timing' => 'resolve',
+                'payload' => ['source_ability_id' => 'holoship', 'health_loss' => $upkeepLoss],
+                'is_resolved' => 1,
+                'resolved_at' => gmdate('Y-m-d H:i:s'),
+            ];
+        }
+    }
+
+    foreach ($nextHealthByUser as $userId => $nextHealth) {
+        if ($nextHealth > 0) {
+            continue;
+        }
+        $restoreHealth = max(0, (int)($defeatRestoreHealthByUser[$userId] ?? 0));
+        if ($restoreHealth <= 0) {
+            continue;
+        }
+
+        $nextHealthByUser[$userId] = $restoreHealth;
+        if (!empty($ownedAbilitySetByUser[$userId]['backup_generator'])) {
+            unset($ownedAbilitySetByUser[$userId]['backup_generator']);
+        } elseif (!empty($ownedAbilitySetByUser[$userId]['escape_pods'])) {
+            unset($ownedAbilitySetByUser[$userId]['escape_pods']);
+        }
+
+        $ownedAbilityIdsByUser[$userId] = array_values(array_keys($ownedAbilitySetByUser[$userId]));
+        sort($ownedAbilityIdsByUser[$userId], SORT_STRING);
+
+        $roundEffectRows[] = [
+            'game_id' => $gameId,
+            'round_number' => $roundNumber,
+            'owner_user_id' => $userId,
+            'target_user_id' => null,
+            'ability_instance_id' => null,
+            'effect_key' => 'trigger:on_defeat_restore',
+            'trigger_timing' => 'resolve',
+            'payload' => ['restored_health' => $restoreHealth],
+            'is_resolved' => 1,
+            'resolved_at' => gmdate('Y-m-d H:i:s'),
+        ];
+    }
+
+    // 7) Finish the round.
     $pdo->beginTransaction();
     try {
         $updateHealthStmt = $pdo->prepare(
-            'UPDATE rumble_player_state SET current_health = :current_health WHERE game_id = :game_id AND user_id = :user_id'
+            'UPDATE rumble_player_state SET current_health = :current_health, owned_abilities_json = :owned_abilities_json WHERE game_id = :game_id AND user_id = :user_id'
         );
         $defeatedUserIds = [];
         foreach ($nextHealthByUser as $userId => $nextHealth) {
             $updateHealthStmt->execute([
                 'current_health' => $nextHealth,
+                'owned_abilities_json' => rumble_encode_owned_abilities($ownedAbilityIdsByUser[$userId] ?? []),
                 'game_id' => $gameId,
                 'user_id' => $userId,
             ]);
@@ -1192,6 +1750,36 @@ function rumble_resolve_round_and_advance(int $gameId, int $roundNumber): int
             $defeatRoleParams = array_merge(['observer', $gameId], $defeatedUserIds, ['observer']);
             $defeatRoleStmt = $pdo->prepare($defeatRoleSql);
             $defeatRoleStmt->execute($defeatRoleParams);
+        }
+
+        if (!empty($roundStartEffectIdsToResolve)) {
+            $idPlaceholders = implode(',', array_fill(0, count($roundStartEffectIdsToResolve), '?'));
+            $resolveSql = 'UPDATE rumble_round_effects SET is_resolved = 1, resolved_at = ? WHERE id IN (' . $idPlaceholders . ')';
+            $resolveParams = array_merge([gmdate('Y-m-d H:i:s')], $roundStartEffectIdsToResolve);
+            $resolveStmt = $pdo->prepare($resolveSql);
+            $resolveStmt->execute($resolveParams);
+        }
+
+        if (!empty($roundEffectRows)) {
+            $insertEffectStmt = $pdo->prepare(
+                'INSERT INTO rumble_round_effects '
+                . '(game_id, round_number, owner_user_id, target_user_id, ability_instance_id, effect_key, trigger_timing, payload, is_resolved, resolved_at) '
+                . 'VALUES (:game_id, :round_number, :owner_user_id, :target_user_id, :ability_instance_id, :effect_key, :trigger_timing, :payload, :is_resolved, :resolved_at)'
+            );
+            foreach ($roundEffectRows as $effectRow) {
+                $insertEffectStmt->execute([
+                    'game_id' => $effectRow['game_id'],
+                    'round_number' => $effectRow['round_number'],
+                    'owner_user_id' => $effectRow['owner_user_id'],
+                    'target_user_id' => $effectRow['target_user_id'],
+                    'ability_instance_id' => $effectRow['ability_instance_id'],
+                    'effect_key' => $effectRow['effect_key'],
+                    'trigger_timing' => $effectRow['trigger_timing'],
+                    'payload' => json_encode($effectRow['payload'], JSON_UNESCAPED_UNICODE),
+                    'is_resolved' => $effectRow['is_resolved'],
+                    'resolved_at' => $effectRow['resolved_at'],
+                ]);
+            }
         }
 
         $stateStmt = $pdo->prepare(

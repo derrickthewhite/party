@@ -567,6 +567,7 @@ function games_detail(int $gameId): void
             'observer_role' => 'observer',
         ]);
         $players = [];
+        $playerNameByUserId = [];
         foreach ($playersStmt->fetchAll() as $row) {
             $ownedAbilityIds = rumble_parse_owned_abilities(isset($row['owned_abilities_json']) ? (string)$row['owned_abilities_json'] : null);
             $ownedAbilities = [];
@@ -590,6 +591,10 @@ function games_detail(int $gameId): void
                 'member_role' => (string)$row['role'],
                 'owned_abilities' => $ownedAbilities,
             ];
+
+            $playerNameByUserId[(int)$row['user_id']] = trim((string)($row['ship_name'] ?? '')) !== ''
+                ? trim((string)$row['ship_name'])
+                : (string)$row['username'];
         }
 
         $offer = rumble_fetch_offer_payload($gameId, $roundNumber);
@@ -654,15 +659,70 @@ function games_detail(int $gameId): void
                 }
 
                 $defense = $decoded['defense'] ?? 0;
+                $abilityActivations = rumble_normalize_ability_activations($decoded['ability_activations'] ?? []);
+                $abilityEnergySpent = 0;
+                foreach ($abilityActivations as $activation) {
+                    $abilityEnergySpent += rumble_activation_energy_cost($activation);
+                }
+                $attackEnergySpent = 0;
+                foreach ($normalizedAttacks as $amount) {
+                    $attackEnergySpent += max(0, (int)$amount);
+                }
                 $currentOrder = [
                     'attacks' => $normalizedAttacks,
+                    'ability_activations' => $abilityActivations,
                     'defense' => max(0, (int)$defense),
+                    'energy_budget' => max(0, (int)($decoded['energy_budget'] ?? 0)),
+                    'attack_energy_spent' => max(0, (int)($decoded['attack_energy_spent'] ?? $attackEnergySpent)),
+                    'ability_energy_spent' => max(0, (int)($decoded['ability_energy_spent'] ?? $abilityEnergySpent)),
+                    'total_energy_spent' => max(0, (int)($decoded['total_energy_spent'] ?? ($attackEnergySpent + $abilityEnergySpent))),
                 ];
             }
         }
 
         $previousRound = max(0, $roundNumber - 1);
         $previousOrders = [];
+        $currentRoundEvents = [];
+        $previousRoundEvents = [];
+
+        $eventRowsStmt = db()->prepare(
+            'SELECT id, round_number, owner_user_id, target_user_id, effect_key, trigger_timing, payload, created_at '
+            . 'FROM rumble_round_effects '
+            . 'WHERE game_id = :game_id AND round_number IN (:current_round, :previous_round) '
+            . 'ORDER BY round_number ASC, id ASC'
+        );
+        $eventRowsStmt->execute([
+            'game_id' => $gameId,
+            'current_round' => $roundNumber,
+            'previous_round' => $previousRound,
+        ]);
+        foreach ($eventRowsStmt->fetchAll() as $eventRow) {
+            $roundForEvent = (int)($eventRow['round_number'] ?? 0);
+            $payload = json_decode((string)($eventRow['payload'] ?? '{}'), true);
+            $normalizedEvent = [
+                'id' => (int)($eventRow['id'] ?? 0),
+                'round_number' => $roundForEvent,
+                'owner_user_id' => (int)($eventRow['owner_user_id'] ?? 0),
+                'target_user_id' => isset($eventRow['target_user_id']) ? ($eventRow['target_user_id'] === null ? null : (int)$eventRow['target_user_id']) : null,
+                'effect_key' => (string)($eventRow['effect_key'] ?? ''),
+                'trigger_timing' => (string)($eventRow['trigger_timing'] ?? ''),
+                'payload' => is_array($payload) ? $payload : [],
+                'text' => rumble_round_effect_human_text([
+                    'effect_key' => (string)($eventRow['effect_key'] ?? ''),
+                    'owner_user_id' => (int)($eventRow['owner_user_id'] ?? 0),
+                    'target_user_id' => isset($eventRow['target_user_id']) ? ($eventRow['target_user_id'] === null ? null : (int)$eventRow['target_user_id']) : null,
+                    'payload' => is_array($payload) ? $payload : [],
+                ], $playerNameByUserId),
+                'created_at' => (string)($eventRow['created_at'] ?? ''),
+            ];
+
+            if ($roundForEvent === $roundNumber) {
+                $currentRoundEvents[] = $normalizedEvent;
+            } elseif ($roundForEvent === $previousRound) {
+                $previousRoundEvents[] = $normalizedEvent;
+            }
+        }
+
         if ($previousRound > 0) {
             $previousStmt = db()->prepare(
                 'SELECT a.user_id, u.username, a.payload FROM game_actions a '
@@ -701,7 +761,12 @@ function games_detail(int $gameId): void
                     'user_id' => (int)$row['user_id'],
                     'username' => (string)$row['username'],
                     'attacks' => $normalizedAttacks,
+                    'ability_activations' => rumble_normalize_ability_activations($decoded['ability_activations'] ?? []),
                     'defense' => max(0, (int)($decoded['defense'] ?? 0)),
+                    'energy_budget' => max(0, (int)($decoded['energy_budget'] ?? 0)),
+                    'attack_energy_spent' => max(0, (int)($decoded['attack_energy_spent'] ?? 0)),
+                    'ability_energy_spent' => max(0, (int)($decoded['ability_energy_spent'] ?? 0)),
+                    'total_energy_spent' => max(0, (int)($decoded['total_energy_spent'] ?? 0)),
                 ];
             }
         }
@@ -715,7 +780,9 @@ function games_detail(int $gameId): void
             'offered_abilities' => $offeredAbilities,
             'current_bids' => $currentBids,
             'current_order' => $currentOrder,
+            'current_round_event_log' => $currentRoundEvents,
             'previous_round_orders' => $previousOrders,
+            'previous_round_event_log' => $previousRoundEvents,
         ];
     }
 
