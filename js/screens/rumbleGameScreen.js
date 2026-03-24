@@ -12,7 +12,7 @@ export function createRumbleGameScreen(deps) {
 			<p class="top-user-label" data-ref="progressText">Bidding submissions: 0/0</p>
 
 			<div data-ref="biddingPanel">
-				<p data-ref="bidHelpText">Place secret bids for offered abilities. Total bid cannot exceed your current health.</p>
+				<p data-ref="bidHelpText">Place secret bids for offered abilities. You can overbid your health, but if bidding leaves you at 0 or less you are eliminated before combat.</p>
 				<p data-ref="bidValidationText"></p>
 				<div class="row" style="font-weight: 600; margin-bottom: 6px; align-items: center;">
 					<div style="flex: 0 0 180px;">Ability</div>
@@ -55,7 +55,10 @@ export function createRumbleGameScreen(deps) {
 	`);
 	const playerRowTemplate = createTemplate(`
 		<div class="row mobile-stack" style="align-items: center; margin-bottom: 6px;">
-			<div style="flex: 1;" data-ref="name"></div>
+			<div style="flex: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+				<div data-ref="name"></div>
+				<small data-ref="abilities" style="opacity: 0.85;"></small>
+			</div>
 			<div style="min-width: 220px;" data-ref="right">
 				<div data-ref="label"></div>
 				<input type="number" min="0" step="1" placeholder="Attack amount" data-ref="input">
@@ -327,8 +330,6 @@ export function createRumbleGameScreen(deps) {
 	}
 
 	function getBidValidation() {
-		const selfPlayer = getSelfPlayer();
-		const health = selfPlayer ? Number(selfPlayer.health || 0) : 0;
 		const offeredSet = {};
 		serverSnapshot.offeredAbilities.forEach(function eachAbility(ability) {
 			offeredSet[String(ability.id)] = true;
@@ -342,8 +343,6 @@ export function createRumbleGameScreen(deps) {
 		const totalBid = getBidTotal();
 		return {
 			totalBid,
-			health,
-			invalidTotal: totalBid > health,
 			invalidAbilityIds,
 		};
 	}
@@ -461,6 +460,7 @@ export function createRumbleGameScreen(deps) {
 		const row = cloneTemplateNode(playerRowTemplate);
 		const rowRefs = collectRefs(row);
 		const name = rowRefs.name;
+		const abilities = rowRefs.abilities;
 		const right = rowRefs.right;
 		const label = rowRefs.label;
 		const input = rowRefs.input;
@@ -473,7 +473,7 @@ export function createRumbleGameScreen(deps) {
 
 		playersList.appendChild(row);
 
-		const refs = { row, name, right, label, input };
+		const refs = { row, name, abilities, right, label, input };
 		playerRowsById.set(key, refs);
 		return refs;
 	}
@@ -506,6 +506,22 @@ export function createRumbleGameScreen(deps) {
 			const isDefeated = !!player.is_defeated || Number(player.health || 0) <= 0;
 
 			refs.name.textContent = String(player.username || 'Unknown') + ' | Health: ' + Math.max(0, Number(player.health || 0));
+			const ownedAbilities = Array.isArray(player.owned_abilities) ? player.owned_abilities : [];
+			if (ownedAbilities.length > 0) {
+				refs.abilities.textContent = 'Abilities: ' + ownedAbilities.map(function eachAbility(ability) {
+					return String(ability && ability.name ? ability.name : 'Unknown');
+				}).join(', ');
+				refs.abilities.title = ownedAbilities.map(function eachAbility(ability) {
+					const abilityName = String(ability && ability.name ? ability.name : 'Unknown');
+					const description = String(ability && ability.description ? ability.description : 'No description available.');
+					return abilityName + ': ' + description;
+				}).join('\n');
+				refs.abilities.style.display = '';
+			} else {
+				refs.abilities.textContent = '';
+				refs.abilities.title = '';
+				refs.abilities.style.display = 'none';
+			}
 			if (refs.row.parentNode !== playersList) {
 				playersList.appendChild(refs.row);
 			} else {
@@ -627,14 +643,11 @@ export function createRumbleGameScreen(deps) {
 			progressText.textContent = 'Bidding submissions: ' + serverSnapshot.submittedCount + '/' + serverSnapshot.participantCount;
 
 			const bidValidation = getBidValidation();
-			if (bidValidation.invalidTotal) {
-				bidValidationText.textContent = 'Bids are invalid: total bid exceeds your current health.';
-				bidValidationText.style.color = '#b42318';
-			} else if (bidValidation.invalidAbilityIds.length > 0) {
+			if (bidValidation.invalidAbilityIds.length > 0) {
 				bidValidationText.textContent = 'Bids are invalid: one or more offered abilities are unavailable.';
 				bidValidationText.style.color = '#b42318';
 			} else {
-				bidValidationText.textContent = 'Total bid: ' + bidValidation.totalBid + ' / Health ' + bidValidation.health;
+				bidValidationText.textContent = 'Total bid: ' + bidValidation.totalBid;
 				bidValidationText.style.color = '';
 			}
 
@@ -888,10 +901,6 @@ export function createRumbleGameScreen(deps) {
 				const bidValidation = getBidValidation();
 				if (bidValidation.invalidAbilityIds.length > 0) {
 					setStatusNode('Invalid bids: one or more offered abilities are unavailable.', 'error');
-					return;
-				}
-				if (bidValidation.invalidTotal) {
-					setStatusNode('Invalid bids: total bid exceeds your health.', 'error');
 					return;
 				}
 

@@ -476,11 +476,14 @@ function games_detail(int $gameId): void
 
     $rumbleProgress = null;
     if (normalize_game_type((string)$game['game_type']) === 'rumble') {
+        $isInProgress = (string)($game['status'] ?? '') === 'in_progress';
         $roundNumber = (int)($game['current_round'] ?? 1);
         $phase = (string)($game['phase'] ?? default_phase_for_game_type((string)$game['game_type']));
 
-        rumble_initialize_player_state($gameId);
-        if ($phase === 'bidding') {
+        if ($isInProgress) {
+            rumble_initialize_player_state($gameId);
+        }
+        if ($isInProgress && $phase === 'bidding') {
             rumble_ensure_bidding_offer($gameId, $roundNumber, (int)$game['owner_user_id']);
         }
 
@@ -735,7 +738,7 @@ function rumble_ensure_bidding_offer(int $gameId, int $roundNumber, int $actorUs
     $participantCount = max(0, (int)$participantsStmt->fetchColumn());
 
     $abilityCount = count(rumble_ability_library());
-    $offerCount = min($abilityCount, max(6, $participantCount * 2));
+    $offerCount = min($abilityCount, max(0, $participantCount * 2));
     $offered = rumble_pick_random_abilities($offerCount);
 
     $insertStmt = db()->prepare(

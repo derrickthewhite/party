@@ -510,10 +510,6 @@ function rumble_upsert_bids(int $gameId): void
         $totalBid += $amount;
     }
 
-    if ($totalBid > $currentHealth) {
-        error_response('Invalid bids: total bid cannot exceed current health.', 422);
-    }
-
     ksort($normalized, SORT_STRING);
     $payload = [
         'bids' => $normalized,
@@ -776,7 +772,7 @@ function rumble_resolve_bidding_and_enter_battle(int $gameId, int $roundNumber):
     $ownedByUser = [];
     foreach ($playerRows as $row) {
         $userId = (int)$row['user_id'];
-        $remainingHealth[$userId] = max(0, (int)$row['current_health']);
+        $remainingHealth[$userId] = (int)$row['current_health'];
         $ownedByUser[$userId] = rumble_parse_owned_abilities(isset($row['owned_abilities_json']) ? (string)$row['owned_abilities_json'] : null);
     }
 
@@ -851,11 +847,6 @@ function rumble_resolve_bidding_and_enter_battle(int $gameId, int $roundNumber):
                 if ((int)$bidAmount !== (int)$bidLevel) {
                     continue;
                 }
-
-                if (($remainingHealth[(int)$userId] ?? 0) < (int)$bidLevel) {
-                    continue;
-                }
-
                 $eligibleAtLevel[] = (int)$userId;
             }
 
@@ -873,7 +864,7 @@ function rumble_resolve_bidding_and_enter_battle(int $gameId, int $roundNumber):
         }
 
         $winnerId = $candidateIds[count($candidateIds) === 1 ? 0 : random_int(0, count($candidateIds) - 1)];
-        $remainingHealth[$winnerId] = max(0, $remainingHealth[$winnerId] - $winningBid);
+        $remainingHealth[$winnerId] = $remainingHealth[$winnerId] - $winningBid;
         $ownedByUser[$winnerId][] = $abilityId;
         $assigned[$abilityId] = [
             'user_id' => $winnerId,
@@ -898,13 +889,26 @@ function rumble_resolve_bidding_and_enter_battle(int $gameId, int $roundNumber):
             'UPDATE rumble_player_state SET current_health = :current_health, owned_abilities_json = :owned_abilities_json '
             . 'WHERE game_id = :game_id AND user_id = :user_id'
         );
+        $defeatedUserIds = [];
         foreach ($remainingHealth as $userId => $health) {
             $updatePlayerStmt->execute([
-                'current_health' => max(0, (int)$health),
+                'current_health' => (int)$health,
                 'owned_abilities_json' => rumble_encode_owned_abilities($ownedByUser[$userId] ?? []),
                 'game_id' => $gameId,
                 'user_id' => $userId,
             ]);
+
+            if ((int)$health <= 0) {
+                $defeatedUserIds[] = (int)$userId;
+            }
+        }
+
+        if (!empty($defeatedUserIds)) {
+            $rolePlaceholders = implode(',', array_fill(0, count($defeatedUserIds), '?'));
+            $defeatRoleSql = 'UPDATE game_members SET role = ? WHERE game_id = ? AND user_id IN (' . $rolePlaceholders . ') AND role <> ?';
+            $defeatRoleParams = array_merge(['observer', $gameId], $defeatedUserIds, ['observer']);
+            $defeatRoleStmt = $pdo->prepare($defeatRoleSql);
+            $defeatRoleStmt->execute($defeatRoleParams);
         }
 
         $deleteAssignmentStmt = $pdo->prepare(
