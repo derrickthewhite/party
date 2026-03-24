@@ -249,6 +249,7 @@ function rumble_ability_public_view(array $ability): array
     return [
         'id' => (string)($ability['id'] ?? ''),
         'name' => (string)($ability['name'] ?? ''),
+        'title' => (string)($ability['name'] ?? ''),
         'template_type' => (string)($ability['template_type'] ?? ''),
         'tags' => array_values(array_map(static fn ($v): string => (string)$v, (array)($ability['tags'] ?? []))),
         'description' => (string)($ability['text_short'] ?? ''),

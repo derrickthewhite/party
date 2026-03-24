@@ -10,6 +10,12 @@ export function createRumbleGameScreen(deps) {
 				<button data-ref="refreshBtn">Refresh</button>
 			</div>
 			<p class="top-user-label" data-ref="progressText">Bidding submissions: 0/0</p>
+			<div class="row mobile-stack" data-ref="shipNameRow" style="align-items: center; margin: 6px 0 8px 0;">
+				<label style="min-width: 90px;" for="rumble-ship-name-input">Ship name</label>
+				<input id="rumble-ship-name-input" type="text" maxlength="60" placeholder="Enter ship name" data-ref="shipNameInput">
+				<button data-ref="saveShipNameBtn">Save Name</button>
+			</div>
+			<p data-ref="shipNameHint" style="margin: 0 0 8px 0; opacity: 0.85;">Leave blank to use your username.</p>
 
 			<div data-ref="biddingPanel">
 				<p data-ref="bidHelpText">Place secret bids for offered abilities. You can overbid your health, but if bidding leaves you at 0 or less you are eliminated before combat.</p>
@@ -57,7 +63,7 @@ export function createRumbleGameScreen(deps) {
 		<div class="row mobile-stack" style="align-items: center; margin-bottom: 6px;">
 			<div style="flex: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
 				<div data-ref="name"></div>
-				<small data-ref="abilities" style="opacity: 0.85;"></small>
+				<small data-ref="abilities" style="opacity: 0.85; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;"></small>
 			</div>
 			<div style="min-width: 220px;" data-ref="right">
 				<div data-ref="label"></div>
@@ -74,6 +80,10 @@ export function createRumbleGameScreen(deps) {
 	const refreshBtn = refs.refreshBtn;
 	const phaseTitle = refs.phaseTitle;
 	const progressText = refs.progressText;
+	const shipNameRow = refs.shipNameRow;
+	const shipNameInput = refs.shipNameInput;
+	const saveShipNameBtn = refs.saveShipNameBtn;
+	const shipNameHint = refs.shipNameHint;
 	const biddingPanel = refs.biddingPanel;
 	const bidHelpText = refs.bidHelpText;
 	const bidValidationText = refs.bidValidationText;
@@ -97,6 +107,7 @@ export function createRumbleGameScreen(deps) {
 	bidValidationText.style.fontWeight = '600';
 	defenseText.style.margin = '8px 0 6px 0';
 	defenseText.style.fontWeight = '600';
+	shipNameInput.style.flex = '1';
 	attackHelpText.style.margin = '4px 0 8px 0';
 	orderValidationText.style.margin = '0 0 8px 0';
 	orderValidationText.style.fontWeight = '600';
@@ -106,9 +117,11 @@ export function createRumbleGameScreen(deps) {
 	let lastGameId = null;
 	let lastRound = 1;
 	let lastPerms = {};
+	let lastMemberRole = 'none';
 	let setStatusNode = function noop() {};
 	let refreshBusy = false;
 	let orderBusy = false;
+	let shipNameBusy = false;
 	let autoRefreshId = null;
 
 	const serverSnapshot = {
@@ -121,6 +134,7 @@ export function createRumbleGameScreen(deps) {
 		currentBids: null,
 		currentOrder: null,
 		previousRoundOrders: [],
+		selfShipName: '',
 	};
 
 	const localDraft = {
@@ -128,6 +142,8 @@ export function createRumbleGameScreen(deps) {
 		bids: {},
 		dirtyAttacks: false,
 		dirtyBids: false,
+		shipName: '',
+		dirtyShipName: false,
 	};
 
 	const uiState = {
@@ -204,7 +220,9 @@ export function createRumbleGameScreen(deps) {
 		const row = serverSnapshot.players.find(function eachPlayer(player) {
 			return Number(player.user_id) === targetId;
 		});
-		return row ? String(row.username || ('User ' + targetId)) : ('User ' + targetId);
+		return row
+			? String(row.ship_name || row.username || ('User ' + targetId))
+			: ('User ' + targetId);
 	}
 
 	function describeOrder(order) {
@@ -347,6 +365,38 @@ export function createRumbleGameScreen(deps) {
 		};
 	}
 
+	function canEditShipName() {
+		return lastMemberRole !== 'none' && lastMemberRole !== 'observer';
+	}
+
+	function reconcileShipNameEditor() {
+		const editable = canEditShipName();
+		shipNameRow.style.display = editable ? '' : 'none';
+		shipNameHint.style.display = editable ? '' : 'none';
+		if (!editable) {
+			return;
+		}
+
+		const activeEl = document.activeElement;
+		const focused = activeEl === shipNameInput;
+		const valueFromDraft = String(localDraft.shipName || '');
+		if (!focused && shipNameInput.value !== valueFromDraft) {
+			shipNameInput.value = valueFromDraft;
+		}
+
+		shipNameInput.disabled = shipNameBusy;
+		saveShipNameBtn.disabled = shipNameBusy;
+		saveShipNameBtn.textContent = shipNameBusy ? 'Saving...' : 'Save Name';
+
+		const normalizedDraft = String(localDraft.shipName || '').trim();
+		const normalizedServer = String(serverSnapshot.selfShipName || '').trim();
+		if (normalizedDraft === '' || normalizedDraft === normalizedServer) {
+			shipNameHint.textContent = 'Leave blank to use your username.';
+		} else {
+			shipNameHint.textContent = 'Unsaved ship name: ' + normalizedDraft;
+		}
+	}
+
 	function ensureAbilityRow(ability) {
 		const key = String(ability.id || '');
 		if (abilityRowsById.has(key)) {
@@ -399,7 +449,7 @@ export function createRumbleGameScreen(deps) {
 			const key = String(ability.id || '');
 			active.add(key);
 			const rowRefs = ensureAbilityRow(ability);
-			rowRefs.name.textContent = String(ability.name || key);
+			rowRefs.name.textContent = String(ability.title || ability.name || key);
 			rowRefs.description.textContent = String(ability.description || '');
 			abilitiesList.appendChild(rowRefs.row);
 
@@ -473,9 +523,57 @@ export function createRumbleGameScreen(deps) {
 
 		playersList.appendChild(row);
 
-		const refs = { row, name, abilities, right, label, input };
+		const refs = { row, name, abilities, right, label, input, abilityBadgeById: new Map() };
 		playerRowsById.set(key, refs);
 		return refs;
+	}
+
+	function reconcileOwnedAbilities(refs, ownedAbilities) {
+		const list = Array.isArray(ownedAbilities) ? ownedAbilities : [];
+		if (list.length === 0) {
+			refs.abilities.style.display = 'none';
+			refs.abilities.textContent = '';
+			refs.abilities.title = '';
+			refs.abilityBadgeById.clear();
+			return;
+		}
+
+		refs.abilities.style.display = '';
+		refs.abilities.title = '';
+
+		const activeIds = new Set();
+		list.forEach(function eachAbility(ability, index) {
+			const abilityId = String(ability && ability.id ? ability.id : ('ability_' + String(index)));
+			activeIds.add(abilityId);
+
+			let badge = refs.abilityBadgeById.get(abilityId);
+			if (!badge) {
+				badge = document.createElement('span');
+				badge.style.display = 'inline-block';
+				badge.style.padding = '1px 6px';
+				badge.style.border = '1px solid rgba(0, 0, 0, 0.2)';
+				badge.style.borderRadius = '999px';
+				refs.abilityBadgeById.set(abilityId, badge);
+			}
+
+			const abilityName = String(ability && (ability.title || ability.name) ? (ability.title || ability.name) : 'Unknown');
+			const description = String(ability && ability.description ? ability.description : 'No description available.');
+			badge.textContent = abilityName;
+			badge.title = abilityName + ': ' + description;
+			refs.abilities.appendChild(badge);
+		});
+
+		Array.from(refs.abilityBadgeById.keys()).forEach(function eachExisting(abilityId) {
+			if (activeIds.has(abilityId)) {
+				return;
+			}
+
+			const badge = refs.abilityBadgeById.get(abilityId);
+			if (badge && badge.parentNode === refs.abilities) {
+				refs.abilities.removeChild(badge);
+			}
+			refs.abilityBadgeById.delete(abilityId);
+		});
 	}
 
 	function reconcilePlayersList() {
@@ -505,23 +603,10 @@ export function createRumbleGameScreen(deps) {
 			const refs = ensurePlayerRow(player);
 			const isDefeated = !!player.is_defeated || Number(player.health || 0) <= 0;
 
-			refs.name.textContent = String(player.username || 'Unknown') + ' | Health: ' + Math.max(0, Number(player.health || 0));
+			const displayShipName = String(player.ship_name || player.username || 'Unknown');
+			refs.name.textContent = displayShipName + ' | Health: ' + Math.max(0, Number(player.health || 0));
 			const ownedAbilities = Array.isArray(player.owned_abilities) ? player.owned_abilities : [];
-			if (ownedAbilities.length > 0) {
-				refs.abilities.textContent = 'Abilities: ' + ownedAbilities.map(function eachAbility(ability) {
-					return String(ability && ability.name ? ability.name : 'Unknown');
-				}).join(', ');
-				refs.abilities.title = ownedAbilities.map(function eachAbility(ability) {
-					const abilityName = String(ability && ability.name ? ability.name : 'Unknown');
-					const description = String(ability && ability.description ? ability.description : 'No description available.');
-					return abilityName + ': ' + description;
-				}).join('\n');
-				refs.abilities.style.display = '';
-			} else {
-				refs.abilities.textContent = '';
-				refs.abilities.title = '';
-				refs.abilities.style.display = 'none';
-			}
+			reconcileOwnedAbilities(refs, ownedAbilities);
 			if (refs.row.parentNode !== playersList) {
 				playersList.appendChild(refs.row);
 			} else {
@@ -632,6 +717,7 @@ export function createRumbleGameScreen(deps) {
 	function reconcileUi() {
 		const canAct = !!lastPerms.can_act;
 		const bidding = isBiddingPhase();
+		reconcileShipNameEditor();
 
 		biddingPanel.style.display = bidding ? '' : 'none';
 		battlePanel.style.display = bidding ? 'none' : '';
@@ -738,6 +824,12 @@ export function createRumbleGameScreen(deps) {
 			: null;
 		const nextOrder = progress && progress.current_order ? progress.current_order : null;
 		const nextPreviousOrders = progress && Array.isArray(progress.previous_round_orders) ? progress.previous_round_orders : [];
+		const nextSelfPlayer = nextPlayers.find(function eachPlayer(player) {
+			return !!player.is_self;
+		}) || null;
+		const nextSelfShipName = nextSelfPlayer
+			? String(nextSelfPlayer.ship_name || nextSelfPlayer.username || '')
+			: '';
 
 		const phaseChanged = phaseMode !== serverSnapshot.phaseMode;
 
@@ -759,6 +851,11 @@ export function createRumbleGameScreen(deps) {
 			defense: Math.max(0, Number(nextOrder.defense || 0)),
 		} : null;
 		serverSnapshot.previousRoundOrders = nextPreviousOrders;
+		serverSnapshot.selfShipName = nextSelfShipName;
+
+		if (!localDraft.dirtyShipName) {
+			localDraft.shipName = nextSelfShipName;
+		}
 
 		if (phaseChanged) {
 			if (isBiddingPhase()) {
@@ -865,6 +962,7 @@ export function createRumbleGameScreen(deps) {
 		onSetGame: function onSetGame(context) {
 			lastGameId = context.game.id;
 			lastPerms = context.game.permissions || {};
+			lastMemberRole = String(context.game.member_role || 'none').toLowerCase();
 			setStatusNode = context.setStatusNode;
 
 			context.nodes.composerRow.style.display = '';
@@ -886,6 +984,42 @@ export function createRumbleGameScreen(deps) {
 
 	refreshBtn.addEventListener('click', function onRefreshClick() {
 		refreshRumbleState({ silent: false });
+	});
+
+	shipNameInput.addEventListener('input', function onShipNameInput() {
+		localDraft.shipName = String(shipNameInput.value || '');
+		localDraft.dirtyShipName = true;
+		reconcileUi();
+	});
+
+	shipNameInput.addEventListener('keydown', async function onShipNameKeyDown(event) {
+		if (event.key !== 'Enter') {
+			return;
+		}
+
+		event.preventDefault();
+		saveShipNameBtn.click();
+	});
+
+	saveShipNameBtn.addEventListener('click', async function onSaveShipName() {
+		if (!lastGameId || shipNameBusy || !canEditShipName()) {
+			return;
+		}
+
+		const nextShipName = String(localDraft.shipName || '');
+		shipNameBusy = true;
+		reconcileUi();
+		try {
+			await deps.api.setRumbleShipName(lastGameId, nextShipName);
+			localDraft.dirtyShipName = false;
+			await refreshRumbleState({ silent: true });
+			setStatusNode('Ship name updated.', 'ok');
+		} catch (err) {
+			setStatusNode(err.message || 'Unable to update ship name.', 'error');
+		} finally {
+			shipNameBusy = false;
+			reconcileUi();
+		}
 	});
 
 	submitBtn.addEventListener('click', async function onSubmitOrder() {

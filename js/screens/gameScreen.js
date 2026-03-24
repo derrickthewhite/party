@@ -12,6 +12,7 @@ export function createBaseGameScreen(deps, options) {
 			<div class="row">
 				<h2 data-ref="title">${config.title || 'Game'}</h2>
 				<div data-ref="headingSpacer"></div>
+				<button data-ref="leave">Leave game</button>
 				<button class="link" data-ref="back">Back to lobby</button>
 			</div>
 			<p class="top-user-label" data-ref="userLabel"></p>
@@ -52,12 +53,14 @@ export function createBaseGameScreen(deps, options) {
 	const typePanel = refs.typePanel;
 	const status = refs.status;
 	const adminControls = refs.adminControls;
+	const leave = refs.leave;
 	const adminStart = refs.adminStart;
 	const adminEnd = refs.adminEnd;
 	const adminDelete = refs.adminDelete;
 	let mountedTypePanel = null;
 
 	refs.headingSpacer.style.flex = '1';
+	leave.style.display = 'none';
 	modeInfo.style.marginTop = '-6px';
 	modeInfo.style.opacity = '0.8';
 	composerRow.style.marginTop = '10px';
@@ -71,6 +74,33 @@ export function createBaseGameScreen(deps, options) {
 		chat.stopPolling();
 		state.patch({ activeGame: null });
 		state.setScreen('landing');
+	});
+
+	leave.addEventListener('click', async function onLeave() {
+		const activeGame = state.state.activeGame;
+		if (!activeGame || leave.style.display === 'none' || leave.disabled) {
+			return;
+		}
+
+		const confirmed = await showConfirmModal({
+			title: 'Confirm Leave',
+			message: 'Are you sure you want to leave this game?',
+			cancelLabel: 'Cancel',
+			confirmLabel: 'Leave Game',
+		});
+		if (!confirmed) {
+			return;
+		}
+
+		try {
+			await api.leaveGame(activeGame.id);
+			chat.stopPolling();
+			state.patch({ activeGame: null });
+			await refreshGames();
+			state.setScreen('landing');
+		} catch (err) {
+			setStatus(status, err.message, 'error');
+		}
 	});
 
 	sendButton.addEventListener('click', async function onSendClick() {
@@ -231,6 +261,7 @@ export function createBaseGameScreen(deps, options) {
 		const memberRole = game && game.member_role ? game.member_role : 'none';
 		const chatLocked = !perms.can_chat;
 		const actionsLocked = !perms.can_act;
+		const canLeave = !!perms.can_leave;
 
 		messageInput.disabled = chatLocked;
 		sendButton.disabled = chatLocked;
@@ -238,13 +269,19 @@ export function createBaseGameScreen(deps, options) {
 		actionPayload.disabled = actionsLocked;
 		actionButton.disabled = actionsLocked;
 		const isOwnerOrAdmin = !!perms.can_delete;
-		adminControls.style.display = isOwnerOrAdmin ? 'flex' : 'none';
-		adminStart.style.display = isOwnerOrAdmin ? '' : 'none';
-		adminEnd.style.display = isOwnerOrAdmin ? '' : 'none';
-		adminDelete.style.display = isOwnerOrAdmin ? '' : 'none';
+		const isOwner = String(memberRole).toLowerCase() === 'owner';
+		const hasAdminRights = !!(state.state.user && state.state.user.is_admin);
+		const showAdminUi = !hasAdminRights || !!state.state.adminUiEnabled;
+		const canSeeManageControls = isOwnerOrAdmin && (isOwner || showAdminUi);
+		adminControls.style.display = canSeeManageControls ? 'flex' : 'none';
+		adminStart.style.display = canSeeManageControls ? '' : 'none';
+		adminEnd.style.display = canSeeManageControls ? '' : 'none';
+		adminDelete.style.display = canSeeManageControls ? '' : 'none';
 		adminStart.disabled = !perms.can_start;
 		adminEnd.disabled = !perms.can_end;
 		adminDelete.disabled = !perms.can_delete;
+		leave.style.display = canLeave ? '' : 'none';
+		leave.disabled = !canLeave;
 
 		if (!game) {
 			modeInfo.textContent = '';

@@ -1,13 +1,15 @@
 export function getInitialRoute() {
     try {
         const params = new URL(location.href).searchParams;
+        const adminUiRaw = String(params.get('admin_ui') || '').toLowerCase();
         return {
             screen: params.get('screen') || null,
             next: params.get('next') || null,
             game: params.get('game') || null,
+            admin_ui_enabled: adminUiRaw === '1' || adminUiRaw === 'true',
         };
     } catch (e) {
-        return { screen: null, next: null, game: null };
+        return { screen: null, next: null, game: null, admin_ui_enabled: false };
     }
 }
 

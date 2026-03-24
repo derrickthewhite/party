@@ -4,6 +4,7 @@ function createStateModule() {
 		user: null,
 		games: [],
 		activeGame: null,
+		adminUiEnabled: false,
 		statusText: '',
 		statusKind: '',
 		messageCursorByGame: {},

@@ -12,6 +12,7 @@ export function createLandingScreen(deps) {
 			<div class="row">
 				<h2>Game Lobby</h2>
 				<div data-ref="headingSpacer"></div>
+				<button data-ref="adminUiToggle">Admin UI: On</button>
 				<button data-ref="refresh">Refresh</button>
 				<button class="link" data-ref="signout">Sign out</button>
 			</div>
@@ -47,6 +48,7 @@ export function createLandingScreen(deps) {
 		</section>
 	`);
 	const refs = collectRefs(root);
+	const adminUiToggle = refs.adminUiToggle;
 	const refresh = refs.refresh;
 	const signout = refs.signout;
 	const userLabel = refs.userLabel;
@@ -75,6 +77,7 @@ export function createLandingScreen(deps) {
 				<div class="row game-item-controls-left">
 					<button data-ref="join">Join</button>
 					<button data-ref="observe">Observe</button>
+					<button data-ref="leave">Leave</button>
 					<button class="secondary" data-ref="open">Open</button>
 				</div>
 				<div class="row game-item-controls-right">
@@ -130,14 +133,43 @@ export function createLandingScreen(deps) {
 		stub: refs.stubOption,
 	};
 
+	function hasAdminRights() {
+		return !!(state.state.user && state.state.user.is_admin);
+	}
+
+	function isAdminUiEnabled() {
+		if (!hasAdminRights()) {
+			return true;
+		}
+
+		return !!state.state.adminUiEnabled;
+	}
+
+	function syncAdminUiToggle() {
+		const canToggle = hasAdminRights();
+		adminUiToggle.style.display = canToggle ? '' : 'none';
+		adminUiToggle.textContent = 'Admin UI: ' + (isAdminUiEnabled() ? 'On' : 'Off');
+	}
+
 	function syncGameTypeOptions() {
-		const isAdmin = !!(state.state.user && state.state.user.is_admin);
-		gameTypeOptions.stub.hidden = !isAdmin;
-		if (!isAdmin && gameTypeSelect.value === 'stub') {
+		const stubEnabled = hasAdminRights() && isAdminUiEnabled();
+		gameTypeOptions.stub.hidden = !stubEnabled;
+		if (!stubEnabled && gameTypeSelect.value === 'stub') {
 			gameTypeSelect.value = 'chat';
 		}
 	}
 
+	adminUiToggle.addEventListener('click', function onToggleAdminUi() {
+		if (!hasAdminRights()) {
+			return;
+		}
+
+		state.patch({ adminUiEnabled: !state.state.adminUiEnabled });
+		syncAdminUiToggle();
+		syncGameTypeOptions();
+	});
+
+	syncAdminUiToggle();
 	syncGameTypeOptions();
 	createBtn.addEventListener('click', async function onCreate() {
 		try {
@@ -217,6 +249,7 @@ export function createLandingScreen(deps) {
 	});
 
 	function renderGames(games) {
+		syncAdminUiToggle();
 		syncGameTypeOptions();
 		const user = state.state.user || {};
 		userLabel.textContent = user.username ? 'Signed in as: ' + user.username : '';
@@ -263,6 +296,33 @@ export function createLandingScreen(deps) {
 					await openGame(active.id);
 					await refreshGames();
 					setStatus(status, 'Joined as observer.', 'ok');
+				} catch (err) {
+					setStatus(status, err.message, 'error');
+				}
+			});
+
+			const leave = itemRefs.leave;
+			leave.addEventListener('click', async function onLeave() {
+				const active = rowState.game;
+				if (!active || leave.style.display === 'none') {
+					return;
+				}
+
+				const confirmed = await showConfirmModal({
+					title: 'Confirm Leave',
+					message: 'Are you sure you want to leave this game?',
+					cancelLabel: 'Cancel',
+					confirmLabel: 'Leave Game',
+				});
+				if (!confirmed) {
+					return;
+				}
+
+				try {
+					setStatus(status, 'Leaving game...', '');
+					await api.leaveGame(active.id);
+					await refreshGames();
+					setStatus(status, 'Left game.', 'ok');
 				} catch (err) {
 					setStatus(status, err.message, 'error');
 				}
@@ -369,6 +429,7 @@ export function createLandingScreen(deps) {
 				progressInfo: itemRefs.progressInfo,
 				join,
 				observe,
+				leave,
 				open,
 				start,
 				end,
@@ -448,16 +509,21 @@ export function createLandingScreen(deps) {
 
 			const canOpen = alreadyMember || observerRole || inMemberList;
 			const isOwnerOrAdmin = !!permissions.can_delete;
+			const isOwner = memberRole === 'owner';
+			const showAdminUi = isAdminUiEnabled();
+			const canSeeManageControls = isOwnerOrAdmin && (isOwner || showAdminUi);
 			const canJoinPlayer = !!permissions.can_join_player;
 			const canJoinObserver = !!permissions.can_join_observer;
+			const canLeave = !!permissions.can_leave;
 
 			refs.join.style.display = canJoinPlayer ? '' : 'none';
 			refs.observe.style.display = canJoinObserver ? '' : 'none';
+			refs.leave.style.display = canLeave ? '' : 'none';
 			refs.open.style.display = canOpen ? '' : 'none';
 
-			refs.start.style.display = isOwnerOrAdmin ? '' : 'none';
-			refs.end.style.display = isOwnerOrAdmin ? '' : 'none';
-			refs.remove.style.display = isOwnerOrAdmin ? '' : 'none';
+			refs.start.style.display = canSeeManageControls ? '' : 'none';
+			refs.end.style.display = canSeeManageControls ? '' : 'none';
+			refs.remove.style.display = canSeeManageControls ? '' : 'none';
 
 			refs.start.disabled = !permissions.can_start;
 			refs.end.disabled = !permissions.can_end;

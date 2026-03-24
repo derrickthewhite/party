@@ -44,6 +44,7 @@ function game_permissions_for_user(array $game, array $user, ?string $memberRole
         'can_delete' => $isOwner || $isAdmin,
         'can_join_player' => !$isMember && $status === 'open',
         'can_join_observer' => !$isMember,
+        'can_leave' => $isMember && !$isOwner && $status === 'open',
         'can_chat' => $isMember && !$isObserver && $status !== 'closed',
         'can_act' => $isMember && !$isObserver && $status === 'in_progress',
     ];

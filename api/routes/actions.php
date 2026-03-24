@@ -54,6 +54,14 @@ function handle_actions_route(string $method, array $segments): void
         rumble_upsert_bids((int)$segments[1]);
     }
 
+    if (count($segments) === 4 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'actions' && $segments[3] === 'rumble-ship-name') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+
+        rumble_upsert_ship_name((int)$segments[1]);
+    }
+
     if (count($segments) === 5 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'actions' && $segments[3] === 'rumble-bids' && $segments[4] === 'cancel') {
         if ($method !== 'POST') {
             error_response('Method not allowed.', 405);
@@ -557,6 +565,51 @@ function rumble_upsert_bids(int $gameId): void
         'round' => $roundNumber,
         'total_bid' => $totalBid,
     ], 201);
+}
+
+function rumble_upsert_ship_name(int $gameId): void
+{
+    $user = require_user();
+    $role = game_require_member_or_403((int)$user['id'], $gameId);
+    if ($role === 'observer') {
+        error_response('Observers cannot set ship names.', 403);
+    }
+
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    if (normalize_game_type((string)$game['game_type']) !== 'rumble') {
+        error_response('This endpoint is only available for rumble games.', 409);
+    }
+
+    $body = json_input();
+    $shipNameRaw = (string)($body['ship_name'] ?? '');
+    $shipName = trim($shipNameRaw);
+    if (strlen($shipName) > 60) {
+        error_response('Ship name must be at most 60 characters.', 422);
+    }
+
+    $saveValue = $shipName === '' ? null : $shipName;
+
+    $stmt = db()->prepare(
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health, ship_name, owned_abilities_json) '
+        . 'VALUES (:game_id, :user_id, 100, :ship_name, :owned_abilities_json) '
+        . 'ON DUPLICATE KEY UPDATE ship_name = :ship_name_update'
+    );
+    $stmt->execute([
+        'game_id' => $gameId,
+        'user_id' => (int)$user['id'],
+        'ship_name' => $saveValue,
+        'owned_abilities_json' => json_encode([], JSON_UNESCAPED_UNICODE),
+        'ship_name_update' => $saveValue,
+    ]);
+
+    success_response([
+        'updated' => true,
+        'ship_name' => $saveValue ?? (string)($user['username'] ?? ''),
+    ]);
 }
 
 function rumble_cancel_bids(int $gameId): void

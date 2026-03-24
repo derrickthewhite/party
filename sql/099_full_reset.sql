@@ -130,6 +130,7 @@ CREATE TABLE IF NOT EXISTS `rumble_player_state` (
   `game_id` BIGINT UNSIGNED NOT NULL,
   `user_id` BIGINT UNSIGNED NOT NULL,
   `current_health` INT UNSIGNED NOT NULL DEFAULT 100,
+  `ship_name` VARCHAR(60) NULL,
   `owned_abilities_json` JSON NULL,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`game_id`, `user_id`),

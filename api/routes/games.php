@@ -54,6 +54,13 @@ function handle_games_route(string $method, array $segments): void
         games_delete((int)$segments[1]);
     }
 
+    if (count($segments) === 3 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'leave') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+        games_leave((int)$segments[1]);
+    }
+
     if (count($segments) === 2 && $segments[0] === 'games' && ctype_digit($segments[1])) {
         if ($method !== 'GET') {
             error_response('Method not allowed.', 405);
@@ -419,6 +426,40 @@ function games_delete(int $gameId): void
     success_response(['deleted' => true, 'game_id' => $gameId]);
 }
 
+function games_leave(int $gameId): void
+{
+    $user = require_user();
+
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    $memberRole = game_member_role((int)$user['id'], $gameId);
+    if ($memberRole === null) {
+        error_response('You are not a member of this game.', 403);
+    }
+
+    if ((string)$game['status'] !== 'open') {
+        error_response('You can only leave games that have not started.', 409);
+    }
+
+    if ($memberRole === 'owner') {
+        error_response('Game owner cannot leave. Delete the game instead.', 403);
+    }
+
+    $stmt = db()->prepare('DELETE FROM game_members WHERE game_id = :game_id AND user_id = :user_id LIMIT 1');
+    $stmt->execute([
+        'game_id' => $gameId,
+        'user_id' => (int)$user['id'],
+    ]);
+
+    success_response([
+        'left' => true,
+        'game_id' => $gameId,
+    ]);
+}
+
 function games_detail(int $gameId): void
 {
     $user = require_user();
@@ -513,7 +554,7 @@ function games_detail(int $gameId): void
         $submittedCount = (int)$submittedStmt->fetchColumn();
 
         $playersStmt = db()->prepare(
-            'SELECT gm.user_id, u.username, COALESCE(rps.current_health, 100) AS current_health, gm.role, rps.owned_abilities_json '
+            'SELECT gm.user_id, u.username, COALESCE(rps.current_health, 100) AS current_health, gm.role, rps.ship_name, rps.owned_abilities_json '
             . 'FROM game_members gm '
             . 'JOIN users u ON u.id = gm.user_id '
             . 'LEFT JOIN rumble_player_state rps ON rps.game_id = gm.game_id AND rps.user_id = gm.user_id '
@@ -540,6 +581,9 @@ function games_detail(int $gameId): void
             $players[] = [
                 'user_id' => (int)$row['user_id'],
                 'username' => (string)$row['username'],
+                'ship_name' => trim((string)($row['ship_name'] ?? '')) !== ''
+                    ? trim((string)$row['ship_name'])
+                    : (string)$row['username'],
                 'health' => max(0, (int)$row['current_health']),
                 'is_self' => (int)$row['user_id'] === (int)$user['id'],
                 'is_defeated' => (int)$row['current_health'] <= 0,

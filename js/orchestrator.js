@@ -90,6 +90,7 @@ export function initializePartyApp() {
 	const initialRoute = getInitialRoute();
 	let currentNext = isSafeNext(initialRoute.next) ? initialRoute.next : null;
 	let currentGameId = isValidGameId(initialRoute.game) ? initialRoute.game : null;
+	state.patch({ adminUiEnabled: !!initialRoute.admin_ui_enabled });
 
 	function navigateToScreen(screen) {
 		state.clearStatus();
@@ -168,6 +169,9 @@ export function initializePartyApp() {
 			if (currentNext) params.set('next', currentNext);
 			if (currentGameId) {
 				params.set('game', String(currentGameId));
+			}
+			if (current.adminUiEnabled) {
+				params.set('admin_ui', '1');
 			}
 			const qs = params.toString();
 			history.replaceState(null, '', qs ? '?' + qs : location.pathname + location.hash);

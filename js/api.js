@@ -45,6 +45,7 @@ function createApiModule() {
 		createGame: (title, gameType) => request('/games', 'POST', { title, game_type: gameType }),
 		joinGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/join', 'POST'),
 		observeGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/observe', 'POST'),
+		leaveGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/leave', 'POST'),
 		startGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/start', 'POST'),
 		endGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/end', 'POST'),
 		deleteGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/delete', 'POST'),
@@ -62,6 +63,9 @@ function createApiModule() {
 			bids: bids || {},
 		}),
 		cancelRumbleBids: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-bids/cancel', 'POST'),
+		setRumbleShipName: (gameId, shipName) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-ship-name', 'POST', {
+			ship_name: shipName,
+		}),
 		endRumbleBidding: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-bids/end', 'POST'),
 		endRumbleTurn: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/reveal', 'POST'),
 	};
