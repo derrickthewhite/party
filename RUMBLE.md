@@ -23,6 +23,7 @@ Bidding happens once at game start. Won abilities persist until game end.
 ## Bidding Rules
 
 - A random offer of abilities is generated when the game starts.
+- The same ability may appear multiple times in that offer.
 - Players submit secret integer bids per offered ability.
 - Bid constraints:
   - Each bid is an integer >= 0.
@@ -31,8 +32,9 @@ Bidding happens once at game start. Won abilities persist until game end.
   - Highest non-zero bid wins.
   - If multiple players tie at the same highest non-zero bid, winner is chosen randomly among tied players.
   - Winner loses Health equal to winning bid.
-  - Winner permanently gains that ability for the game.
+  - Winner permanently gains that offered copy of the ability for the game.
 - Players may win multiple abilities if they can afford the winning bids.
+- Players may also end up owning multiple copies of the same ability if they win repeated offer slots.
 - Bidding resolves automatically when all eligible players submit.
 - Owner/admin can force-end bidding.
 

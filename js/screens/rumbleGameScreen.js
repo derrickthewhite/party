@@ -16,6 +16,10 @@ export function createRumbleGameScreen(deps) {
 				<button data-ref="saveShipNameBtn">Save Name</button>
 			</div>
 			<p data-ref="shipNameHint" style="margin: 0 0 8px 0; opacity: 0.85;">Leave blank to use your username.</p>
+			<div class="row mobile-stack" data-ref="adminCheatToggleRow" style="display: none; align-items: center; margin: 0 0 8px 0; gap: 8px;">
+				<button data-ref="adminCheatToggleBtn">Admin Cheat: Show</button>
+				<small data-ref="adminCheatToggleHint" style="opacity: 0.85;">Global Admin UI must also be enabled.</small>
+			</div>
 			<div data-ref="adminCheatPanel" style="display: none; margin: 0 0 10px 0; padding: 10px; border: 1px dashed rgba(0, 0, 0, 0.25); border-radius: 10px; background: rgba(0, 0, 0, 0.03);">
 				<div class="row mobile-stack" style="align-items: center; margin-bottom: 8px;">
 					<h4 style="margin: 0;">Admin Ability Cheat</h4>
@@ -96,8 +100,8 @@ export function createRumbleGameScreen(deps) {
 				<div data-ref="name"></div>
 				<small data-ref="abilities" style="opacity: 0.85; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;"></small>
 			</div>
-			<div style="min-width: 220px;" data-ref="right">
-				<div data-ref="label"></div>
+			<div style="min-width: 220px; display: flex; flex-direction: column; justify-content: center; gap: 4px;" data-ref="right">
+				<div data-ref="label" style="line-height: 1.2;"></div>
 				<input type="number" min="0" step="1" placeholder="Attack amount" data-ref="input">
 			</div>
 		</div>
@@ -158,6 +162,9 @@ export function createRumbleGameScreen(deps) {
 	const shipNameInput = refs.shipNameInput;
 	const saveShipNameBtn = refs.saveShipNameBtn;
 	const shipNameHint = refs.shipNameHint;
+	const adminCheatToggleRow = refs.adminCheatToggleRow;
+	const adminCheatToggleBtn = refs.adminCheatToggleBtn;
+	const adminCheatToggleHint = refs.adminCheatToggleHint;
 	const adminCheatPanel = refs.adminCheatPanel;
 	const adminCheatSummary = refs.adminCheatSummary;
 	const adminCheatHint = refs.adminCheatHint;
@@ -256,6 +263,7 @@ export function createRumbleGameScreen(deps) {
 
 	const uiState = {
 		isEditing: true,
+		adminCheatExpanded: false,
 	};
 
 	const abilityRowsById = new Map();
@@ -266,6 +274,47 @@ export function createRumbleGameScreen(deps) {
 	const currentEventRowsById = new Map();
 	const previousEventRowsById = new Map();
 	const adminCheatTargetOptionByValue = new Map();
+
+	function childElements(node) {
+		return Array.from(node.children || []);
+	}
+
+	function placeChildAt(parentNode, childNode, index) {
+		if (!parentNode || !childNode) {
+			return;
+		}
+
+		const existingAtIndex = childElements(parentNode)[index] || null;
+		if (existingAtIndex === childNode) {
+			return;
+		}
+
+		parentNode.insertBefore(childNode, existingAtIndex);
+	}
+
+	function getOfferItemKey(ability) {
+		const explicitKey = String(ability && ability.offer_item_key ? ability.offer_item_key : '').trim();
+		if (explicitKey) {
+			return explicitKey;
+		}
+		return String(ability && ability.id ? ability.id : '').trim();
+	}
+
+	function getOwnedAbilityDraftKey(ability) {
+		const explicitKey = String(ability && ability.owned_instance_key ? ability.owned_instance_key : '').trim();
+		if (explicitKey) {
+			return explicitKey;
+		}
+		const abilityId = String(ability && ability.id ? ability.id : '').trim();
+		const copyIndex = Math.max(0, Number(ability && ability.ability_copy_index ? ability.ability_copy_index : 0));
+		return copyIndex > 0 ? (abilityId + '__' + copyIndex) : abilityId;
+	}
+
+	function getActivationDraftKey(activation) {
+		const abilityId = String(activation && activation.ability_id ? activation.ability_id : '').trim();
+		const copyIndex = Math.max(0, Number(activation && activation.ability_copy_index ? activation.ability_copy_index : 0));
+		return copyIndex > 0 ? (abilityId + '__' + copyIndex) : abilityId;
+	}
 
 	function isBiddingPhase() {
 		return serverSnapshot.phaseMode === 'bidding';
@@ -372,6 +421,12 @@ export function createRumbleGameScreen(deps) {
 			}
 
 			const next = {};
+			if (Object.prototype.hasOwnProperty.call(item, 'ability_copy_index')) {
+				const copyIndex = Number(item.ability_copy_index);
+				if (Number.isFinite(copyIndex) && copyIndex > 0) {
+					next.ability_copy_index = Math.floor(copyIndex);
+				}
+			}
 			if (Object.prototype.hasOwnProperty.call(item, 'target_user_id')) {
 				const target = Number(item.target_user_id);
 				if (Number.isFinite(target) && target > 0) {
@@ -423,6 +478,13 @@ export function createRumbleGameScreen(deps) {
 					: index),
 			};
 
+			if (Object.prototype.hasOwnProperty.call(item, 'ability_copy_index')) {
+				const copyIndex = Number(item.ability_copy_index);
+				if (Number.isFinite(copyIndex) && copyIndex > 0) {
+					normalizedEntry.ability_copy_index = Math.floor(copyIndex);
+				}
+			}
+
 			if (Object.prototype.hasOwnProperty.call(item, 'target_user_id')) {
 				const target = Number(item.target_user_id);
 				if (Number.isFinite(target) && target > 0) {
@@ -455,7 +517,11 @@ export function createRumbleGameScreen(deps) {
 			if (a.client_order_index !== b.client_order_index) {
 				return a.client_order_index - b.client_order_index;
 			}
-			return String(a.ability_id).localeCompare(String(b.ability_id));
+			const abilityCompare = String(a.ability_id).localeCompare(String(b.ability_id));
+			if (abilityCompare !== 0) {
+				return abilityCompare;
+			}
+			return Math.max(0, Number(a.ability_copy_index || 0)) - Math.max(0, Number(b.ability_copy_index || 0));
 		});
 
 		return normalized;
@@ -464,7 +530,8 @@ export function createRumbleGameScreen(deps) {
 	function activationArrayToMap(activations) {
 		const mapped = {};
 		normalizeAbilityActivationArray(activations).forEach(function eachActivation(entry) {
-			mapped[String(entry.ability_id)] = {
+			mapped[getActivationDraftKey(entry)] = {
+				ability_copy_index: Object.prototype.hasOwnProperty.call(entry, 'ability_copy_index') ? entry.ability_copy_index : undefined,
 				target_user_id: Object.prototype.hasOwnProperty.call(entry, 'target_user_id') ? entry.target_user_id : undefined,
 				x_cost: Object.prototype.hasOwnProperty.call(entry, 'x_cost') ? entry.x_cost : undefined,
 				mode: Object.prototype.hasOwnProperty.call(entry, 'mode') ? entry.mode : undefined,
@@ -569,19 +636,22 @@ export function createRumbleGameScreen(deps) {
 
 		if (templateKey === 'activated_spend_with_target_policy') {
 			const targetPolicy = String(params.target_policy || 'optional_target');
+			const costKind = String(params && params.cost_formula && params.cost_formula.kind ? params.cost_formula.kind : '');
 			const showTarget = targetPolicy === 'single_opponent' || targetPolicy === 'optional_target';
 			return {
 				showTarget,
 				targetRequired: targetPolicy === 'single_opponent',
-				showXCost: String(params.cost_mode || '') === 'variable' || abilityId === 'mining_rig',
+				showXCost: String(params.cost_mode || '') === 'variable' || costKind === 'variable_x' || costKind === 'scaled_x',
 			};
 		}
 
 		if (templateKey === 'activated_defense_mode') {
+			const targetPolicy = String(params.target_policy || '');
+			const costKind = String(params && params.cost_formula && params.cost_formula.kind ? params.cost_formula.kind : '');
 			return {
-				showTarget: abilityId === 'focused_defense',
-				targetRequired: abilityId === 'focused_defense',
-				showXCost: Object.prototype.hasOwnProperty.call(templateInputs, 'x_cost') && abilityId === 'mine_layer',
+				showTarget: targetPolicy === 'single_opponent' || abilityId === 'focused_defense',
+				targetRequired: targetPolicy === 'single_opponent' || abilityId === 'focused_defense',
+				showXCost: costKind === 'variable_x' || costKind === 'scaled_x' || Object.prototype.hasOwnProperty.call(templateInputs, 'x_cost'),
 			};
 		}
 
@@ -614,8 +684,8 @@ export function createRumbleGameScreen(deps) {
 				return;
 			}
 
-			const abilityId = String(ability.id || '');
-			const draft = activationMap[abilityId] || { is_enabled: false };
+			const draftKey = getOwnedAbilityDraftKey(ability);
+			const draft = activationMap[draftKey] || { is_enabled: false };
 			if (draft.is_enabled === false) {
 				return;
 			}
@@ -636,7 +706,8 @@ export function createRumbleGameScreen(deps) {
 			}
 
 			const abilityId = String(ability.id || '');
-			const draft = activationMap[abilityId] || { is_enabled: false };
+			const draftKey = getOwnedAbilityDraftKey(ability);
+			const draft = activationMap[draftKey] || { is_enabled: false };
 			if (draft.is_enabled === false) {
 				return;
 			}
@@ -645,6 +716,9 @@ export function createRumbleGameScreen(deps) {
 				ability_id: abilityId,
 				client_order_index: orderIndex,
 			};
+			if (Object.prototype.hasOwnProperty.call(ability, 'ability_copy_index')) {
+				activation.ability_copy_index = Math.max(1, Math.floor(Number(ability.ability_copy_index || 0)));
+			}
 			if (Object.prototype.hasOwnProperty.call(draft, 'target_user_id')) {
 				activation.target_user_id = Math.max(1, Math.floor(Number(draft.target_user_id || 0)));
 			}
@@ -832,8 +906,8 @@ export function createRumbleGameScreen(deps) {
 				return;
 			}
 
-			const abilityId = String(ability.id || '');
-			const activation = effectiveActivations[abilityId] || { is_enabled: false };
+			const abilityKey = getOwnedAbilityDraftKey(ability);
+			const activation = effectiveActivations[abilityKey] || { is_enabled: false };
 			if (activation.is_enabled === false) {
 				return;
 			}
@@ -845,14 +919,14 @@ export function createRumbleGameScreen(deps) {
 
 			if (!Object.prototype.hasOwnProperty.call(activation, 'target_user_id')) {
 				if (controlSpec.targetRequired) {
-					missingAbilityTargets.push(abilityId);
+					missingAbilityTargets.push(abilityKey);
 				}
 				return;
 			}
 
 			const targetKey = String(Math.max(0, Number(activation.target_user_id || 0)));
 			if (!attackableTargets[targetKey]) {
-				invalidAbilityTargets.push(abilityId);
+				invalidAbilityTargets.push(abilityKey);
 			}
 		});
 
@@ -901,7 +975,7 @@ export function createRumbleGameScreen(deps) {
 	function getBidValidation() {
 		const offeredSet = {};
 		serverSnapshot.offeredAbilities.forEach(function eachAbility(ability) {
-			offeredSet[String(ability.id)] = true;
+			offeredSet[getOfferItemKey(ability)] = true;
 		});
 
 		const effectiveBids = getEffectiveBids();
@@ -949,7 +1023,7 @@ export function createRumbleGameScreen(deps) {
 	}
 
 	function ensureAbilityRow(ability) {
-		const key = String(ability.id || '');
+		const key = getOfferItemKey(ability);
 		if (abilityRowsById.has(key)) {
 			return abilityRowsById.get(key);
 		}
@@ -997,12 +1071,12 @@ export function createRumbleGameScreen(deps) {
 		const canEditBids = !!lastPerms.can_act;
 
 		serverSnapshot.offeredAbilities.forEach(function eachAbility(ability) {
-			const key = String(ability.id || '');
+			const key = getOfferItemKey(ability);
 			active.add(key);
 			const rowRefs = ensureAbilityRow(ability);
 			rowRefs.name.textContent = String(ability.title || ability.name || key);
 			rowRefs.description.textContent = String(ability.description || '');
-			abilitiesList.appendChild(rowRefs.row);
+			placeChildAt(abilitiesList, rowRefs.row, active.size - 1);
 
 			if (!canEditBids) {
 				rowRefs.label.textContent = 'No bidding access';
@@ -1092,9 +1166,22 @@ export function createRumbleGameScreen(deps) {
 		refs.abilities.style.display = '';
 		refs.abilities.title = '';
 
-		const activeIds = new Set();
+		const grouped = {};
 		list.forEach(function eachAbility(ability, index) {
 			const abilityId = String(ability && ability.id ? ability.id : ('ability_' + String(index)));
+			if (!grouped[abilityId]) {
+				grouped[abilityId] = {
+					ability,
+					count: 0,
+				};
+			}
+			grouped[abilityId].count += 1;
+		});
+
+		const activeIds = new Set();
+		Object.keys(grouped).sort().forEach(function eachAbilityId(abilityId, index) {
+			const groupedEntry = grouped[abilityId];
+			const ability = groupedEntry.ability;
 			activeIds.add(abilityId);
 
 			let badge = refs.abilityBadgeById.get(abilityId);
@@ -1109,9 +1196,9 @@ export function createRumbleGameScreen(deps) {
 
 			const abilityName = String(ability && (ability.title || ability.name) ? (ability.title || ability.name) : 'Unknown');
 			const description = String(ability && ability.description ? ability.description : 'No description available.');
-			badge.textContent = abilityName;
-			badge.title = abilityName + ': ' + description;
-			refs.abilities.appendChild(badge);
+			badge.textContent = groupedEntry.count > 1 ? (abilityName + ' x' + groupedEntry.count) : abilityName;
+			badge.title = abilityName + ': ' + description + (groupedEntry.count > 1 ? ' (owned ' + groupedEntry.count + ' copies)' : '');
+			placeChildAt(refs.abilities, badge, index);
 		});
 
 		Array.from(refs.abilityBadgeById.keys()).forEach(function eachExisting(abilityId) {
@@ -1128,7 +1215,7 @@ export function createRumbleGameScreen(deps) {
 	}
 
 	function ensureAbilityActivationRow(ability) {
-		const key = String(ability.id || '');
+		const key = getOwnedAbilityDraftKey(ability);
 		if (abilityActivationRowsById.has(key)) {
 			return abilityActivationRowsById.get(key);
 		}
@@ -1258,9 +1345,17 @@ export function createRumbleGameScreen(deps) {
 	}
 
 	function reconcileAdminCheatPanel() {
-		const visible = isAdminCheatVisible();
-		adminCheatPanel.style.display = visible ? '' : 'none';
-		if (!visible) {
+		const available = isAdminCheatVisible();
+		if (!available) {
+			uiState.adminCheatExpanded = false;
+		}
+		adminCheatToggleRow.style.display = available ? '' : 'none';
+		adminCheatToggleBtn.textContent = 'Admin Cheat: ' + (uiState.adminCheatExpanded ? 'Hide' : 'Show');
+		adminCheatToggleHint.textContent = available
+			? 'Global Admin UI is enabled for this in-progress game.'
+			: 'Global Admin UI must also be enabled.';
+		adminCheatPanel.style.display = available && uiState.adminCheatExpanded ? '' : 'none';
+		if (!available || !uiState.adminCheatExpanded) {
 			return;
 		}
 
@@ -1285,10 +1380,11 @@ export function createRumbleGameScreen(deps) {
 
 		const selectedTarget = getCheatTargetPlayer();
 		const selectedAbilityIds = getSelectedCheatAbilityIds();
-		const ownedSet = {};
+		const ownedCounts = {};
 		if (selectedTarget && Array.isArray(selectedTarget.owned_abilities)) {
 			selectedTarget.owned_abilities.forEach(function eachOwnedAbility(ability) {
-				ownedSet[String(ability.id || '')] = true;
+				const key = String(ability.id || '');
+				ownedCounts[key] = Math.max(0, Number(ownedCounts[key] || 0)) + 1;
 			});
 		}
 
@@ -1308,15 +1404,15 @@ export function createRumbleGameScreen(deps) {
 			active.add(key);
 			const refs = ensureAdminCheatAbilityRow(ability);
 			const checked = !!(localDraft.adminCheatSelections && localDraft.adminCheatSelections[key]);
-			const alreadyOwned = !!ownedSet[key];
+			const ownedCount = Math.max(0, Number(ownedCounts[key] || 0));
 
 			refs.name.textContent = String(ability.title || ability.name || key);
 			refs.meta.textContent = String(ability.template_kind || 'unknown');
 			refs.description.textContent = String(ability.description || '');
-			refs.status.textContent = alreadyOwned ? 'Already owned' : (checked ? 'Will grant' : 'Available');
+			refs.status.textContent = ownedCount > 0 ? ('Owned x' + ownedCount) : (checked ? 'Will grant' : 'Available');
 			refs.checkbox.disabled = adminCheatBusy;
 			refs.checkbox.checked = checked;
-			adminCheatAbilityList.appendChild(refs.row);
+			placeChildAt(adminCheatAbilityList, refs.row, active.size - 1);
 		});
 
 		Array.from(adminCheatAbilityRowsById.keys()).forEach(function eachExisting(key) {
@@ -1363,8 +1459,8 @@ export function createRumbleGameScreen(deps) {
 			return 'Passive ability. Always applied automatically by the resolver.';
 		}
 
-		const abilityId = String(ability.id || '');
-		const activation = activationMap[abilityId] || null;
+		const abilityKey = getOwnedAbilityDraftKey(ability);
+		const activation = activationMap[abilityKey] || null;
 		if (!activation || activation.is_enabled === false) {
 			return 'Not activated this round.';
 		}
@@ -1415,13 +1511,15 @@ export function createRumbleGameScreen(deps) {
 
 		const active = new Set();
 		selfOwnedAbilities.forEach(function eachAbility(ability) {
-			const key = String(ability.id || '');
+			const key = getOwnedAbilityDraftKey(ability);
 			active.add(key);
 			const refs = ensureAbilityActivationRow(ability);
-			refs.name.textContent = String(ability.title || ability.name || key);
+			const abilityName = String(ability.title || ability.name || key);
+			const copyIndex = Math.max(0, Number(ability.ability_copy_index || 0));
+			refs.name.textContent = copyIndex > 1 ? (abilityName + ' #' + copyIndex) : abilityName;
 			refs.meta.textContent = String(ability.template_kind || 'unknown');
 			refs.description.textContent = String(ability.description || '');
-			abilityActivationList.appendChild(refs.row);
+			placeChildAt(abilityActivationList, refs.row, active.size - 1);
 
 			const isActivated = isActivatedAbility(ability);
 			const controlSpec = getAbilityControlSpec(ability);
@@ -1531,7 +1629,7 @@ export function createRumbleGameScreen(deps) {
 			const effectKey = String(event && event.effect_key ? event.effect_key : 'event');
 			refs.meta.textContent = labelPrefix + ' • ' + effectKey;
 			refs.text.textContent = String(event && event.text ? event.text : 'No event details.');
-			listNode.appendChild(refs.line);
+			placeChildAt(listNode, refs.line, active.size - 1);
 		});
 
 		Array.from(rowMap.keys()).forEach(function eachExisting(key) {
@@ -1583,11 +1681,7 @@ export function createRumbleGameScreen(deps) {
 			refs.name.textContent = displayShipName + ' | Health: ' + Math.max(0, Number(player.health || 0));
 			const ownedAbilities = Array.isArray(player.owned_abilities) ? player.owned_abilities : [];
 			reconcileOwnedAbilities(refs, ownedAbilities);
-			if (refs.row.parentNode !== playersList) {
-				playersList.appendChild(refs.row);
-			} else {
-				playersList.appendChild(refs.row);
-			}
+			placeChildAt(playersList, refs.row, active.size - 1);
 
 			if (player.is_self) {
 				refs.label.textContent = isDefeated ? 'Defeated' : 'You';
@@ -1669,7 +1763,7 @@ export function createRumbleGameScreen(deps) {
 
 			refs.meta.textContent = String(order.username || 'Unknown');
 			refs.text.textContent = describeOrder(order);
-			lastTurnList.appendChild(refs.line);
+			placeChildAt(lastTurnList, refs.line, active.size - 1);
 		});
 
 		Array.from(previousOrderRowsById.keys()).forEach(function eachExisting(key) {
@@ -2028,6 +2122,15 @@ export function createRumbleGameScreen(deps) {
 
 	adminCheatTargetSelect.addEventListener('change', function onAdminCheatTargetChange() {
 		localDraft.adminCheatTargetUserId = String(adminCheatTargetSelect.value || '');
+		reconcileUi();
+	});
+
+	adminCheatToggleBtn.addEventListener('click', function onAdminCheatToggle() {
+		if (!isAdminCheatVisible()) {
+			return;
+		}
+
+		uiState.adminCheatExpanded = !uiState.adminCheatExpanded;
 		reconcileUi();
 	});
 

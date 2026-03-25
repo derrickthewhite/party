@@ -46,6 +46,12 @@ function rumble_default_ability_library(): array
             'template_type' => 'activated_attack_modifier',
             'tags' => ['attack', 'delayed', 'modifier'],
             'text_short' => 'Spend X Energy. Next round, add X bonus damage to one attack.',
+            'template_params' => [
+                'target_policy' => 'none',
+                'cost_mode' => 'variable',
+                'cost_formula' => ['kind' => 'variable_x'],
+                'effect_formula' => ['kind' => 'next_round_bonus_attack_x'],
+            ],
         ],
         'efficient_targeting' => [
             'id' => 'efficient_targeting',
@@ -53,6 +59,12 @@ function rumble_default_ability_library(): array
             'template_type' => 'activated_attack_modifier',
             'tags' => ['attack', 'cost_reduction'],
             'text_short' => 'Spend 10 Energy. Your second-largest attack this round costs 0 Energy.',
+            'template_params' => [
+                'target_policy' => 'none',
+                'cost_mode' => 'fixed',
+                'cost_formula' => ['kind' => 'constant', 'value' => 10],
+                'effect_formula' => ['kind' => 'second_largest_attack_free'],
+            ],
         ],
         'phase_bomb' => [
             'id' => 'phase_bomb',
@@ -64,9 +76,14 @@ function rumble_default_ability_library(): array
         'mine_layer' => [
             'id' => 'mine_layer',
             'name' => 'Mine Layer',
-            'template_type' => 'activated_defense_trigger',
+            'template_type' => 'activated_defense',
+            'template_key' => 'activated_defense_mode',
             'tags' => ['defense', 'retaliation'],
             'text_short' => 'Spend X Energy. This round, each player who attacks you takes floor(X/2) damage.',
+            'template_params' => [
+                'cost_formula' => ['kind' => 'variable_x'],
+                'trigger_effect' => ['kind' => 'retaliation_floor_half_x'],
+            ],
         ],
         'hailing_frequencies' => [
             'id' => 'hailing_frequencies',
@@ -78,9 +95,15 @@ function rumble_default_ability_library(): array
         'scheming' => [
             'id' => 'scheming',
             'name' => 'Scheming',
-            'template_type' => 'trigger_on_attacked',
+            'template_type' => 'activated_defense',
+            'template_key' => 'activated_defense_mode',
             'tags' => ['defense', 'retaliation', 'burn'],
             'text_short' => 'Burn 10. Choose one opponent. If that opponent attacks you this round, you ignore their largest attack and they take that much damage.',
+            'template_params' => [
+                'target_policy' => 'single_opponent',
+                'health_burn' => 10,
+                'trigger_effect' => ['kind' => 'scheming_reflect_largest_attack'],
+            ],
         ],
         'death_ray' => [
             'id' => 'death_ray',
@@ -228,6 +251,12 @@ function rumble_default_ability_library(): array
             'template_type' => 'activated_utility',
             'tags' => ['healing', 'resource_conversion'],
             'text_short' => 'Spend 3X Energy. Gain X Health.',
+            'template_params' => [
+                'target_policy' => 'none',
+                'cost_mode' => 'variable',
+                'cost_formula' => ['kind' => 'scaled_x', 'multiplier' => 3],
+                'effect_formula' => ['kind' => 'heal_x'],
+            ],
         ],
     ];
 }
@@ -431,7 +460,7 @@ function rumble_ability_template_key(array $ability): string
     if ($type === 'trigger_on_defeat') {
         return 'trigger_on_defeat_single_use';
     }
-    if ($type === 'trigger_on_attacked' || $type === 'activated_defense_trigger') {
+        if ($type === 'trigger_on_attacked') {
         return 'trigger_on_attacked';
     }
     if ($type === 'passive_modifier') {
@@ -567,6 +596,54 @@ function rumble_ability_public_view(array $ability): array
     ];
 }
 
+function rumble_offer_item_key(int $index, string $abilityId): string
+{
+    $sanitizedAbilityId = preg_replace('/[^a-z0-9_]+/i', '_', trim($abilityId));
+    $safeAbilityId = is_string($sanitizedAbilityId) && $sanitizedAbilityId !== '' ? strtolower($sanitizedAbilityId) : 'ability';
+    return 'offer_' . max(0, $index) . '_' . $safeAbilityId;
+}
+
+function rumble_normalize_offer_items(array $payload): array
+{
+    $itemsRaw = isset($payload['items']) && is_array($payload['items']) ? $payload['items'] : null;
+    if ($itemsRaw === null) {
+        $legacyIds = isset($payload['ability_ids']) && is_array($payload['ability_ids']) ? $payload['ability_ids'] : [];
+        $itemsRaw = [];
+        foreach ($legacyIds as $index => $abilityIdRaw) {
+            $itemsRaw[] = [
+                'offer_item_key' => rumble_offer_item_key((int)$index, trim((string)$abilityIdRaw)),
+                'ability_id' => $abilityIdRaw,
+            ];
+        }
+    }
+
+    $items = [];
+    $seenKeys = [];
+    foreach ($itemsRaw as $index => $itemRaw) {
+        $item = is_array($itemRaw) ? $itemRaw : ['ability_id' => $itemRaw];
+        $abilityId = trim((string)($item['ability_id'] ?? ''));
+        if ($abilityId === '' || !rumble_ability_exists($abilityId)) {
+            continue;
+        }
+
+        $offerItemKey = trim((string)($item['offer_item_key'] ?? ''));
+        if ($offerItemKey === '') {
+            $offerItemKey = rumble_offer_item_key((int)$index, $abilityId);
+        }
+        if (isset($seenKeys[$offerItemKey])) {
+            continue;
+        }
+
+        $seenKeys[$offerItemKey] = true;
+        $items[] = [
+            'offer_item_key' => $offerItemKey,
+            'ability_id' => $abilityId,
+        ];
+    }
+
+    return $items;
+}
+
 function rumble_parse_owned_abilities(?string $raw): array
 {
     if ($raw === null || trim($raw) === '') {
@@ -578,15 +655,13 @@ function rumble_parse_owned_abilities(?string $raw): array
         return [];
     }
 
-    $seen = [];
     $ids = [];
     foreach ($decoded as $abilityId) {
         $id = trim((string)$abilityId);
-        if ($id === '' || isset($seen[$id]) || !rumble_ability_exists($id)) {
+        if ($id === '' || !rumble_ability_exists($id)) {
             continue;
         }
 
-        $seen[$id] = true;
         $ids[] = $id;
     }
 
@@ -596,21 +671,146 @@ function rumble_parse_owned_abilities(?string $raw): array
 
 function rumble_encode_owned_abilities(array $abilityIds): string
 {
-    $seen = [];
     $normalized = [];
     foreach ($abilityIds as $abilityId) {
         $id = trim((string)$abilityId);
-        if ($id === '' || isset($seen[$id]) || !rumble_ability_exists($id)) {
+        if ($id === '' || !rumble_ability_exists($id)) {
             continue;
         }
 
-        $seen[$id] = true;
         $normalized[] = $id;
     }
 
     sort($normalized, SORT_STRING);
 
     return json_encode($normalized, JSON_UNESCAPED_UNICODE);
+}
+
+function rumble_owned_ability_counts(array $abilityIds): array
+{
+    $counts = [];
+    foreach ($abilityIds as $abilityId) {
+        $id = trim((string)$abilityId);
+        if ($id === '' || !rumble_ability_exists($id)) {
+            continue;
+        }
+        $counts[$id] = max(0, (int)($counts[$id] ?? 0)) + 1;
+    }
+    ksort($counts, SORT_STRING);
+    return $counts;
+}
+
+function rumble_owned_abilities_public_view(array $abilityIds): array
+{
+    $public = [];
+    $copyIndexByAbilityId = [];
+    foreach ($abilityIds as $abilityId) {
+        $id = trim((string)$abilityId);
+        if ($id === '') {
+            continue;
+        }
+        $ability = rumble_ability_by_id($id);
+        if ($ability === null) {
+            continue;
+        }
+
+        $copyIndexByAbilityId[$id] = max(0, (int)($copyIndexByAbilityId[$id] ?? 0)) + 1;
+        $copyIndex = (int)$copyIndexByAbilityId[$id];
+        $entry = rumble_ability_public_view($ability);
+        $entry['ability_copy_index'] = $copyIndex;
+        $entry['owned_instance_key'] = $id . '__' . $copyIndex;
+        $public[] = $entry;
+    }
+    return $public;
+}
+
+function rumble_offer_item_public_view(array $item): ?array
+{
+    $abilityId = trim((string)($item['ability_id'] ?? ''));
+    if ($abilityId === '') {
+        return null;
+    }
+
+    $ability = rumble_ability_by_id($abilityId);
+    if ($ability === null) {
+        return null;
+    }
+
+    $entry = rumble_ability_public_view($ability);
+    $entry['offer_item_key'] = trim((string)($item['offer_item_key'] ?? ''));
+    return $entry;
+}
+
+function rumble_normalize_bid_map($raw, array $allowedOfferItems = []): array
+{
+    if (!is_array($raw)) {
+        return [];
+    }
+
+    $normalized = [];
+    $allowedByKey = [];
+    $allowedAbilityIds = [];
+    foreach ($allowedOfferItems as $item) {
+        if (!is_array($item)) {
+            continue;
+        }
+        $offerItemKey = trim((string)($item['offer_item_key'] ?? ''));
+        $abilityId = trim((string)($item['ability_id'] ?? ''));
+        if ($offerItemKey !== '') {
+            $allowedByKey[$offerItemKey] = $abilityId;
+        }
+        if ($abilityId !== '') {
+            $allowedAbilityIds[$abilityId] = true;
+        }
+    }
+
+    foreach ($raw as $offerItemKeyRaw => $amountRaw) {
+        $offerItemKey = trim((string)$offerItemKeyRaw);
+        if ($offerItemKey === '') {
+            continue;
+        }
+
+        if (!empty($allowedByKey)) {
+            $isKnownKey = isset($allowedByKey[$offerItemKey]);
+            $isLegacyAbilityId = isset($allowedAbilityIds[$offerItemKey]);
+            if (!$isKnownKey && !$isLegacyAbilityId) {
+                continue;
+            }
+            if ($isLegacyAbilityId) {
+                $legacyAbilityId = $offerItemKey;
+                $matchedKey = null;
+                foreach ($allowedOfferItems as $candidate) {
+                    if ((string)($candidate['ability_id'] ?? '') !== $legacyAbilityId) {
+                        continue;
+                    }
+                    $candidateKey = trim((string)($candidate['offer_item_key'] ?? ''));
+                    if ($candidateKey === '' || isset($normalized[$candidateKey])) {
+                        continue;
+                    }
+                    $matchedKey = $candidateKey;
+                    break;
+                }
+                if ($matchedKey === null) {
+                    continue;
+                }
+                $offerItemKey = $matchedKey;
+            }
+        }
+
+        if (!is_int($amountRaw) && !ctype_digit((string)$amountRaw)) {
+            continue;
+        }
+
+        $amount = (int)$amountRaw;
+        if ($amount <= 0) {
+            continue;
+        }
+
+        $normalized[$offerItemKey] = $amount;
+    }
+
+    ksort($normalized, SORT_STRING);
+    return $normalized;
 }
 
 function rumble_ability_catalog_public_view(): array
@@ -643,20 +843,15 @@ function rumble_admin_grant_abilities(int $gameId, int $actorUserId, int $target
     }
 
     $normalizedRequestedIds = [];
-    $seenRequested = [];
     foreach ($abilityIds as $abilityId) {
         $normalizedId = trim((string)$abilityId);
         if ($normalizedId === '') {
-            continue;
-        }
-        if (isset($seenRequested[$normalizedId])) {
             continue;
         }
         if (!rumble_ability_exists($normalizedId)) {
             error_response('Unknown rumble ability: ' . $normalizedId, 422);
         }
 
-        $seenRequested[$normalizedId] = true;
         $normalizedRequestedIds[] = $normalizedId;
     }
 
@@ -686,27 +881,15 @@ function rumble_admin_grant_abilities(int $gameId, int $actorUserId, int $target
     }
 
     $existingOwnedIds = rumble_parse_owned_abilities(isset($member['owned_abilities_json']) ? (string)$member['owned_abilities_json'] : null);
-    $existingSet = array_fill_keys($existingOwnedIds, true);
     $addedAbilityIds = [];
     foreach ($normalizedRequestedIds as $requestedId) {
-        if (isset($existingSet[$requestedId])) {
-            continue;
-        }
-        $existingSet[$requestedId] = true;
         $addedAbilityIds[] = $requestedId;
         $existingOwnedIds[] = $requestedId;
     }
 
     $encodedOwnedAbilities = rumble_encode_owned_abilities($existingOwnedIds);
     $finalOwnedIds = rumble_parse_owned_abilities($encodedOwnedAbilities);
-    $finalOwnedAbilities = [];
-    foreach ($finalOwnedIds as $ownedAbilityId) {
-        $ability = rumble_ability_by_id($ownedAbilityId);
-        if ($ability === null) {
-            continue;
-        }
-        $finalOwnedAbilities[] = rumble_ability_public_view($ability);
-    }
+    $finalOwnedAbilities = rumble_owned_abilities_public_view($finalOwnedIds);
 
     $stateStmt = $db->prepare('SELECT current_round, phase FROM game_state WHERE game_id = :game_id LIMIT 1');
     $stateStmt->execute(['game_id' => $gameId]);
@@ -772,8 +955,13 @@ function rumble_pick_random_abilities(int $count): array
         return [];
     }
 
-    shuffle($ids);
-    return array_slice($ids, 0, min($count, count($ids)));
+    $picked = [];
+    $maxIndex = count($ids) - 1;
+    for ($index = 0; $index < $count; $index += 1) {
+        $picked[] = $ids[random_int(0, $maxIndex)];
+    }
+
+    return $picked;
 }
 
 function rumble_normalize_ability_activations($raw, bool $strict = false): array
@@ -806,6 +994,22 @@ function rumble_normalize_ability_activations($raw, bool $strict = false): array
             'ability_id' => $abilityId,
             'client_order_index' => max(0, is_int($idx) ? $idx : 0),
         ];
+
+        if (array_key_exists('ability_copy_index', $item)) {
+            $copyIndexRaw = $item['ability_copy_index'];
+            if (!is_int($copyIndexRaw) && !ctype_digit((string)$copyIndexRaw)) {
+                if ($strict) {
+                    throw new InvalidArgumentException('ability_copy_index must be a whole positive number when provided.');
+                }
+            } else {
+                $copyIndex = (int)$copyIndexRaw;
+                if ($copyIndex > 0) {
+                    $entry['ability_copy_index'] = $copyIndex;
+                } elseif ($strict) {
+                    throw new InvalidArgumentException('ability_copy_index must be a whole positive number when provided.');
+                }
+            }
+        }
 
         $instanceRaw = $item['ability_instance_id'] ?? null;
         if ($instanceRaw !== null && $instanceRaw !== '') {
@@ -896,7 +1100,11 @@ function rumble_normalize_ability_activations($raw, bool $strict = false): array
         if ($indexCmp !== 0) {
             return $indexCmp;
         }
-        return strcmp((string)($a['ability_id'] ?? ''), (string)($b['ability_id'] ?? ''));
+        $abilityCmp = strcmp((string)($a['ability_id'] ?? ''), (string)($b['ability_id'] ?? ''));
+        if ($abilityCmp !== 0) {
+            return $abilityCmp;
+        }
+        return ((int)($a['ability_copy_index'] ?? 0)) <=> ((int)($b['ability_copy_index'] ?? 0));
     });
 
     return array_values($normalized);
@@ -1135,14 +1343,7 @@ function rumble_game_build_detail_payload(int $gameId, array $game, array $user)
     $playerNameByUserId = [];
     foreach ($playersStmt->fetchAll() as $row) {
         $ownedAbilityIds = rumble_parse_owned_abilities(isset($row['owned_abilities_json']) ? (string)$row['owned_abilities_json'] : null);
-        $ownedAbilities = [];
-        foreach ($ownedAbilityIds as $abilityId) {
-            $ability = rumble_ability_by_id($abilityId);
-            if ($ability === null) {
-                continue;
-            }
-            $ownedAbilities[] = rumble_ability_public_view($ability);
-        }
+        $ownedAbilities = rumble_owned_abilities_public_view($ownedAbilityIds);
 
         $players[] = [
             'user_id' => (int)$row['user_id'],
@@ -1164,12 +1365,12 @@ function rumble_game_build_detail_payload(int $gameId, array $game, array $user)
 
     $offer = rumble_fetch_offer_payload($gameId, $roundNumber);
     $offeredAbilities = [];
-    foreach ($offer['ability_ids'] as $abilityId) {
-        $ability = rumble_ability_by_id($abilityId);
-        if ($ability === null) {
+    foreach (($offer['items'] ?? []) as $offerItem) {
+        $publicItem = rumble_offer_item_public_view($offerItem);
+        if ($publicItem === null) {
             continue;
         }
-        $offeredAbilities[] = rumble_ability_public_view($ability);
+        $offeredAbilities[] = $publicItem;
     }
 
     $currentBids = null;
@@ -1188,7 +1389,7 @@ function rumble_game_build_detail_payload(int $gameId, array $game, array $user)
         $currentBidPayload = $currentBidStmt->fetchColumn();
         if ($currentBidPayload !== false) {
             $decodedBid = json_decode((string)$currentBidPayload, true);
-            $currentBids = rumble_normalize_bid_map(isset($decodedBid['bids']) ? $decodedBid['bids'] : []);
+            $currentBids = rumble_normalize_bid_map(isset($decodedBid['bids']) ? $decodedBid['bids'] : [], (array)($offer['items'] ?? []));
         }
     }
 
@@ -1399,7 +1600,14 @@ function rumble_ensure_bidding_offer(int $gameId, int $roundNumber, int $actorUs
 
     $abilityCount = count(rumble_ability_library());
     $offerCount = min($abilityCount, max(0, $participantCount * 2));
-    $offered = rumble_pick_random_abilities($offerCount);
+    $offeredAbilityIds = rumble_pick_random_abilities($offerCount);
+    $offeredItems = [];
+    foreach ($offeredAbilityIds as $index => $abilityId) {
+        $offeredItems[] = [
+            'offer_item_key' => rumble_offer_item_key((int)$index, (string)$abilityId),
+            'ability_id' => (string)$abilityId,
+        ];
+    }
 
     $insertStmt = db()->prepare(
         'INSERT INTO game_actions (game_id, user_id, action_type, payload, round_number, phase, revealed_at) '
@@ -1409,7 +1617,7 @@ function rumble_ensure_bidding_offer(int $gameId, int $roundNumber, int $actorUs
         'game_id' => $gameId,
         'user_id' => $actorUserId,
         'action_type' => 'ability_offer',
-        'payload' => json_encode(['ability_ids' => $offered], JSON_UNESCAPED_UNICODE),
+        'payload' => json_encode(['items' => $offeredItems], JSON_UNESCAPED_UNICODE),
         'round_number' => $roundNumber,
         'phase' => 'bidding',
         'revealed_at' => gmdate('Y-m-d H:i:s'),
@@ -1438,51 +1646,12 @@ function rumble_fetch_offer_payload(int $gameId, int $roundNumber): array
         return ['ability_ids' => []];
     }
 
-    $abilityIdsRaw = is_array($decoded['ability_ids'] ?? null) ? $decoded['ability_ids'] : [];
-    $abilityIds = [];
-    $seen = [];
-    foreach ($abilityIdsRaw as $idRaw) {
-        $id = trim((string)$idRaw);
-        if ($id === '' || isset($seen[$id]) || !rumble_ability_exists($id)) {
-            continue;
-        }
-
-        $seen[$id] = true;
-        $abilityIds[] = $id;
-    }
+    $items = rumble_normalize_offer_items($decoded);
 
     return [
-        'ability_ids' => $abilityIds,
+        'items' => $items,
+        'ability_ids' => array_values(array_map(static fn (array $item): string => (string)$item['ability_id'], $items)),
     ];
-}
-
-function rumble_normalize_bid_map($raw): array
-{
-    if (!is_array($raw)) {
-        return [];
-    }
-
-    $normalized = [];
-    foreach ($raw as $abilityIdRaw => $amountRaw) {
-        $abilityId = trim((string)$abilityIdRaw);
-        if ($abilityId === '' || !rumble_ability_exists($abilityId)) {
-            continue;
-        }
-
-        if (!is_int($amountRaw) && !ctype_digit((string)$amountRaw)) {
-            continue;
-        }
-
-        $amount = (int)$amountRaw;
-        if ($amount <= 0) {
-            continue;
-        }
-
-        $normalized[$abilityId] = $amount;
-    }
-
-    ksort($normalized, SORT_STRING);
-    return $normalized;
 }
 
 function rumble_action_upsert_order(int $gameId): void
@@ -1537,7 +1706,8 @@ function rumble_action_upsert_order(int $gameId): void
     }
 
     $ownedAbilityIds = rumble_parse_owned_abilities(isset($stateRow['owned_abilities_json']) ? (string)$stateRow['owned_abilities_json'] : null);
-    $ownedAbilityMap = array_fill_keys($ownedAbilityIds, true);
+    $ownedAbilityMap = array_fill_keys(array_keys(rumble_owned_ability_counts($ownedAbilityIds)), true);
+    $ownedAbilityCounts = rumble_owned_ability_counts($ownedAbilityIds);
 
     $body = json_input();
     $attacksRaw = $body['attacks'] ?? [];
@@ -1599,10 +1769,28 @@ function rumble_action_upsert_order(int $gameId): void
         $totalAttack += $amount;
     }
 
+    $activationCounts = [];
+    $activationCopyKeys = [];
     foreach ($normalizedAbilityActivations as $activation) {
         $abilityId = (string)($activation['ability_id'] ?? '');
         if ($abilityId === '' || !isset($ownedAbilityMap[$abilityId])) {
             error_response('One or more activated abilities are not owned by this player.', 422);
+        }
+
+        $activationCounts[$abilityId] = max(0, (int)($activationCounts[$abilityId] ?? 0)) + 1;
+        if ($activationCounts[$abilityId] > max(0, (int)($ownedAbilityCounts[$abilityId] ?? 0))) {
+            error_response('One or more activated abilities exceed the number of copies you own.', 422);
+        }
+
+        if (array_key_exists('ability_copy_index', $activation)) {
+            $copyKey = $abilityId . '__' . (int)$activation['ability_copy_index'];
+            if (isset($activationCopyKeys[$copyKey])) {
+                error_response('Each owned ability copy can only be activated once per round.', 422);
+            }
+            $activationCopyKeys[$copyKey] = true;
+            if ((int)$activation['ability_copy_index'] > max(0, (int)($ownedAbilityCounts[$abilityId] ?? 0))) {
+                error_response('One or more activated ability copies are invalid.', 422);
+            }
         }
 
         if (array_key_exists('target_user_id', $activation)) {
@@ -1743,23 +1931,32 @@ function rumble_action_upsert_bids(int $gameId): void
         error_response('No ability offer is available for this game.', 409);
     }
 
-    $allowed = [];
-    foreach ($offer['ability_ids'] as $abilityId) {
-        $allowed[$abilityId] = true;
+    $allowedOfferItems = (array)($offer['items'] ?? []);
+    $allowedByKey = [];
+    foreach ($allowedOfferItems as $item) {
+        $offerItemKey = trim((string)($item['offer_item_key'] ?? ''));
+        if ($offerItemKey === '') {
+            continue;
+        }
+        $allowedByKey[$offerItemKey] = (string)($item['ability_id'] ?? '');
     }
 
     $body = json_input();
     $bidsRaw = $body['bids'] ?? [];
     if (!is_array($bidsRaw)) {
-        error_response('Bids must be an object keyed by ability id.', 422);
+        error_response('Bids must be an object keyed by offer item.', 422);
     }
 
-    $normalized = [];
+    $normalized = rumble_normalize_bid_map($bidsRaw, $allowedOfferItems);
     $totalBid = 0;
-    foreach ($bidsRaw as $abilityIdRaw => $amountRaw) {
-        $abilityId = trim((string)$abilityIdRaw);
-        if ($abilityId === '' || !isset($allowed[$abilityId])) {
-            error_response('One or more ability ids are invalid for this offer.', 422);
+    foreach ($bidsRaw as $offerItemKeyRaw => $amountRaw) {
+        $offerItemKey = trim((string)$offerItemKeyRaw);
+        if ($offerItemKey === '') {
+            error_response('One or more offer item keys are invalid for this offer.', 422);
+        }
+
+        if (!isset($allowedByKey[$offerItemKey]) && !in_array($offerItemKey, array_values($allowedByKey), true)) {
+            error_response('One or more offer item keys are invalid for this offer.', 422);
         }
 
         if (!is_int($amountRaw) && !ctype_digit((string)$amountRaw)) {
@@ -1770,16 +1967,9 @@ function rumble_action_upsert_bids(int $gameId): void
         if ($amount < 0) {
             error_response('Bid amounts must be non-negative.', 422);
         }
-
-        if ($amount === 0) {
-            continue;
-        }
-
-        $normalized[$abilityId] = $amount;
-        $totalBid += $amount;
+        $totalBid += max(0, $amount);
     }
 
-    ksort($normalized, SORT_STRING);
     $payload = [
         'bids' => $normalized,
         'total_bid' => $totalBid,
@@ -2030,20 +2220,11 @@ function rumble_action_current_offer(int $gameId, int $roundNumber): ?array
         return null;
     }
 
-    $idsRaw = isset($payload['ability_ids']) && is_array($payload['ability_ids']) ? $payload['ability_ids'] : [];
-    $ids = [];
-    $seen = [];
-    foreach ($idsRaw as $idRaw) {
-        $id = trim((string)$idRaw);
-        if ($id === '' || isset($seen[$id]) || !rumble_ability_exists($id)) {
-            continue;
-        }
-        $seen[$id] = true;
-        $ids[] = $id;
-    }
+    $items = rumble_normalize_offer_items($payload);
 
     return [
-        'ability_ids' => $ids,
+        'items' => $items,
+        'ability_ids' => array_values(array_map(static fn (array $item): string => (string)$item['ability_id'], $items)),
     ];
 }
 
@@ -2064,7 +2245,7 @@ function rumble_action_resolve_bidding_and_enter_battle(int $gameId, int $roundN
     ]);
 
     $offer = rumble_action_current_offer($gameId, $roundNumber);
-    if ($offer === null || empty($offer['ability_ids'])) {
+    if ($offer === null || empty($offer['items'])) {
         error_response('No ability offer is available for this game.', 409);
     }
 
@@ -2105,9 +2286,14 @@ function rumble_action_resolve_bidding_and_enter_battle(int $gameId, int $roundN
     ]);
     $bidRows = $bidStmt->fetchAll();
 
-    $bidsByAbility = [];
-    foreach ($offer['ability_ids'] as $abilityId) {
-        $bidsByAbility[$abilityId] = [];
+    $offerItems = (array)($offer['items'] ?? []);
+    $bidsByOfferItem = [];
+    foreach ($offerItems as $offerItem) {
+        $offerItemKey = trim((string)($offerItem['offer_item_key'] ?? ''));
+        if ($offerItemKey === '') {
+            continue;
+        }
+        $bidsByOfferItem[$offerItemKey] = [];
     }
 
     foreach ($bidRows as $row) {
@@ -2121,28 +2307,24 @@ function rumble_action_resolve_bidding_and_enter_battle(int $gameId, int $roundN
             continue;
         }
 
-        $bids = isset($payload['bids']) && is_array($payload['bids']) ? $payload['bids'] : [];
-        foreach ($bids as $abilityIdRaw => $amountRaw) {
-            $abilityId = trim((string)$abilityIdRaw);
-            if (!isset($bidsByAbility[$abilityId])) {
+        $bids = rumble_normalize_bid_map(isset($payload['bids']) ? $payload['bids'] : [], $offerItems);
+        foreach ($bids as $offerItemKey => $amount) {
+            if (!isset($bidsByOfferItem[$offerItemKey])) {
                 continue;
             }
-            if (!is_int($amountRaw) && !ctype_digit((string)$amountRaw)) {
-                continue;
-            }
-
-            $amount = (int)$amountRaw;
-            if ($amount <= 0) {
-                continue;
-            }
-
-            $bidsByAbility[$abilityId][$userId] = $amount;
+            $bidsByOfferItem[$offerItemKey][$userId] = (int)$amount;
         }
     }
 
     $assigned = [];
-    foreach ($offer['ability_ids'] as $abilityId) {
-        $abilityBids = $bidsByAbility[$abilityId] ?? [];
+    foreach ($offerItems as $offerItem) {
+        $offerItemKey = trim((string)($offerItem['offer_item_key'] ?? ''));
+        $abilityId = trim((string)($offerItem['ability_id'] ?? ''));
+        if ($offerItemKey === '' || $abilityId === '') {
+            continue;
+        }
+
+        $abilityBids = $bidsByOfferItem[$offerItemKey] ?? [];
         if (empty($abilityBids)) {
             continue;
         }
@@ -2180,7 +2362,9 @@ function rumble_action_resolve_bidding_and_enter_battle(int $gameId, int $roundN
         $winnerId = $candidateIds[count($candidateIds) === 1 ? 0 : random_int(0, count($candidateIds) - 1)];
         $remainingHealth[$winnerId] = $remainingHealth[$winnerId] - $winningBid;
         $ownedByUser[$winnerId][] = $abilityId;
-        $assigned[$abilityId] = [
+        $assigned[] = [
+            'offer_item_key' => $offerItemKey,
+            'ability_id' => $abilityId,
             'user_id' => $winnerId,
             'bid' => $winningBid,
         ];
@@ -2521,6 +2705,16 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
         $totalEnergySpentByUser[$userId] = 0;
     }
 
+    $activationHealthLossByUser = [];
+    $activationHealingByUser = [];
+    $efficientTargetingByUser = [];
+    $mineLayerDamageByUser = [];
+    $schemingTargetByUser = [];
+    $retaliationDamageByUser = [];
+    foreach ($healthByUser as $userId => $health) {
+        $retaliationDamageByUser[$userId] = 0;
+    }
+
     foreach ($orderRows as $row) {
         $userId = (int)$row['user_id'];
         if (!isset($healthByUser[$userId])) {
@@ -2608,6 +2802,15 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                         }
                     }
                     $effectPayload['applied_damage_each'] = $damage;
+                } elseif ($effectKind === 'heal_x') {
+                    $healing = max(0, (int)($activation['x_cost'] ?? 0));
+                    if ($healing > 0) {
+                        $activationHealingByUser[$userId] = max(0, (int)($activationHealingByUser[$userId] ?? 0)) + $healing;
+                        $effectPayload['healing'] = $healing;
+                    }
+                } elseif ($effectKind === 'second_largest_attack_free') {
+                    $efficientTargetingByUser[$userId] = true;
+                    $effectPayload['enabled'] = true;
                 }
             } elseif ($templateKey === 'activated_defense_mode') {
                 if ($abilityId === 'shield_capacitors') {
@@ -2633,6 +2836,18 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                         'resolved_at' => null,
                     ];
                     $effectPayload['scheduled_for_round'] = $roundNumber + 1;
+                } elseif ($abilityId === 'mine_layer') {
+                    $x = max(0, (int)($activation['x_cost'] ?? 0));
+                    $mineLayerDamageByUser[$userId] = max(0, (int)($mineLayerDamageByUser[$userId] ?? 0)) + (int)floor($x / 2);
+                    $effectPayload['retaliation_per_attacker'] = (int)floor($x / 2);
+                } elseif ($abilityId === 'scheming' && $targetId > 0) {
+                    $schemingTargetByUser[$userId] = $targetId;
+                    $healthBurn = max(0, (int)($templateParams['health_burn'] ?? 0));
+                    if ($healthBurn > 0) {
+                        $activationHealthLossByUser[$userId] = max(0, (int)($activationHealthLossByUser[$userId] ?? 0)) + $healthBurn;
+                        $effectPayload['health_burn'] = $healthBurn;
+                    }
+                    $effectPayload['scheming_target_user_id'] = $targetId;
                 }
             }
 
@@ -2655,6 +2870,7 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
         $remaining = min($health, $remainingEnergy);
         $used = 0;
         $attackableTargetCount = 0;
+        $positiveAttackSpends = [];
         $orderedTargets = array_keys($attacks);
         sort($orderedTargets, SORT_NUMERIC);
         foreach ($orderedTargets as $targetKey) {
@@ -2671,9 +2887,16 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
             }
             if ((int)$amountRaw > 0) {
                 $attackableTargetCount++;
+                $positiveAttackSpends[] = (int)$amountRaw;
             }
         }
         $singleAttackBonusApplies = isset($ownedMap['death_ray']) && $attackableTargetCount === 1;
+        if (!empty($efficientTargetingByUser[$userId])) {
+            rsort($positiveAttackSpends, SORT_NUMERIC);
+            if (count($positiveAttackSpends) >= 2) {
+                $remaining += max(0, (int)$positiveAttackSpends[1]);
+            }
+        }
 
         foreach ($orderedTargets as $targetKey) {
             if ($remaining <= 0) {
@@ -2756,6 +2979,27 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
             continue;
         }
 
+        if (isset($schemingTargetByUser[$targetId])) {
+            $schemingAttackerId = (int)$schemingTargetByUser[$targetId];
+            $schemingAmount = max(0, (int)($attackerMap[$schemingAttackerId] ?? 0));
+            if ($schemingAmount > 0) {
+                $normalIncomingByTargetByAttacker[$targetId][$schemingAttackerId] = 0;
+                $retaliationDamageByUser[$schemingAttackerId] = max(0, (int)($retaliationDamageByUser[$schemingAttackerId] ?? 0)) + $schemingAmount;
+                $roundEffectRows[] = [
+                    'game_id' => $gameId,
+                    'round_number' => $roundNumber,
+                    'owner_user_id' => (int)$targetId,
+                    'target_user_id' => $schemingAttackerId,
+                    'ability_instance_id' => null,
+                    'effect_key' => 'trigger:scheming',
+                    'trigger_timing' => 'resolve',
+                    'payload' => ['negated_attack' => $schemingAmount],
+                    'is_resolved' => 1,
+                    'resolved_at' => gmdate('Y-m-d H:i:s'),
+                ];
+            }
+        }
+
         if (!empty($nimbleDodgeByUser[$targetId])) {
             $largestAttackerId = null;
             $largestAmount = -1;
@@ -2789,13 +3033,19 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                 $normalIncomingByTargetByAttacker[$targetId][$attackerId] = max(0, (int)$amount - $reduction);
             }
         }
+
+        $mineLayerDamage = max(0, (int)($mineLayerDamageByUser[$targetId] ?? 0));
+        if ($mineLayerDamage > 0) {
+            foreach ($normalIncomingByTargetByAttacker[$targetId] as $attackerId => $amount) {
+                if (max(0, (int)$amount) <= 0) {
+                    continue;
+                }
+                $retaliationDamageByUser[(int)$attackerId] = max(0, (int)($retaliationDamageByUser[(int)$attackerId] ?? 0)) + $mineLayerDamage;
+            }
+        }
     }
 
     $nextHealthByUser = [];
-    $retaliationDamageByUser = [];
-    foreach ($healthByUser as $userId => $health) {
-        $retaliationDamageByUser[$userId] = 0;
-    }
 
     foreach ($healthByUser as $userId => $health) {
         if ($health <= 0) {
@@ -2841,7 +3091,8 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
             }
         }
 
-        $nextHealthByUser[$userId] = max(0, $health - $damage);
+        $preRetaliationHealth = max(0, $health - $damage - max(0, (int)($activationHealthLossByUser[$userId] ?? 0)));
+        $nextHealthByUser[$userId] = min(1000, $preRetaliationHealth + max(0, (int)($activationHealingByUser[$userId] ?? 0)));
 
         $normalIncomingTotal = 0;
         foreach ($normalByAttacker as $v) {

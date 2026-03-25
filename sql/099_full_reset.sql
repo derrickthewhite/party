@@ -287,16 +287,16 @@ VALUES
     'effect_formula', NULL
   ), 1),
   ('torpedo_bays', 'Torpedo Bays', 'activated_attack_modifier', 'activated_spend_with_target_policy', JSON_ARRAY('attack', 'delayed', 'modifier'), 'Spend X Energy. Next round, add X bonus damage to one attack.', JSON_OBJECT(
-    'target_policy', 'optional_target',
+    'target_policy', 'none',
     'cost_mode', 'variable',
     'cost_formula', JSON_OBJECT('kind', 'variable_x'),
-    'effect_formula', NULL
+    'effect_formula', JSON_OBJECT('kind', 'next_round_bonus_attack_x')
   ), 1),
   ('efficient_targeting', 'Efficient Targeting', 'activated_attack_modifier', 'activated_spend_with_target_policy', JSON_ARRAY('attack', 'cost_reduction'), 'Spend 10 Energy. Your second-largest attack this round costs 0 Energy.', JSON_OBJECT(
-    'target_policy', 'optional_target',
+    'target_policy', 'none',
     'cost_mode', 'fixed',
     'cost_formula', JSON_OBJECT('kind', 'constant', 'value', 10),
-    'effect_formula', NULL
+    'effect_formula', JSON_OBJECT('kind', 'second_largest_attack_free')
   ), 1),
   ('phase_bomb', 'Phase Bomb', 'activated_attack', 'activated_spend_with_target_policy', JSON_ARRAY('attack', 'aoe'), 'Spend X Energy. Deal floor(X/2) damage to all other opponents.', JSON_OBJECT(
     'target_policy', 'all_other_players',
@@ -304,9 +304,16 @@ VALUES
     'cost_formula', JSON_OBJECT('kind', 'variable_x'),
     'effect_formula', JSON_OBJECT('kind', 'damage_floor_half_x', 'channel', 'normal')
   ), 1),
-  ('mine_layer', 'Mine Layer', 'activated_defense_trigger', 'trigger_on_attacked', JSON_ARRAY('defense', 'retaliation'), 'Spend X Energy. This round, each player who attacks you takes floor(X/2) damage.', JSON_OBJECT(), 1),
+  ('mine_layer', 'Mine Layer', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'retaliation'), 'Spend X Energy. This round, each player who attacks you takes floor(X/2) damage.', JSON_OBJECT(
+    'cost_formula', JSON_OBJECT('kind', 'variable_x'),
+    'trigger_effect', JSON_OBJECT('kind', 'retaliation_floor_half_x')
+  ), 1),
   ('hailing_frequencies', 'Hailing Frequencies', 'utility_status', 'activated_self_or_toggle', JSON_ARRAY('utility', 'status', 'duel_lockout'), 'Choose one opponent. Next round, neither of you may attack the other. Not valid if only two players remain.', JSON_OBJECT(), 1),
-  ('scheming', 'Scheming', 'trigger_on_attacked', 'trigger_on_attacked', JSON_ARRAY('defense', 'retaliation', 'burn'), 'Burn 10. Choose one opponent. If that opponent attacks you this round, you ignore their largest attack and they take that much damage.', JSON_OBJECT(), 1),
+  ('scheming', 'Scheming', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'retaliation', 'burn'), 'Burn 10. Choose one opponent. If that opponent attacks you this round, you ignore their largest attack and they take that much damage.', JSON_OBJECT(
+    'target_policy', 'single_opponent',
+    'health_burn', 10,
+    'trigger_effect', JSON_OBJECT('kind', 'scheming_reflect_largest_attack')
+  ), 1),
   ('death_ray', 'Death Ray', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('attack', 'passive'), 'Passive. If you make exactly one attack this round, increase that attack by 50%.', JSON_OBJECT(), 1),
   ('heavy_guns', 'Heavy Guns', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('attack', 'passive'), 'Passive. Each of your attacks deals +10 damage.', JSON_OBJECT(), 1),
   ('holoship', 'Holoship', 'passive_modifier', 'round_end_effect', JSON_ARRAY('defense', 'passive', 'upkeep_cost'), 'Passive. You cannot be targeted by attacks. At end of round, lose 5 Health.', JSON_OBJECT(), 1),
@@ -355,10 +362,10 @@ VALUES
   ('automated_repair_systems', 'Automated Repair Systems', 'round_start_effect', 'round_start_effect', JSON_ARRAY('healing', 'passive'), 'Passive. Gain 5 Health each round, up to your starting maximum Health.', JSON_OBJECT(), 1),
   ('replicators', 'Replicators', 'round_start_effect', 'round_start_effect', JSON_ARRAY('healing', 'passive'), 'Passive. Gain 5 Health each round.', JSON_OBJECT(), 1),
   ('mining_rig', 'Mining Rig', 'activated_utility', 'activated_spend_with_target_policy', JSON_ARRAY('healing', 'resource_conversion'), 'Spend 3X Energy. Gain X Health.', JSON_OBJECT(
-    'target_policy', 'optional_target',
+    'target_policy', 'none',
     'cost_mode', 'variable',
     'cost_formula', JSON_OBJECT('kind', 'scaled_x', 'multiplier', 3),
-    'effect_formula', NULL
+    'effect_formula', JSON_OBJECT('kind', 'heal_x')
   ), 1)
 ON DUPLICATE KEY UPDATE
   `ability_name` = VALUES(`ability_name`),
