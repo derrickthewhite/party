@@ -22,6 +22,7 @@ import {
 	getEffectiveAttacks as getEffectiveAttacksState,
 	getEffectiveBids as getEffectiveBidsState,
 	getSelectedCheatAbilityIds as getSelectedCheatAbilityIdsState,
+	getParsedCheatHealth as getParsedCheatHealthState,
 	getSelfOwnedAbilities as getSelfOwnedAbilitiesState,
 	getSelfPlayer as getSelfPlayerState,
 	hasSubmittedBids as hasSubmittedBidsState,
@@ -82,6 +83,8 @@ export function createRumbleGameScreen(deps) {
 		dirtyShipName: false,
 		adminCheatTargetUserId: '',
 		adminCheatSelections: {},
+		adminCheatHealthValue: '',
+		adminCheatHealthDirty: false,
 	};
 
 	const uiState = {
@@ -150,6 +153,10 @@ export function createRumbleGameScreen(deps) {
 
 	function getSelfOwnedAbilities() {
 		return getSelfOwnedAbilitiesState(serverSnapshot);
+	}
+
+	function getParsedCheatHealth() {
+		return getParsedCheatHealthState(localDraft);
 	}
 
 	function getEffectiveAbilityActivationMap() {
@@ -302,6 +309,7 @@ export function createRumbleGameScreen(deps) {
 		getCheatEligiblePlayers,
 		getCheatTargetPlayer,
 		getSelectedCheatAbilityIds,
+		getParsedCheatHealth,
 		getLastGameId,
 		isAdminCheatBusy,
 		setAdminCheatBusy,

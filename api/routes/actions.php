@@ -71,6 +71,22 @@ function handle_actions_route(string $method, array $segments): void
         rumble_admin_grant_abilities_route((int)$segments[1]);
     }
 
+    if (count($segments) === 4 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'actions' && $segments[3] === 'rumble-admin-revoke-abilities') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+
+        rumble_admin_revoke_abilities_route((int)$segments[1]);
+    }
+
+    if (count($segments) === 4 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'actions' && $segments[3] === 'rumble-admin-set-health') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+
+        rumble_admin_set_health_route((int)$segments[1]);
+    }
+
     if (count($segments) === 5 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'actions' && $segments[3] === 'rumble-bids' && $segments[4] === 'cancel') {
         if ($method !== 'POST') {
             error_response('Method not allowed.', 405);
@@ -307,6 +323,90 @@ function rumble_admin_grant_abilities_route(int $gameId): void
         'added_ability_ids' => $result['added_ability_ids'],
         'owned_ability_ids' => $result['owned_ability_ids'],
         'owned_abilities' => $result['owned_abilities'],
+    ]);
+}
+
+function rumble_admin_revoke_abilities_route(int $gameId): void
+{
+    $user = require_user();
+    if ((int)($user['is_admin'] ?? 0) !== 1) {
+        error_response('Only admins can revoke rumble abilities.', 403);
+    }
+
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    if (normalize_game_type((string)$game['game_type']) !== 'rumble') {
+        error_response('This endpoint is only available for rumble games.', 409);
+    }
+
+    if ((string)$game['status'] !== 'in_progress') {
+        error_response('Rumble ability revokes are only available while the game is in progress.', 409);
+    }
+
+    $body = json_input();
+    $targetRaw = $body['user_id'] ?? null;
+    if (!is_int($targetRaw) && !ctype_digit((string)$targetRaw)) {
+        error_response('A valid target user_id is required.', 422);
+    }
+
+    $abilityIds = $body['ability_ids'] ?? null;
+    if (!is_array($abilityIds)) {
+        error_response('ability_ids must be an array.', 422);
+    }
+
+    $result = rumble_admin_revoke_abilities($gameId, (int)$user['id'], (int)$targetRaw, $abilityIds);
+
+    success_response([
+        'revoked' => true,
+        'target_user_id' => $result['target_user_id'],
+        'target_username' => $result['target_username'],
+        'removed_ability_ids' => $result['removed_ability_ids'],
+        'owned_ability_ids' => $result['owned_ability_ids'],
+        'owned_abilities' => $result['owned_abilities'],
+    ]);
+}
+
+function rumble_admin_set_health_route(int $gameId): void
+{
+    $user = require_user();
+    if ((int)($user['is_admin'] ?? 0) !== 1) {
+        error_response('Only admins can set rumble health.', 403);
+    }
+
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    if (normalize_game_type((string)$game['game_type']) !== 'rumble') {
+        error_response('This endpoint is only available for rumble games.', 409);
+    }
+
+    if ((string)$game['status'] !== 'in_progress') {
+        error_response('Rumble health changes are only available while the game is in progress.', 409);
+    }
+
+    $body = json_input();
+    $targetRaw = $body['user_id'] ?? null;
+    if (!is_int($targetRaw) && !ctype_digit((string)$targetRaw)) {
+        error_response('A valid target user_id is required.', 422);
+    }
+
+    $healthRaw = $body['health'] ?? null;
+    if (!is_int($healthRaw) && !ctype_digit((string)$healthRaw)) {
+        error_response('Health must be a non-negative integer.', 422);
+    }
+
+    $result = rumble_admin_set_health($gameId, (int)$user['id'], (int)$targetRaw, (int)$healthRaw);
+
+    success_response([
+        'updated' => true,
+        'target_user_id' => $result['target_user_id'],
+        'target_username' => $result['target_username'],
+        'health' => $result['health'],
     ]);
 }
 

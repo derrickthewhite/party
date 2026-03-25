@@ -10,15 +10,25 @@ const ADMIN_CHEAT_PANEL_HTML = `
 		</div>
 		<div data-ref="adminCheatPanel" style="display: none; margin: 0 0 10px 0; padding: 10px; border: 1px dashed rgba(0, 0, 0, 0.25); border-radius: 10px; background: rgba(0, 0, 0, 0.03);">
 			<div class="row mobile-stack" style="align-items: center; margin-bottom: 8px;">
-				<h4 style="margin: 0;">Admin Ability Cheat</h4>
-				<div data-ref="adminCheatSummary" style="margin-left: auto; opacity: 0.85;">Select a player and abilities to grant.</div>
+				<h4 style="margin: 0;">Admin Rumble Cheat</h4>
+				<div data-ref="adminCheatSummary" style="margin-left: auto; opacity: 0.85;">Select a player to manage abilities and health.</div>
 			</div>
 			<p data-ref="adminCheatHint" style="margin: 0 0 8px 0; opacity: 0.85;">Visible only to admins while Admin UI is enabled.</p>
 			<div class="row mobile-stack" style="align-items: center; margin: 0 0 8px 0; gap: 8px;">
 				<label for="rumble-admin-cheat-target" style="min-width: 100px;">Target player</label>
 				<select id="rumble-admin-cheat-target" data-ref="adminCheatTargetSelect" style="flex: 1;"></select>
-				<button data-ref="adminCheatSubmitBtn">Grant Selected</button>
 				<button data-ref="adminCheatClearBtn">Clear</button>
+			</div>
+			<div class="row mobile-stack" style="align-items: center; margin: 0 0 8px 0; gap: 8px;">
+				<label for="rumble-admin-cheat-health" style="min-width: 100px;">Set health</label>
+				<input id="rumble-admin-cheat-health" data-ref="adminCheatHealthInput" type="number" min="0" step="1" inputmode="numeric" style="width: 140px;">
+				<button data-ref="adminCheatSetHealthBtn">Set Health</button>
+				<small data-ref="adminCheatHealthHint" style="opacity: 0.8;">Any non-negative integer.</small>
+			</div>
+			<div class="row mobile-stack" style="align-items: center; margin: 0 0 8px 0; gap: 8px;">
+				<button data-ref="adminCheatGrantBtn">Grant Selected</button>
+				<button data-ref="adminCheatRevokeBtn">Remove Selected</button>
+				<small data-ref="adminCheatSelectionHint" style="opacity: 0.8;">Selected abilities are applied to the chosen player.</small>
 			</div>
 			<div class="list" data-ref="adminCheatAbilityList" style="max-height: 260px; overflow: auto; padding-right: 4px;"></div>
 			<p data-ref="adminCheatEmptyText" style="margin: 8px 0 0 0; opacity: 0.85;">No abilities available.</p>
@@ -49,6 +59,20 @@ export function createAdminCheatController(context) {
 
 	function clearSelections() {
 		context.localDraft.adminCheatSelections = {};
+	}
+
+	function syncHealthDraftFromTarget(targetPlayer) {
+		context.localDraft.adminCheatHealthValue = targetPlayer ? String(Math.max(0, Number(targetPlayer.health || 0))) : '';
+		context.localDraft.adminCheatHealthDirty = false;
+	}
+
+	function clearDraft() {
+		clearSelections();
+		syncHealthDraftFromTarget(context.getCheatTargetPlayer());
+	}
+
+	function getTargetLabel(targetPlayer) {
+		return String(targetPlayer.ship_name || targetPlayer.username || ('User ' + targetPlayer.user_id));
 	}
 
 	function ensureAdminCheatAbilityRow(ability) {
@@ -85,6 +109,13 @@ export function createAdminCheatController(context) {
 
 	refs.adminCheatTargetSelect.addEventListener('change', function onAdminCheatTargetChange() {
 		context.localDraft.adminCheatTargetUserId = String(refs.adminCheatTargetSelect.value || '');
+		syncHealthDraftFromTarget(context.getCheatTargetPlayer());
+		context.reconcileUi();
+	});
+
+	refs.adminCheatHealthInput.addEventListener('input', function onAdminCheatHealthInput() {
+		context.localDraft.adminCheatHealthValue = String(refs.adminCheatHealthInput.value || '').trim();
+		context.localDraft.adminCheatHealthDirty = true;
 		context.reconcileUi();
 	});
 
@@ -102,11 +133,11 @@ export function createAdminCheatController(context) {
 			return;
 		}
 
-		clearSelections();
+		clearDraft();
 		context.reconcileUi();
 	});
 
-	refs.adminCheatSubmitBtn.addEventListener('click', async function onAdminCheatSubmit() {
+	refs.adminCheatGrantBtn.addEventListener('click', async function onAdminCheatGrant() {
 		if (!context.getLastGameId() || context.isAdminCheatBusy() || !context.isAdminCheatVisible()) {
 			return;
 		}
@@ -124,7 +155,7 @@ export function createAdminCheatController(context) {
 
 		const confirmed = await showConfirmModal({
 			title: 'Confirm Ability Grant',
-			message: 'Grant ' + selectedAbilityIds.length + ' selected abilities to ' + String(targetPlayer.ship_name || targetPlayer.username || ('User ' + targetPlayer.user_id)) + '?',
+			message: 'Grant ' + selectedAbilityIds.length + ' selected abilities to ' + getTargetLabel(targetPlayer) + '?',
 			cancelLabel: 'Cancel',
 			confirmLabel: 'Grant Abilities',
 		});
@@ -145,6 +176,93 @@ export function createAdminCheatController(context) {
 			}
 		} catch (err) {
 			context.setStatusNode(err.message || 'Unable to grant abilities.', 'error');
+		} finally {
+			context.setAdminCheatBusy(false);
+			context.reconcileUi();
+		}
+	});
+
+	refs.adminCheatRevokeBtn.addEventListener('click', async function onAdminCheatRevoke() {
+		if (!context.getLastGameId() || context.isAdminCheatBusy() || !context.isAdminCheatVisible()) {
+			return;
+		}
+
+		const targetPlayer = context.getCheatTargetPlayer();
+		const selectedAbilityIds = context.getSelectedCheatAbilityIds();
+		if (!targetPlayer) {
+			context.setStatusNode('Choose a target player first.', 'error');
+			return;
+		}
+		if (selectedAbilityIds.length === 0) {
+			context.setStatusNode('Select at least one ability to remove.', 'error');
+			return;
+		}
+
+		const confirmed = await showConfirmModal({
+			title: 'Confirm Ability Removal',
+			message: 'Remove all owned copies of ' + selectedAbilityIds.length + ' selected abilities from ' + getTargetLabel(targetPlayer) + '?',
+			cancelLabel: 'Cancel',
+			confirmLabel: 'Remove Abilities',
+		});
+		if (!confirmed) {
+			return;
+		}
+
+		context.setAdminCheatBusy(true);
+		context.reconcileUi();
+		try {
+			const result = await context.api.revokeRumbleAbilities(context.getLastGameId(), targetPlayer.user_id, selectedAbilityIds);
+			clearSelections();
+			await context.refreshRumbleState({ silent: true });
+			if (Array.isArray(result.removed_ability_ids) && result.removed_ability_ids.length > 0) {
+				context.setStatusNode('Removed ' + result.removed_ability_ids.length + ' abilities from ' + String(result.target_username || targetPlayer.username || targetPlayer.ship_name || ('User ' + targetPlayer.user_id)) + '.', 'ok');
+			} else {
+				context.setStatusNode(String(result.target_username || targetPlayer.username || targetPlayer.ship_name || ('User ' + targetPlayer.user_id)) + ' had none of the selected abilities.', 'ok');
+			}
+		} catch (err) {
+			context.setStatusNode(err.message || 'Unable to remove abilities.', 'error');
+		} finally {
+			context.setAdminCheatBusy(false);
+			context.reconcileUi();
+		}
+	});
+
+	refs.adminCheatSetHealthBtn.addEventListener('click', async function onAdminCheatSetHealth() {
+		if (!context.getLastGameId() || context.isAdminCheatBusy() || !context.isAdminCheatVisible()) {
+			return;
+		}
+
+		const targetPlayer = context.getCheatTargetPlayer();
+		const parsedHealth = context.getParsedCheatHealth();
+		if (!targetPlayer) {
+			context.setStatusNode('Choose a target player first.', 'error');
+			return;
+		}
+		if (parsedHealth === null) {
+			context.setStatusNode('Enter a non-negative integer health value.', 'error');
+			return;
+		}
+
+		const confirmed = await showConfirmModal({
+			title: 'Confirm Health Change',
+			message: 'Set ' + getTargetLabel(targetPlayer) + ' to ' + parsedHealth + ' health?',
+			cancelLabel: 'Cancel',
+			confirmLabel: 'Set Health',
+		});
+		if (!confirmed) {
+			return;
+		}
+
+		context.setAdminCheatBusy(true);
+		context.reconcileUi();
+		try {
+			const result = await context.api.setRumbleHealth(context.getLastGameId(), targetPlayer.user_id, parsedHealth);
+			context.localDraft.adminCheatHealthValue = String(result.health);
+			context.localDraft.adminCheatHealthDirty = false;
+			await context.refreshRumbleState({ silent: true });
+			context.setStatusNode('Set ' + String(result.target_username || targetPlayer.username || targetPlayer.ship_name || ('User ' + targetPlayer.user_id)) + ' to ' + result.health + ' health.', 'ok');
+		} catch (err) {
+			context.setStatusNode(err.message || 'Unable to set health.', 'error');
 		} finally {
 			context.setAdminCheatBusy(false);
 			context.reconcileUi();
@@ -180,6 +298,7 @@ export function createAdminCheatController(context) {
 		});
 		if (!targetStillAvailable) {
 			context.localDraft.adminCheatTargetUserId = '';
+			syncHealthDraftFromTarget(null);
 		}
 		if (refs.adminCheatTargetSelect.value !== String(context.localDraft.adminCheatTargetUserId || '')) {
 			refs.adminCheatTargetSelect.value = String(context.localDraft.adminCheatTargetUserId || '');
@@ -187,12 +306,19 @@ export function createAdminCheatController(context) {
 
 		const selectedTarget = context.getCheatTargetPlayer();
 		const selectedAbilityIds = context.getSelectedCheatAbilityIds();
+		const parsedHealth = context.getParsedCheatHealth();
 		const ownedCounts = {};
 		if (selectedTarget && Array.isArray(selectedTarget.owned_abilities)) {
 			selectedTarget.owned_abilities.forEach(function eachOwnedAbility(ability) {
 				const key = String(ability.id || '');
 				ownedCounts[key] = Math.max(0, Number(ownedCounts[key] || 0)) + 1;
 			});
+		}
+		if (selectedTarget && !context.localDraft.adminCheatHealthDirty) {
+			const nextHealthValue = String(Math.max(0, Number(selectedTarget.health || 0)));
+			if (context.localDraft.adminCheatHealthValue !== nextHealthValue) {
+				context.localDraft.adminCheatHealthValue = nextHealthValue;
+			}
 		}
 
 		let focusedAbilityId = null;
@@ -242,15 +368,29 @@ export function createAdminCheatController(context) {
 		}
 
 		refs.adminCheatHint.textContent = selectedTarget
-			? ('Target: ' + String(selectedTarget.ship_name || selectedTarget.username || ('User ' + selectedTarget.user_id)))
+			? ('Target: ' + getTargetLabel(selectedTarget))
 			: 'Visible only to admins while Admin UI is enabled.';
-		refs.adminCheatSummary.textContent = selectedAbilityIds.length > 0
-			? (selectedAbilityIds.length + ' selected')
-			: 'Select a player and abilities to grant.';
+		refs.adminCheatSummary.textContent = selectedTarget
+			? (selectedAbilityIds.length > 0
+				? (selectedAbilityIds.length + ' abilities selected; current health ' + Math.max(0, Number(selectedTarget.health || 0)))
+				: ('Current health ' + Math.max(0, Number(selectedTarget.health || 0)) + '. Select abilities or edit health.'))
+			: 'Select a player to manage abilities and health.';
 		refs.adminCheatTargetSelect.disabled = context.isAdminCheatBusy() || eligiblePlayers.length === 0;
-		refs.adminCheatSubmitBtn.textContent = context.isAdminCheatBusy() ? 'Granting...' : 'Grant Selected';
-		refs.adminCheatSubmitBtn.disabled = context.isAdminCheatBusy() || !selectedTarget || selectedAbilityIds.length === 0;
-		refs.adminCheatClearBtn.disabled = context.isAdminCheatBusy() || selectedAbilityIds.length === 0;
+		refs.adminCheatHealthInput.value = String(context.localDraft.adminCheatHealthValue || '');
+		refs.adminCheatHealthInput.disabled = context.isAdminCheatBusy() || !selectedTarget;
+		refs.adminCheatHealthHint.textContent = selectedTarget
+			? ('Current: ' + Math.max(0, Number(selectedTarget.health || 0)))
+			: 'Any non-negative integer.';
+		refs.adminCheatSelectionHint.textContent = selectedAbilityIds.length > 0
+			? (selectedAbilityIds.length + ' selected ability ' + (selectedAbilityIds.length === 1 ? 'type' : 'types'))
+			: 'Selected abilities are applied to the chosen player.';
+		refs.adminCheatGrantBtn.textContent = context.isAdminCheatBusy() ? 'Working...' : 'Grant Selected';
+		refs.adminCheatRevokeBtn.textContent = context.isAdminCheatBusy() ? 'Working...' : 'Remove Selected';
+		refs.adminCheatSetHealthBtn.textContent = context.isAdminCheatBusy() ? 'Working...' : 'Set Health';
+		refs.adminCheatGrantBtn.disabled = context.isAdminCheatBusy() || !selectedTarget || selectedAbilityIds.length === 0;
+		refs.adminCheatRevokeBtn.disabled = context.isAdminCheatBusy() || !selectedTarget || selectedAbilityIds.length === 0;
+		refs.adminCheatSetHealthBtn.disabled = context.isAdminCheatBusy() || !selectedTarget || parsedHealth === null;
+		refs.adminCheatClearBtn.disabled = context.isAdminCheatBusy() || (selectedAbilityIds.length === 0 && !context.localDraft.adminCheatHealthDirty);
 		refs.adminCheatEmptyText.style.display = context.serverSnapshot.abilityCatalog.length === 0 ? '' : 'none';
 	}
 

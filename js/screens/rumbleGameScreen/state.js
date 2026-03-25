@@ -58,6 +58,19 @@ export function getSelectedCheatAbilityIds(localDraft) {
 	}).sort();
 }
 
+export function getCheatHealthDraftValue(localDraft) {
+	return String(localDraft && typeof localDraft.adminCheatHealthValue === 'string' ? localDraft.adminCheatHealthValue : '').trim();
+}
+
+export function getParsedCheatHealth(localDraft) {
+	const value = getCheatHealthDraftValue(localDraft);
+	if (!/^\d+$/.test(value)) {
+		return null;
+	}
+
+	return Math.max(0, Math.floor(Number(value)));
+}
+
 export function getCheatTargetPlayer(serverSnapshot, localDraft) {
 	const targetUserId = Number(localDraft && localDraft.adminCheatTargetUserId ? localDraft.adminCheatTargetUserId : 0);
 	if (!targetUserId) {
