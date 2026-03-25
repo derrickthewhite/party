@@ -1,160 +1,83 @@
-import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate, showConfirmModal } from './dom.js';
+import { collectRefs, createNodeFromHtml, createTemplate } from './dom.js';
 import { createBaseGameScreen } from './gameScreen.js';
+import {
+	activationArrayToMap,
+	normalizeAbilityActivationArray,
+	normalizeAttacksMap,
+	normalizeBidsMap,
+} from './rumbleGameScreen/normalization.js';
+import {
+	ABILITY_ACTIVATION_ROW_TEMPLATE_HTML,
+	ABILITY_ROW_TEMPLATE_HTML,
+	ADMIN_CHEAT_ABILITY_ROW_TEMPLATE_HTML,
+	EVENT_LOG_TEMPLATE_HTML,
+	PLAYER_ROW_TEMPLATE_HTML,
+	PREVIOUS_ORDER_TEMPLATE_HTML,
+	RUMBLE_PANEL_HTML,
+} from './rumbleGameScreen/templates.js';
+import {
+	bindShipNameHandlers,
+	canEditShipName as canEditShipNameModule,
+	reconcileShipNameEditor as reconcileShipNameEditorModule,
+} from './rumbleGameScreen/shipName.js';
+import {
+	bindAdminCheatHandlers,
+	clearAdminCheatSelections as clearAdminCheatSelectionsModule,
+	ensureAdminCheatAbilityRow as ensureAdminCheatAbilityRowModule,
+	reconcileAdminCheatPanel as reconcileAdminCheatPanelModule,
+} from './rumbleGameScreen/adminCheatPanel.js';
+import { bindPhaseControlHandlers, bindRefreshHandler } from './rumbleGameScreen/phaseControls.js';
+import { ensureAbilityRow as ensureAbilityRowModule, reconcileAbilitiesList as reconcileAbilitiesListModule } from './rumbleGameScreen/biddingPanel.js';
+import {
+	ensurePlayerRow as ensurePlayerRowModule,
+	reconcileOwnedAbilities as reconcileOwnedAbilitiesModule,
+	reconcilePlayersList as reconcilePlayersListModule,
+} from './rumbleGameScreen/playersList.js';
+import {
+	ensureAbilityActivationRow as ensureAbilityActivationRowModule,
+	reconcileAbilityActivationList as reconcileAbilityActivationListModule,
+} from './rumbleGameScreen/abilityActivations.js';
+import {
+	ensureEventRow as ensureEventRowModule,
+	reconcileEventLogList as reconcileEventLogListModule,
+	reconcilePreviousOrdersList as reconcilePreviousOrdersListModule,
+} from './rumbleGameScreen/eventLogs.js';
+import {
+	clearDraftDirty as clearRumbleDraftDirty,
+	getCheatEligiblePlayers as getCheatEligiblePlayersState,
+	getCheatTargetPlayer as getCheatTargetPlayerState,
+	getEffectiveAbilityActivationArray as getEffectiveAbilityActivationArrayState,
+	getEffectiveAbilityActivationMap as getEffectiveAbilityActivationMapState,
+	getEffectiveAttacks as getEffectiveAttacksState,
+	getEffectiveBids as getEffectiveBidsState,
+	getSelectedCheatAbilityIds as getSelectedCheatAbilityIdsState,
+	getSelfOwnedAbilities as getSelfOwnedAbilitiesState,
+	getSelfPlayer as getSelfPlayerState,
+	hasSubmittedBids as hasSubmittedBidsState,
+	hasSubmittedOrder as hasSubmittedOrderState,
+	isBiddingPhase as getIsBiddingPhase,
+	isDraftDirty as getIsDraftDirty,
+} from './rumbleGameScreen/state.js';
+import {
+	describeActivationReadonly as describeActivationReadonlyValidation,
+	describeOrder as describeOrderValidation,
+	getAttackTotal as getAttackTotalValidation,
+	getBidTotal as getBidTotalValidation,
+	getBidValidation as getBidValidationFromState,
+	getDraftActivationSummary as getDraftActivationSummaryValidation,
+	getOrderValidation as getOrderValidationFromState,
+	playerNameById as playerNameByIdValidation,
+} from './rumbleGameScreen/validation.js';
 
 export function createRumbleGameScreen(deps) {
-	const panel = createNodeFromHtml(`
-		<div class="card">
-			<div class="row">
-				<h3 data-ref="phaseTitle">Rumble Bidding</h3>
-				<div data-ref="headerSpacer"></div>
-				<button data-ref="refreshBtn">Refresh</button>
-			</div>
-			<p class="top-user-label" data-ref="progressText">Bidding submissions: 0/0</p>
-			<div class="row mobile-stack" data-ref="shipNameRow" style="align-items: center; margin: 6px 0 8px 0;">
-				<label style="min-width: 90px;" for="rumble-ship-name-input">Ship name</label>
-				<input id="rumble-ship-name-input" type="text" maxlength="60" placeholder="Enter ship name" data-ref="shipNameInput">
-				<button data-ref="saveShipNameBtn">Save Name</button>
-			</div>
-			<p data-ref="shipNameHint" style="margin: 0 0 8px 0; opacity: 0.85;">Leave blank to use your username.</p>
-			<div class="row mobile-stack" data-ref="adminCheatToggleRow" style="display: none; align-items: center; margin: 0 0 8px 0; gap: 8px;">
-				<button data-ref="adminCheatToggleBtn">Admin Cheat: Show</button>
-				<small data-ref="adminCheatToggleHint" style="opacity: 0.85;">Global Admin UI must also be enabled.</small>
-			</div>
-			<div data-ref="adminCheatPanel" style="display: none; margin: 0 0 10px 0; padding: 10px; border: 1px dashed rgba(0, 0, 0, 0.25); border-radius: 10px; background: rgba(0, 0, 0, 0.03);">
-				<div class="row mobile-stack" style="align-items: center; margin-bottom: 8px;">
-					<h4 style="margin: 0;">Admin Ability Cheat</h4>
-					<div data-ref="adminCheatSummary" style="margin-left: auto; opacity: 0.85;">Select a player and abilities to grant.</div>
-				</div>
-				<p data-ref="adminCheatHint" style="margin: 0 0 8px 0; opacity: 0.85;">Visible only to admins while Admin UI is enabled.</p>
-				<div class="row mobile-stack" style="align-items: center; margin: 0 0 8px 0; gap: 8px;">
-					<label for="rumble-admin-cheat-target" style="min-width: 100px;">Target player</label>
-					<select id="rumble-admin-cheat-target" data-ref="adminCheatTargetSelect" style="flex: 1;"></select>
-					<button data-ref="adminCheatSubmitBtn">Grant Selected</button>
-					<button data-ref="adminCheatClearBtn">Clear</button>
-				</div>
-				<div class="list" data-ref="adminCheatAbilityList" style="max-height: 260px; overflow: auto; padding-right: 4px;"></div>
-				<p data-ref="adminCheatEmptyText" style="margin: 8px 0 0 0; opacity: 0.85;">No abilities available.</p>
-			</div>
-
-			<div data-ref="biddingPanel">
-				<p data-ref="bidHelpText">Place secret bids for offered abilities. You can overbid your health, but if bidding leaves you at 0 or less you are eliminated before combat.</p>
-				<p data-ref="bidValidationText"></p>
-				<div class="row" style="font-weight: 600; margin-bottom: 6px; align-items: center;">
-					<div style="flex: 0 0 180px;">Ability</div>
-					<div style="flex: 1;">Description</div>
-					<div style="width: 220px;">Bid</div>
-				</div>
-				<div class="list" data-ref="abilitiesList"></div>
-			</div>
-
-			<div data-ref="battlePanel">
-				<p data-ref="defenseText">Defense: 0</p>
-				<p data-ref="energyText">Energy: 0 | Attacks: 0 | Abilities: 0 | Remaining: 0</p>
-				<p data-ref="attackHelpText">Attack allocations (enter power to send at each target):</p>
-				<p data-ref="orderValidationText"></p>
-				<div class="list" data-ref="playersList"></div>
-				<div data-ref="abilityActivationPanel" style="margin-top: 8px;">
-					<p data-ref="abilityActivationHelpText">Ability activations (activated abilities consume energy; passive/triggered abilities resolve automatically):</p>
-					<p data-ref="abilityValidationText"></p>
-					<div class="list" data-ref="abilityActivationList"></div>
-				</div>
-			</div>
-
-			<div class="row mobile-stack" data-ref="buttonRow">
-				<button class="primary" data-ref="submitBtn">Submit Bids</button>
-				<button data-ref="editBtn">Edit Bids</button>
-				<button data-ref="cancelBtn">Cancel Bids</button>
-				<button data-ref="phaseActionBtn">End Bidding</button>
-			</div>
-
-			<h4 data-ref="lastTurnTitle">Last Turn Orders</h4>
-			<div class="list" data-ref="lastTurnList">
-				<p data-ref="emptyPreviousOrdersNode">No previous turn orders yet.</p>
-			</div>
-
-			<h4 data-ref="currentEventLogTitle">Current Round Events</h4>
-			<div class="list" data-ref="currentEventLogList">
-				<p data-ref="emptyCurrentEventLogNode">No current round events yet.</p>
-			</div>
-
-			<h4 data-ref="previousEventLogTitle">Previous Round Events</h4>
-			<div class="list" data-ref="previousEventLogList">
-				<p data-ref="emptyPreviousEventLogNode">No previous round events yet.</p>
-			</div>
-		</div>
-	`);
+	const panel = createNodeFromHtml(RUMBLE_PANEL_HTML);
 	const refs = collectRefs(panel);
-	const abilityRowTemplate = createTemplate(`
-		<div class="row mobile-stack" style="align-items: center; margin-bottom: 6px;">
-			<div style="flex: 0 0 180px;" data-ref="name"></div>
-			<div style="flex: 1;" data-ref="description"></div>
-			<div style="width: 220px;" data-ref="right">
-				<div data-ref="label"></div>
-				<input type="number" min="0" step="1" placeholder="Bid amount" data-ref="input">
-			</div>
-		</div>
-	`);
-	const playerRowTemplate = createTemplate(`
-		<div class="row mobile-stack" style="align-items: center; margin-bottom: 6px;">
-			<div style="flex: 1; display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-				<div data-ref="name"></div>
-				<small data-ref="abilities" style="opacity: 0.85; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;"></small>
-			</div>
-			<div style="min-width: 220px; display: flex; flex-direction: column; justify-content: center; gap: 4px;" data-ref="right">
-				<div data-ref="label" style="line-height: 1.2;"></div>
-				<input type="number" min="0" step="1" placeholder="Attack amount" data-ref="input">
-			</div>
-		</div>
-	`);
-	const abilityActivationRowTemplate = createTemplate(`
-		<div class="row mobile-stack" style="align-items: flex-start; margin-bottom: 6px;">
-			<div style="flex: 1 1 260px; min-width: 220px;">
-				<div data-ref="name" style="font-weight: 600;"></div>
-				<small data-ref="meta" style="opacity: 0.8;"></small>
-				<div data-ref="description" style="margin-top: 3px;"></div>
-			</div>
-			<div style="flex: 1 1 320px; min-width: 240px; display: grid; gap: 6px;" data-ref="controls">
-				<label data-ref="toggleWrap" style="display: inline-flex; align-items: center; gap: 8px;">
-					<input type="checkbox" data-ref="toggleInput" style="width: auto;">
-					<span data-ref="toggleLabel">Activate</span>
-				</label>
-				<div data-ref="targetWrap" class="row" style="margin: 0; gap: 8px;">
-					<label data-ref="targetLabel" style="min-width: 50px;">Target</label>
-					<select data-ref="targetSelect" style="flex: 1;"></select>
-				</div>
-				<div data-ref="xCostWrap" class="row" style="margin: 0; gap: 8px;">
-					<label data-ref="xCostLabel" style="min-width: 50px;">X Cost</label>
-					<input type="number" min="0" step="1" data-ref="xCostInput" placeholder="0" style="flex: 1;">
-				</div>
-				<div data-ref="readonlyText"></div>
-			</div>
-		</div>
-	`);
-	const adminCheatAbilityRowTemplate = createTemplate(`
-		<label class="row mobile-stack" style="align-items: flex-start; margin-bottom: 6px; gap: 8px; cursor: pointer;">
-			<input type="checkbox" data-ref="checkbox" style="width: auto; margin-top: 2px;">
-			<div style="flex: 1; min-width: 0;">
-				<div class="row mobile-stack" style="align-items: center; gap: 8px; margin: 0 0 2px 0;">
-					<div data-ref="name" style="font-weight: 600;"></div>
-					<small data-ref="meta" style="opacity: 0.8;"></small>
-					<small data-ref="status" style="opacity: 0.85;"></small>
-				</div>
-				<div data-ref="description" style="opacity: 0.9;"></div>
-			</div>
-		</label>
-	`);
-	const previousOrderTemplate = createTemplate(`
-		<div class="message-item">
-			<small data-ref="meta"></small>
-			<div data-ref="text"></div>
-		</div>
-	`);
-	const eventLogTemplate = createTemplate(`
-		<div class="message-item">
-			<small data-ref="meta"></small>
-			<div data-ref="text"></div>
-		</div>
-	`);
+	const abilityRowTemplate = createTemplate(ABILITY_ROW_TEMPLATE_HTML);
+	const playerRowTemplate = createTemplate(PLAYER_ROW_TEMPLATE_HTML);
+	const abilityActivationRowTemplate = createTemplate(ABILITY_ACTIVATION_ROW_TEMPLATE_HTML);
+	const adminCheatAbilityRowTemplate = createTemplate(ADMIN_CHEAT_ABILITY_ROW_TEMPLATE_HTML);
+	const previousOrderTemplate = createTemplate(PREVIOUS_ORDER_TEMPLATE_HTML);
+	const eventLogTemplate = createTemplate(EVENT_LOG_TEMPLATE_HTML);
 	const refreshBtn = refs.refreshBtn;
 	const phaseTitle = refs.phaseTitle;
 	const progressText = refs.progressText;
@@ -275,61 +198,16 @@ export function createRumbleGameScreen(deps) {
 	const previousEventRowsById = new Map();
 	const adminCheatTargetOptionByValue = new Map();
 
-	function childElements(node) {
-		return Array.from(node.children || []);
-	}
-
-	function placeChildAt(parentNode, childNode, index) {
-		if (!parentNode || !childNode) {
-			return;
-		}
-
-		const existingAtIndex = childElements(parentNode)[index] || null;
-		if (existingAtIndex === childNode) {
-			return;
-		}
-
-		parentNode.insertBefore(childNode, existingAtIndex);
-	}
-
-	function getOfferItemKey(ability) {
-		const explicitKey = String(ability && ability.offer_item_key ? ability.offer_item_key : '').trim();
-		if (explicitKey) {
-			return explicitKey;
-		}
-		return String(ability && ability.id ? ability.id : '').trim();
-	}
-
-	function getOwnedAbilityDraftKey(ability) {
-		const explicitKey = String(ability && ability.owned_instance_key ? ability.owned_instance_key : '').trim();
-		if (explicitKey) {
-			return explicitKey;
-		}
-		const abilityId = String(ability && ability.id ? ability.id : '').trim();
-		const copyIndex = Math.max(0, Number(ability && ability.ability_copy_index ? ability.ability_copy_index : 0));
-		return copyIndex > 0 ? (abilityId + '__' + copyIndex) : abilityId;
-	}
-
-	function getActivationDraftKey(activation) {
-		const abilityId = String(activation && activation.ability_id ? activation.ability_id : '').trim();
-		const copyIndex = Math.max(0, Number(activation && activation.ability_copy_index ? activation.ability_copy_index : 0));
-		return copyIndex > 0 ? (abilityId + '__' + copyIndex) : abilityId;
-	}
-
 	function isBiddingPhase() {
-		return serverSnapshot.phaseMode === 'bidding';
+		return getIsBiddingPhase(serverSnapshot);
 	}
 
 	function isDraftDirty() {
-		return isBiddingPhase()
-			? localDraft.dirtyBids
-			: (localDraft.dirtyAttacks || localDraft.dirtyAbilityActivations);
+		return getIsDraftDirty(serverSnapshot, localDraft);
 	}
 
 	function clearDraftDirty() {
-		localDraft.dirtyAttacks = false;
-		localDraft.dirtyAbilityActivations = false;
-		localDraft.dirtyBids = false;
+		clearRumbleDraftDirty(localDraft);
 	}
 
 	function isAdminCheatVisible() {
@@ -344,1444 +222,264 @@ export function createRumbleGameScreen(deps) {
 	}
 
 	function getCheatEligiblePlayers() {
-		return serverSnapshot.players.filter(function eachPlayer(player) {
-			return String(player.member_role || '').toLowerCase() !== 'observer';
-		});
+		return getCheatEligiblePlayersState(serverSnapshot);
 	}
 
 	function getSelectedCheatAbilityIds() {
-		return Object.keys(localDraft.adminCheatSelections || {}).filter(function eachAbilityId(abilityId) {
-			return !!localDraft.adminCheatSelections[abilityId];
-		}).sort();
+		return getSelectedCheatAbilityIdsState(localDraft);
 	}
 
 	function clearAdminCheatSelections() {
-		localDraft.adminCheatSelections = {};
-	}
-
-	function normalizeAttacksMap(input) {
-		const normalized = {};
-		const source = input && typeof input === 'object' ? input : {};
-		Object.keys(source).forEach(function eachKey(key) {
-			if (!/^\d+$/.test(String(key))) {
-				return;
-			}
-
-			const amount = Number(source[key]);
-			if (!Number.isFinite(amount)) {
-				return;
-			}
-
-			const integer = Math.max(0, Math.floor(amount));
-			if (integer <= 0) {
-				return;
-			}
-
-			normalized[String(Number(key))] = integer;
-		});
-
-		return normalized;
-	}
-
-	function normalizeBidsMap(input) {
-		const normalized = {};
-		const source = input && typeof input === 'object' ? input : {};
-		Object.keys(source).forEach(function eachKey(key) {
-			if (!/^[a-z0-9_]+$/i.test(String(key))) {
-				return;
-			}
-
-			const amount = Number(source[key]);
-			if (!Number.isFinite(amount)) {
-				return;
-			}
-
-			const integer = Math.max(0, Math.floor(amount));
-			if (integer <= 0) {
-				return;
-			}
-
-			normalized[String(key)] = integer;
-		});
-
-		return normalized;
-	}
-
-	function normalizeAbilityActivationMap(input) {
-		const normalized = {};
-		const source = input && typeof input === 'object' ? input : {};
-		Object.keys(source).forEach(function eachKey(key) {
-			if (!/^[a-z0-9_]+$/i.test(String(key))) {
-				return;
-			}
-
-			const item = source[key];
-			if (!item || typeof item !== 'object') {
-				return;
-			}
-
-			const next = {};
-			if (Object.prototype.hasOwnProperty.call(item, 'ability_copy_index')) {
-				const copyIndex = Number(item.ability_copy_index);
-				if (Number.isFinite(copyIndex) && copyIndex > 0) {
-					next.ability_copy_index = Math.floor(copyIndex);
-				}
-			}
-			if (Object.prototype.hasOwnProperty.call(item, 'target_user_id')) {
-				const target = Number(item.target_user_id);
-				if (Number.isFinite(target) && target > 0) {
-					next.target_user_id = Math.floor(target);
-				}
-			}
-
-			if (Object.prototype.hasOwnProperty.call(item, 'x_cost')) {
-				const xCost = Number(item.x_cost);
-				if (Number.isFinite(xCost) && xCost >= 0) {
-					next.x_cost = Math.floor(xCost);
-				}
-			}
-
-			if (Object.prototype.hasOwnProperty.call(item, 'mode')) {
-				const mode = String(item.mode || '').trim();
-				if (mode) {
-					next.mode = mode.slice(0, 40);
-				}
-			}
-
-			next.is_enabled = item.is_enabled !== false;
-			normalized[String(key)] = next;
-		});
-
-		return normalized;
-	}
-
-	function normalizeAbilityActivationArray(input) {
-		if (!Array.isArray(input)) {
-			return [];
-		}
-
-		const normalized = [];
-		input.forEach(function eachActivation(item, index) {
-			if (!item || typeof item !== 'object') {
-				return;
-			}
-
-			const abilityId = String(item.ability_id || '').trim();
-			if (!abilityId) {
-				return;
-			}
-
-			const normalizedEntry = {
-				ability_id: abilityId,
-				client_order_index: Math.max(0, Number.isFinite(Number(item.client_order_index))
-					? Math.floor(Number(item.client_order_index))
-					: index),
-			};
-
-			if (Object.prototype.hasOwnProperty.call(item, 'ability_copy_index')) {
-				const copyIndex = Number(item.ability_copy_index);
-				if (Number.isFinite(copyIndex) && copyIndex > 0) {
-					normalizedEntry.ability_copy_index = Math.floor(copyIndex);
-				}
-			}
-
-			if (Object.prototype.hasOwnProperty.call(item, 'target_user_id')) {
-				const target = Number(item.target_user_id);
-				if (Number.isFinite(target) && target > 0) {
-					normalizedEntry.target_user_id = Math.floor(target);
-				}
-			}
-
-			if (Object.prototype.hasOwnProperty.call(item, 'x_cost')) {
-				const xCost = Number(item.x_cost);
-				if (Number.isFinite(xCost) && xCost >= 0) {
-					normalizedEntry.x_cost = Math.floor(xCost);
-				}
-			}
-
-			if (Object.prototype.hasOwnProperty.call(item, 'mode')) {
-				const mode = String(item.mode || '').trim();
-				if (mode) {
-					normalizedEntry.mode = mode.slice(0, 40);
-				}
-			}
-
-			if (Object.prototype.hasOwnProperty.call(item, 'is_enabled')) {
-				normalizedEntry.is_enabled = !!item.is_enabled;
-			}
-
-			normalized.push(normalizedEntry);
-		});
-
-		normalized.sort(function sortActivations(a, b) {
-			if (a.client_order_index !== b.client_order_index) {
-				return a.client_order_index - b.client_order_index;
-			}
-			const abilityCompare = String(a.ability_id).localeCompare(String(b.ability_id));
-			if (abilityCompare !== 0) {
-				return abilityCompare;
-			}
-			return Math.max(0, Number(a.ability_copy_index || 0)) - Math.max(0, Number(b.ability_copy_index || 0));
-		});
-
-		return normalized;
-	}
-
-	function activationArrayToMap(activations) {
-		const mapped = {};
-		normalizeAbilityActivationArray(activations).forEach(function eachActivation(entry) {
-			mapped[getActivationDraftKey(entry)] = {
-				ability_copy_index: Object.prototype.hasOwnProperty.call(entry, 'ability_copy_index') ? entry.ability_copy_index : undefined,
-				target_user_id: Object.prototype.hasOwnProperty.call(entry, 'target_user_id') ? entry.target_user_id : undefined,
-				x_cost: Object.prototype.hasOwnProperty.call(entry, 'x_cost') ? entry.x_cost : undefined,
-				mode: Object.prototype.hasOwnProperty.call(entry, 'mode') ? entry.mode : undefined,
-				is_enabled: Object.prototype.hasOwnProperty.call(entry, 'is_enabled') ? !!entry.is_enabled : true,
-			};
-		});
-		return normalizeAbilityActivationMap(mapped);
+		clearAdminCheatSelectionsModule({ localDraft });
 	}
 
 	function getSelfOwnedAbilities() {
-		const selfPlayer = getSelfPlayer();
-		if (!selfPlayer || !Array.isArray(selfPlayer.owned_abilities)) {
-			return [];
-		}
-		return selfPlayer.owned_abilities;
-	}
-
-	function isActivatedAbility(ability) {
-		return String(ability && ability.template_kind ? ability.template_kind : '') === 'activated';
+		return getSelfOwnedAbilitiesState(serverSnapshot);
 	}
 
 	function getEffectiveAbilityActivationMap() {
-		if (hasSubmittedOrder() && !uiState.isEditing) {
-			const activations = serverSnapshot.currentOrder && Array.isArray(serverSnapshot.currentOrder.ability_activations)
-				? serverSnapshot.currentOrder.ability_activations
-				: [];
-			return activationArrayToMap(activations);
-		}
-
-		return normalizeAbilityActivationMap(localDraft.abilityActivations || {});
-	}
-
-	function evaluateAbilityCostFormula(formula, xCost) {
-		const source = formula && typeof formula === 'object' ? formula : {};
-		const kind = String(source.kind || '');
-		if (kind === 'constant') {
-			return Math.max(0, Math.floor(Number(source.value || 0)));
-		}
-
-		if (kind === 'variable_x') {
-			return Math.max(0, Math.floor(Number(xCost || 0)));
-		}
-
-		if (kind === 'scaled_x') {
-			const multiplier = Math.max(0, Math.floor(Number(source.multiplier || 0)));
-			return Math.max(0, Math.floor(Number(xCost || 0)) * multiplier);
-		}
-
-		return null;
-	}
-
-	function abilityCostFromDraft(ability, draftActivation) {
-		const activation = draftActivation && typeof draftActivation === 'object' ? draftActivation : {};
-		const templateKey = String(ability && ability.template_key ? ability.template_key : '');
-		const params = ability && typeof ability.template_params === 'object' && ability.template_params
-			? ability.template_params
-			: {};
-		const xCost = Math.max(0, Math.floor(Number(activation.x_cost || 0)));
-		const formulaCost = evaluateAbilityCostFormula(params.cost_formula, xCost);
-		if (formulaCost !== null) {
-			return formulaCost;
-		}
-
-		if (templateKey === 'activated_spend_with_target_policy') {
-			if (String(params.cost_mode || '') === 'variable') {
-				return xCost;
-			}
-			return 0;
-		}
-
-		if (templateKey === 'activated_defense_mode') {
-			if (Object.prototype.hasOwnProperty.call(activation, 'x_cost')) {
-				return xCost;
-			}
-			return 0;
-		}
-
-		if (templateKey === 'activated_self_or_toggle') {
-			return xCost;
-		}
-
-		return 0;
-	}
-
-	function getAbilityControlSpec(ability) {
-		const templateKey = String(ability && ability.template_key ? ability.template_key : '');
-		const abilityId = String(ability && ability.id ? ability.id : '');
-		const params = ability && typeof ability.template_params === 'object' && ability.template_params
-			? ability.template_params
-			: {};
-		const templateInputs = ability && typeof ability.template_inputs === 'object' && ability.template_inputs
-			? ability.template_inputs
-			: {};
-
-		if (!isActivatedAbility(ability)) {
-			return {
-				showTarget: false,
-				targetRequired: false,
-				showXCost: false,
-			};
-		}
-
-		if (templateKey === 'activated_spend_with_target_policy') {
-			const targetPolicy = String(params.target_policy || 'optional_target');
-			const costKind = String(params && params.cost_formula && params.cost_formula.kind ? params.cost_formula.kind : '');
-			const showTarget = targetPolicy === 'single_opponent' || targetPolicy === 'optional_target';
-			return {
-				showTarget,
-				targetRequired: targetPolicy === 'single_opponent',
-				showXCost: String(params.cost_mode || '') === 'variable' || costKind === 'variable_x' || costKind === 'scaled_x',
-			};
-		}
-
-		if (templateKey === 'activated_defense_mode') {
-			const targetPolicy = String(params.target_policy || '');
-			const costKind = String(params && params.cost_formula && params.cost_formula.kind ? params.cost_formula.kind : '');
-			return {
-				showTarget: targetPolicy === 'single_opponent' || abilityId === 'focused_defense',
-				targetRequired: targetPolicy === 'single_opponent' || abilityId === 'focused_defense',
-				showXCost: costKind === 'variable_x' || costKind === 'scaled_x' || Object.prototype.hasOwnProperty.call(templateInputs, 'x_cost'),
-			};
-		}
-
-		if (templateKey === 'activated_self_or_toggle') {
-			return {
-				showTarget: false,
-				targetRequired: false,
-				showXCost: abilityId !== 'hyperdrive' && Object.prototype.hasOwnProperty.call(templateInputs, 'x_cost'),
-			};
-		}
-
-		return {
-			showTarget: Object.prototype.hasOwnProperty.call(templateInputs, 'target_user_id'),
-			targetRequired: Object.prototype.hasOwnProperty.call(templateInputs, 'target_user_id'),
-			showXCost: Object.prototype.hasOwnProperty.call(templateInputs, 'x_cost'),
-		};
+		return getEffectiveAbilityActivationMapState(serverSnapshot, localDraft, uiState);
 	}
 
 	function getDraftActivationSummary() {
-		if (hasSubmittedOrder() && !uiState.isEditing && serverSnapshot.currentOrder) {
-			return {
-				ability_energy_spent: Math.max(0, Number(serverSnapshot.currentOrder.ability_energy_spent || 0)),
-			};
-		}
-
-		let abilityEnergySpent = 0;
-		const activationMap = getEffectiveAbilityActivationMap();
-		getSelfOwnedAbilities().forEach(function eachAbility(ability) {
-			if (!isActivatedAbility(ability)) {
-				return;
-			}
-
-			const draftKey = getOwnedAbilityDraftKey(ability);
-			const draft = activationMap[draftKey] || { is_enabled: false };
-			if (draft.is_enabled === false) {
-				return;
-			}
-
-			abilityEnergySpent += abilityCostFromDraft(ability, draft);
+		return getDraftActivationSummaryValidation({
+			hasSubmittedOrder: hasSubmittedOrder(),
+			isEditing: uiState.isEditing,
+			currentOrder: serverSnapshot.currentOrder,
+			activationMap: getEffectiveAbilityActivationMap(),
+			selfOwnedAbilities: getSelfOwnedAbilities(),
 		});
-
-		return { ability_energy_spent: abilityEnergySpent };
 	}
 
 	function getEffectiveAbilityActivationArray() {
-		const activationMap = getEffectiveAbilityActivationMap();
-		const activations = [];
-		let orderIndex = 0;
-		getSelfOwnedAbilities().forEach(function eachAbility(ability) {
-			if (!isActivatedAbility(ability)) {
-				return;
-			}
-
-			const abilityId = String(ability.id || '');
-			const draftKey = getOwnedAbilityDraftKey(ability);
-			const draft = activationMap[draftKey] || { is_enabled: false };
-			if (draft.is_enabled === false) {
-				return;
-			}
-
-			const activation = {
-				ability_id: abilityId,
-				client_order_index: orderIndex,
-			};
-			if (Object.prototype.hasOwnProperty.call(ability, 'ability_copy_index')) {
-				activation.ability_copy_index = Math.max(1, Math.floor(Number(ability.ability_copy_index || 0)));
-			}
-			if (Object.prototype.hasOwnProperty.call(draft, 'target_user_id')) {
-				activation.target_user_id = Math.max(1, Math.floor(Number(draft.target_user_id || 0)));
-			}
-			if (Object.prototype.hasOwnProperty.call(draft, 'x_cost')) {
-				activation.x_cost = Math.max(0, Math.floor(Number(draft.x_cost || 0)));
-			}
-			if (Object.prototype.hasOwnProperty.call(draft, 'mode')) {
-				activation.mode = String(draft.mode || '').trim();
-			}
-			if (Object.prototype.hasOwnProperty.call(draft, 'is_enabled')) {
-				activation.is_enabled = draft.is_enabled !== false;
-			}
-
-			activations.push(activation);
-			orderIndex += 1;
-		});
-
-		return normalizeAbilityActivationArray(activations);
+		return getEffectiveAbilityActivationArrayState(serverSnapshot, localDraft, uiState);
 	}
 
 	function playerNameById(userId) {
-		const targetId = Number(userId);
-		const row = serverSnapshot.players.find(function eachPlayer(player) {
-			return Number(player.user_id) === targetId;
-		});
-		return row
-			? String(row.ship_name || row.username || ('User ' + targetId))
-			: ('User ' + targetId);
+		return playerNameByIdValidation(serverSnapshot.players, userId);
 	}
 
 	function describeOrder(order) {
-		if (!order || typeof order !== 'object') {
-			return 'No order';
-		}
-
-		const attacks = normalizeAttacksMap(order.attacks || {});
-		const abilityActivations = normalizeAbilityActivationArray(order.ability_activations || []);
-		const attackParts = Object.keys(attacks).sort(function sortNumeric(a, b) {
-			return Number(a) - Number(b);
-		}).map(function eachTarget(targetId) {
-			return playerNameById(targetId) + ': ' + attacks[targetId];
-		});
-		const abilityParts = abilityActivations.map(function eachActivation(activation) {
-			const parts = [String(activation.ability_id || 'ability')];
-			if (Object.prototype.hasOwnProperty.call(activation, 'target_user_id')) {
-				parts.push('target ' + playerNameById(activation.target_user_id));
-			}
-			if (Object.prototype.hasOwnProperty.call(activation, 'x_cost')) {
-				parts.push('x ' + Math.max(0, Number(activation.x_cost || 0)));
-			}
-			return parts.join(' ');
-		});
-
-		const energyBudget = Math.max(0, Number(order.energy_budget || 0));
-		const totalSpent = Math.max(0, Number(order.total_energy_spent || 0));
-		const energyPart = energyBudget > 0
-			? ' | Energy ' + totalSpent + '/' + energyBudget
-			: '';
-
-		if (attackParts.length === 0) {
-			const abilityText = abilityParts.length > 0 ? ' | Abilities ' + abilityParts.join(', ') : ' | No abilities';
-			return 'Defense ' + Number(order.defense || 0) + ' | No attacks' + abilityText + energyPart;
-		}
-
-		const abilityText = abilityParts.length > 0 ? ' | Abilities ' + abilityParts.join(', ') : ' | No abilities';
-		return 'Defense ' + Number(order.defense || 0) + ' | Attacks ' + attackParts.join(', ') + abilityText + energyPart;
+		return describeOrderValidation(order, serverSnapshot.players);
 	}
 
 	function getSelfPlayer() {
-		const row = serverSnapshot.players.find(function eachPlayer(player) {
-			return !!player.is_self;
-		});
-		return row || null;
+		return getSelfPlayerState(serverSnapshot);
 	}
 
 	function getCheatTargetPlayer() {
-		const targetUserId = Number(localDraft.adminCheatTargetUserId || 0);
-		if (!targetUserId) {
-			return null;
-		}
-
-		const row = serverSnapshot.players.find(function eachPlayer(player) {
-			return Number(player.user_id) === targetUserId;
-		});
-		return row || null;
+		return getCheatTargetPlayerState(serverSnapshot, localDraft);
 	}
 
 	function hasSubmittedOrder() {
-		return !!serverSnapshot.currentOrder;
+		return hasSubmittedOrderState(serverSnapshot);
 	}
 
 	function hasSubmittedBids() {
-		return serverSnapshot.currentBids !== null;
+		return hasSubmittedBidsState(serverSnapshot);
 	}
 
 	function getEffectiveAttacks() {
-		if (hasSubmittedOrder() && !uiState.isEditing) {
-			return normalizeAttacksMap(serverSnapshot.currentOrder.attacks || {});
-		}
-
-		return normalizeAttacksMap(localDraft.attacks || {});
+		return getEffectiveAttacksState(serverSnapshot, localDraft, uiState);
 	}
 
 	function getEffectiveBids() {
-		if (hasSubmittedBids() && !uiState.isEditing) {
-			return normalizeBidsMap(serverSnapshot.currentBids || {});
-		}
-
-		return normalizeBidsMap(localDraft.bids || {});
+		return getEffectiveBidsState(serverSnapshot, localDraft, uiState);
 	}
 
 	function getAttackTotal() {
-		let total = 0;
-		const effectiveAttacks = getEffectiveAttacks();
-		Object.keys(effectiveAttacks).forEach(function eachAttack(targetId) {
-			const amount = Number(effectiveAttacks[targetId] || 0);
-			if (!Number.isFinite(amount)) {
-				return;
-			}
-
-			const integer = Math.max(0, Math.floor(amount));
-			total += integer;
-		});
-
-		return Math.max(0, total);
+		return getAttackTotalValidation(getEffectiveAttacks());
 	}
 
 	function getOrderValidation() {
-		const selfPlayer = getSelfPlayer();
-		if (!lastPerms.can_act) {
-			return {
-				defense: selfPlayer ? Number(selfPlayer.health || 0) : 0,
-				energyBudget: 0,
-				attackEnergySpent: 0,
-				abilityEnergySpent: 0,
-				totalEnergySpent: 0,
-				remainingEnergy: 0,
-				invalidDefense: false,
-				invalidEnergy: false,
-				invalidTargets: [],
-				invalidAbilityTargets: [],
-				missingAbilityTargets: [],
-			};
-		}
-
-		if (hasSubmittedOrder() && !uiState.isEditing) {
-			const energyBudget = Math.max(0, Number(serverSnapshot.currentOrder ? serverSnapshot.currentOrder.energy_budget || 0 : 0));
-			const attackEnergySpent = Math.max(0, Number(serverSnapshot.currentOrder ? serverSnapshot.currentOrder.attack_energy_spent || 0 : 0));
-			const abilityEnergySpent = Math.max(0, Number(serverSnapshot.currentOrder ? serverSnapshot.currentOrder.ability_energy_spent || 0 : 0));
-			const totalEnergySpent = Math.max(0, Number(serverSnapshot.currentOrder ? serverSnapshot.currentOrder.total_energy_spent || 0 : (attackEnergySpent + abilityEnergySpent)));
-			return {
-				defense: Number(serverSnapshot.currentOrder ? serverSnapshot.currentOrder.defense || 0 : 0),
-				energyBudget,
-				attackEnergySpent,
-				abilityEnergySpent,
-				totalEnergySpent,
-				remainingEnergy: energyBudget - totalEnergySpent,
-				invalidDefense: false,
-				invalidEnergy: false,
-				invalidTargets: [],
-				invalidAbilityTargets: [],
-				missingAbilityTargets: [],
-			};
-		}
-
-		const attackableTargets = {};
-		serverSnapshot.players.forEach(function eachPlayer(player) {
-			const key = String(Number(player.user_id));
-			const isDefeated = !!player.is_defeated || Number(player.health || 0) <= 0;
-			if (!player.is_self && !isDefeated) {
-				attackableTargets[key] = true;
-			}
+		return getOrderValidationFromState({
+			canAct: !!lastPerms.can_act,
+			selfPlayer: getSelfPlayer(),
+			hasSubmittedOrder: hasSubmittedOrder(),
+			isEditing: uiState.isEditing,
+			currentOrder: serverSnapshot.currentOrder,
+			players: serverSnapshot.players,
+			effectiveAttacks: getEffectiveAttacks(),
+			effectiveAbilityActivationMap: getEffectiveAbilityActivationMap(),
+			selfOwnedAbilities: getSelfOwnedAbilities(),
 		});
-
-		const effectiveAttacks = getEffectiveAttacks();
-		const invalidTargets = Object.keys(effectiveAttacks).filter(function eachTarget(targetId) {
-			return !attackableTargets[targetId];
-		});
-
-		const effectiveActivations = getEffectiveAbilityActivationMap();
-		const invalidAbilityTargets = [];
-		const missingAbilityTargets = [];
-		getSelfOwnedAbilities().forEach(function eachAbility(ability) {
-			if (!isActivatedAbility(ability)) {
-				return;
-			}
-
-			const abilityKey = getOwnedAbilityDraftKey(ability);
-			const activation = effectiveActivations[abilityKey] || { is_enabled: false };
-			if (activation.is_enabled === false) {
-				return;
-			}
-
-			const controlSpec = getAbilityControlSpec(ability);
-			if (!controlSpec.showTarget) {
-				return;
-			}
-
-			if (!Object.prototype.hasOwnProperty.call(activation, 'target_user_id')) {
-				if (controlSpec.targetRequired) {
-					missingAbilityTargets.push(abilityKey);
-				}
-				return;
-			}
-
-			const targetKey = String(Math.max(0, Number(activation.target_user_id || 0)));
-			if (!attackableTargets[targetKey]) {
-				invalidAbilityTargets.push(abilityKey);
-			}
-		});
-
-		const activationSummary = getDraftActivationSummary();
-		const attackEnergySpent = Math.max(0, getAttackTotal());
-		const abilityEnergySpent = Math.max(0, Number(activationSummary.ability_energy_spent || 0));
-		const totalEnergySpent = attackEnergySpent + abilityEnergySpent;
-		const ownedAbilityIds = getSelfOwnedAbilities().map(function eachAbility(ability) {
-			return String(ability.id || '');
-		});
-		const energyBudget = Math.max(0, Number(selfPlayer ? selfPlayer.health || 0 : 0))
-			+ (ownedAbilityIds.indexOf('turbo_generator') >= 0 ? 10 : 0);
-		const health = selfPlayer ? Number(selfPlayer.health || 0) : 0;
-		const defense = health - getAttackTotal();
-
-		return {
-			defense,
-			energyBudget,
-			attackEnergySpent,
-			abilityEnergySpent,
-			totalEnergySpent,
-			remainingEnergy: energyBudget - totalEnergySpent,
-			invalidDefense: defense < 0,
-			invalidEnergy: totalEnergySpent > energyBudget,
-			invalidTargets,
-			invalidAbilityTargets,
-			missingAbilityTargets,
-		};
 	}
 
 	function getBidTotal() {
-		let total = 0;
-		const effectiveBids = getEffectiveBids();
-		Object.keys(effectiveBids).forEach(function eachAbility(abilityId) {
-			const amount = Number(effectiveBids[abilityId] || 0);
-			if (!Number.isFinite(amount)) {
-				return;
-			}
-
-			total += Math.max(0, Math.floor(amount));
-		});
-
-		return total;
+		return getBidTotalValidation(getEffectiveBids());
 	}
 
 	function getBidValidation() {
-		const offeredSet = {};
-		serverSnapshot.offeredAbilities.forEach(function eachAbility(ability) {
-			offeredSet[getOfferItemKey(ability)] = true;
+		return getBidValidationFromState({
+			offeredAbilities: serverSnapshot.offeredAbilities,
+			effectiveBids: getEffectiveBids(),
 		});
-
-		const effectiveBids = getEffectiveBids();
-		const invalidAbilityIds = Object.keys(effectiveBids).filter(function eachId(abilityId) {
-			return !offeredSet[abilityId];
-		});
-
-		const totalBid = getBidTotal();
-		return {
-			totalBid,
-			invalidAbilityIds,
-		};
 	}
 
 	function canEditShipName() {
-		return lastMemberRole !== 'none' && lastMemberRole !== 'observer';
+		return canEditShipNameModule(lastMemberRole);
 	}
 
 	function reconcileShipNameEditor() {
-		const editable = canEditShipName();
-		shipNameRow.style.display = editable ? '' : 'none';
-		shipNameHint.style.display = editable ? '' : 'none';
-		if (!editable) {
-			return;
-		}
-
-		const activeEl = document.activeElement;
-		const focused = activeEl === shipNameInput;
-		const valueFromDraft = String(localDraft.shipName || '');
-		if (!focused && shipNameInput.value !== valueFromDraft) {
-			shipNameInput.value = valueFromDraft;
-		}
-
-		shipNameInput.disabled = shipNameBusy;
-		saveShipNameBtn.disabled = shipNameBusy;
-		saveShipNameBtn.textContent = shipNameBusy ? 'Saving...' : 'Save Name';
-
-		const normalizedDraft = String(localDraft.shipName || '').trim();
-		const normalizedServer = String(serverSnapshot.selfShipName || '').trim();
-		if (normalizedDraft === '' || normalizedDraft === normalizedServer) {
-			shipNameHint.textContent = 'Leave blank to use your username.';
-		} else {
-			shipNameHint.textContent = 'Unsaved ship name: ' + normalizedDraft;
-		}
+		reconcileShipNameEditorModule({
+			canEditShipName,
+			localDraft,
+			serverSnapshot,
+			shipNameRow,
+			shipNameHint,
+			shipNameInput,
+			saveShipNameBtn,
+			shipNameBusy,
+		});
 	}
 
 	function ensureAbilityRow(ability) {
-		const key = getOfferItemKey(ability);
-		if (abilityRowsById.has(key)) {
-			return abilityRowsById.get(key);
-		}
-
-		const row = cloneTemplateNode(abilityRowTemplate);
-		const rowRefs = collectRefs(row);
-		const name = rowRefs.name;
-		const description = rowRefs.description;
-		const label = rowRefs.label;
-		const input = rowRefs.input;
-		input.addEventListener('input', function onInput() {
-			const raw = Number(input.value || 0);
-			localDraft.bids[key] = Math.max(0, Math.floor(Number.isFinite(raw) ? raw : 0));
-			localDraft.dirtyBids = true;
-			reconcileUi();
-		});
-
-		abilitiesList.appendChild(row);
-
-		const refs = { row, name, description, label, input };
-		abilityRowsById.set(key, refs);
-		return refs;
+		return ensureAbilityRowModule({
+			abilityRowsById,
+			abilityRowTemplate,
+			abilitiesList,
+			localDraft,
+			reconcileUi,
+		}, ability);
 	}
 
 	function reconcileAbilitiesList() {
-		let focusedAbilityId = null;
-		let selectionStart = null;
-		let selectionEnd = null;
-		const activeEl = document.activeElement;
-		if (activeEl && activeEl.tagName === 'INPUT') {
-			Array.from(abilityRowsById.entries()).forEach(function eachEntry(entry) {
-				const key = entry[0];
-				const rowRefs = entry[1];
-				if (rowRefs.input === activeEl) {
-					focusedAbilityId = key;
-					selectionStart = rowRefs.input.selectionStart;
-					selectionEnd = rowRefs.input.selectionEnd;
-				}
-			});
-		}
-
-		const active = new Set();
-		const submittedBids = normalizeBidsMap(serverSnapshot.currentBids || {});
-		const editableBids = normalizeBidsMap(localDraft.bids || {});
-		const canEditBids = !!lastPerms.can_act;
-
-		serverSnapshot.offeredAbilities.forEach(function eachAbility(ability) {
-			const key = getOfferItemKey(ability);
-			active.add(key);
-			const rowRefs = ensureAbilityRow(ability);
-			rowRefs.name.textContent = String(ability.title || ability.name || key);
-			rowRefs.description.textContent = String(ability.description || '');
-			placeChildAt(abilitiesList, rowRefs.row, active.size - 1);
-
-			if (!canEditBids) {
-				rowRefs.label.textContent = 'No bidding access';
-				rowRefs.label.style.display = '';
-				rowRefs.input.style.display = 'none';
-				return;
-			}
-
-			if (hasSubmittedBids() && !uiState.isEditing) {
-				const submittedAmount = Math.max(0, Number(submittedBids[key] || 0));
-				rowRefs.label.textContent = 'Bid: ' + Math.floor(submittedAmount);
-				rowRefs.label.style.display = '';
-				rowRefs.input.style.display = 'none';
-				return;
-			}
-
-			rowRefs.label.style.display = 'none';
-			rowRefs.input.style.display = '';
-			const nextValue = String(Math.max(0, Number(editableBids[key] || 0)));
-			const isFocused = focusedAbilityId === key && document.activeElement === rowRefs.input;
-			if (!isFocused && rowRefs.input.value !== nextValue) {
-				rowRefs.input.value = nextValue;
-			}
-			rowRefs.input.disabled = !canEditBids || orderBusy;
+		reconcileAbilitiesListModule({
+			abilityRowsById,
+			abilityRowTemplate,
+			abilitiesList,
+			serverSnapshot,
+			localDraft,
+			lastPerms,
+			uiState,
+			orderBusy,
+			reconcileUi,
+			hasSubmittedBids,
 		});
-
-		Array.from(abilityRowsById.keys()).forEach(function eachExisting(key) {
-			if (active.has(key)) {
-				return;
-			}
-
-			const rowRefs = abilityRowsById.get(key);
-			if (rowRefs && rowRefs.row.parentNode === abilitiesList) {
-				abilitiesList.removeChild(rowRefs.row);
-			}
-			abilityRowsById.delete(key);
-		});
-
-		if (focusedAbilityId && abilityRowsById.has(focusedAbilityId)) {
-			const rowRefs = abilityRowsById.get(focusedAbilityId);
-			if (rowRefs && rowRefs.input && rowRefs.input.style.display !== 'none' && !rowRefs.input.disabled) {
-				rowRefs.input.focus();
-				if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
-					rowRefs.input.setSelectionRange(selectionStart, selectionEnd);
-				}
-			}
-		}
 	}
 
 	function ensurePlayerRow(player) {
-		const key = String(Number(player.user_id));
-		if (playerRowsById.has(key)) {
-			return playerRowsById.get(key);
-		}
-
-		const row = cloneTemplateNode(playerRowTemplate);
-		const rowRefs = collectRefs(row);
-		const name = rowRefs.name;
-		const abilities = rowRefs.abilities;
-		const right = rowRefs.right;
-		const label = rowRefs.label;
-		const input = rowRefs.input;
-		input.addEventListener('input', function onInput() {
-			const raw = Number(input.value || 0);
-			localDraft.attacks[key] = Math.max(0, Math.floor(Number.isFinite(raw) ? raw : 0));
-			localDraft.dirtyAttacks = true;
-			reconcileUi();
-		});
-
-		playersList.appendChild(row);
-
-		const refs = { row, name, abilities, right, label, input, abilityBadgeById: new Map() };
-		playerRowsById.set(key, refs);
-		return refs;
+		return ensurePlayerRowModule({
+			playerRowsById,
+			playerRowTemplate,
+			playersList,
+			localDraft,
+			reconcileUi,
+		}, player);
 	}
 
 	function reconcileOwnedAbilities(refs, ownedAbilities) {
-		const list = Array.isArray(ownedAbilities) ? ownedAbilities : [];
-		if (list.length === 0) {
-			refs.abilities.style.display = 'none';
-			refs.abilities.textContent = '';
-			refs.abilities.title = '';
-			refs.abilityBadgeById.clear();
-			return;
-		}
-
-		refs.abilities.style.display = '';
-		refs.abilities.title = '';
-
-		const grouped = {};
-		list.forEach(function eachAbility(ability, index) {
-			const abilityId = String(ability && ability.id ? ability.id : ('ability_' + String(index)));
-			if (!grouped[abilityId]) {
-				grouped[abilityId] = {
-					ability,
-					count: 0,
-				};
-			}
-			grouped[abilityId].count += 1;
-		});
-
-		const activeIds = new Set();
-		Object.keys(grouped).sort().forEach(function eachAbilityId(abilityId, index) {
-			const groupedEntry = grouped[abilityId];
-			const ability = groupedEntry.ability;
-			activeIds.add(abilityId);
-
-			let badge = refs.abilityBadgeById.get(abilityId);
-			if (!badge) {
-				badge = document.createElement('span');
-				badge.style.display = 'inline-block';
-				badge.style.padding = '1px 6px';
-				badge.style.border = '1px solid rgba(0, 0, 0, 0.2)';
-				badge.style.borderRadius = '999px';
-				refs.abilityBadgeById.set(abilityId, badge);
-			}
-
-			const abilityName = String(ability && (ability.title || ability.name) ? (ability.title || ability.name) : 'Unknown');
-			const description = String(ability && ability.description ? ability.description : 'No description available.');
-			badge.textContent = groupedEntry.count > 1 ? (abilityName + ' x' + groupedEntry.count) : abilityName;
-			badge.title = abilityName + ': ' + description + (groupedEntry.count > 1 ? ' (owned ' + groupedEntry.count + ' copies)' : '');
-			placeChildAt(refs.abilities, badge, index);
-		});
-
-		Array.from(refs.abilityBadgeById.keys()).forEach(function eachExisting(abilityId) {
-			if (activeIds.has(abilityId)) {
-				return;
-			}
-
-			const badge = refs.abilityBadgeById.get(abilityId);
-			if (badge && badge.parentNode === refs.abilities) {
-				refs.abilities.removeChild(badge);
-			}
-			refs.abilityBadgeById.delete(abilityId);
-		});
+		reconcileOwnedAbilitiesModule(refs, ownedAbilities);
 	}
 
 	function ensureAbilityActivationRow(ability) {
-		const key = getOwnedAbilityDraftKey(ability);
-		if (abilityActivationRowsById.has(key)) {
-			return abilityActivationRowsById.get(key);
-		}
-
-		const row = cloneTemplateNode(abilityActivationRowTemplate);
-		const rowRefs = collectRefs(row);
-		const refs = {
-			row,
-			name: rowRefs.name,
-			meta: rowRefs.meta,
-			description: rowRefs.description,
-			controls: rowRefs.controls,
-			toggleWrap: rowRefs.toggleWrap,
-			toggleInput: rowRefs.toggleInput,
-			toggleLabel: rowRefs.toggleLabel,
-			targetWrap: rowRefs.targetWrap,
-			targetLabel: rowRefs.targetLabel,
-			targetSelect: rowRefs.targetSelect,
-			xCostWrap: rowRefs.xCostWrap,
-			xCostLabel: rowRefs.xCostLabel,
-			xCostInput: rowRefs.xCostInput,
-			readonlyText: rowRefs.readonlyText,
-			targetOptionByValue: new Map(),
-		};
-
-		rowRefs.toggleInput.addEventListener('change', function onToggleChange() {
-			const current = normalizeAbilityActivationMap(localDraft.abilityActivations || {});
-			const nextEntry = current[key] || {};
-			nextEntry.is_enabled = !!rowRefs.toggleInput.checked;
-			current[key] = nextEntry;
-			localDraft.abilityActivations = current;
-			localDraft.dirtyAbilityActivations = true;
-			reconcileUi();
-		});
-
-		rowRefs.targetSelect.addEventListener('change', function onTargetChange() {
-			const current = normalizeAbilityActivationMap(localDraft.abilityActivations || {});
-			const nextEntry = current[key] || {};
-			const selected = String(rowRefs.targetSelect.value || '');
-			if (/^\d+$/.test(selected) && Number(selected) > 0) {
-				nextEntry.target_user_id = Number(selected);
-			} else {
-				delete nextEntry.target_user_id;
-			}
-			nextEntry.is_enabled = nextEntry.is_enabled !== false;
-			current[key] = nextEntry;
-			localDraft.abilityActivations = current;
-			localDraft.dirtyAbilityActivations = true;
-			reconcileUi();
-		});
-
-		rowRefs.xCostInput.addEventListener('input', function onXCostInput() {
-			const current = normalizeAbilityActivationMap(localDraft.abilityActivations || {});
-			const nextEntry = current[key] || {};
-			const raw = Number(rowRefs.xCostInput.value || 0);
-			nextEntry.x_cost = Math.max(0, Math.floor(Number.isFinite(raw) ? raw : 0));
-			nextEntry.is_enabled = nextEntry.is_enabled !== false;
-			current[key] = nextEntry;
-			localDraft.abilityActivations = current;
-			localDraft.dirtyAbilityActivations = true;
-			reconcileUi();
-		});
-
-		abilityActivationList.appendChild(row);
-		abilityActivationRowsById.set(key, refs);
-		return refs;
-	}
-
-	function reconcileSelectOptions(selectNode, optionMap, options) {
-		const active = new Set();
-		options.forEach(function eachOption(option) {
-			const value = String(option.value);
-			active.add(value);
-			let optionNode = optionMap.get(value);
-			if (!optionNode) {
-				optionNode = document.createElement('option');
-				optionMap.set(value, optionNode);
-			}
-			optionNode.value = value;
-			optionNode.textContent = String(option.label);
-			selectNode.appendChild(optionNode);
-		});
-
-		Array.from(optionMap.keys()).forEach(function eachExisting(value) {
-			if (active.has(value)) {
-				return;
-			}
-
-			const node = optionMap.get(value);
-			if (node && node.parentNode === selectNode) {
-				selectNode.removeChild(node);
-			}
-			optionMap.delete(value);
-		});
+		return ensureAbilityActivationRowModule({
+			abilityActivationRowsById,
+			abilityActivationRowTemplate,
+			abilityActivationList,
+			localDraft,
+			reconcileUi,
+		}, ability);
 	}
 
 	function ensureAdminCheatAbilityRow(ability) {
-		const key = String(ability.id || '');
-		if (adminCheatAbilityRowsById.has(key)) {
-			return adminCheatAbilityRowsById.get(key);
-		}
-
-		const row = cloneTemplateNode(adminCheatAbilityRowTemplate);
-		const rowRefs = collectRefs(row);
-		const refs = {
-			row,
-			checkbox: rowRefs.checkbox,
-			name: rowRefs.name,
-			meta: rowRefs.meta,
-			description: rowRefs.description,
-			status: rowRefs.status,
-		};
-
-		rowRefs.checkbox.addEventListener('change', function onCheatAbilityToggle() {
-			const nextSelections = Object.assign({}, localDraft.adminCheatSelections || {});
-			nextSelections[key] = !!rowRefs.checkbox.checked;
-			if (!nextSelections[key]) {
-				delete nextSelections[key];
-			}
-			localDraft.adminCheatSelections = nextSelections;
-			reconcileUi();
-		});
-
-		adminCheatAbilityList.appendChild(row);
-		adminCheatAbilityRowsById.set(key, refs);
-		return refs;
+		return ensureAdminCheatAbilityRowModule({
+			adminCheatAbilityRowsById,
+			adminCheatAbilityRowTemplate,
+			adminCheatAbilityList,
+			localDraft,
+			reconcileUi,
+		}, ability);
 	}
 
 	function reconcileAdminCheatPanel() {
-		const available = isAdminCheatVisible();
-		if (!available) {
-			uiState.adminCheatExpanded = false;
-		}
-		adminCheatToggleRow.style.display = available ? '' : 'none';
-		adminCheatToggleBtn.textContent = 'Admin Cheat: ' + (uiState.adminCheatExpanded ? 'Hide' : 'Show');
-		adminCheatToggleHint.textContent = available
-			? 'Global Admin UI is enabled for this in-progress game.'
-			: 'Global Admin UI must also be enabled.';
-		adminCheatPanel.style.display = available && uiState.adminCheatExpanded ? '' : 'none';
-		if (!available || !uiState.adminCheatExpanded) {
-			return;
-		}
-
-		const eligiblePlayers = getCheatEligiblePlayers();
-		const options = [{ value: '', label: 'Select player' }].concat(eligiblePlayers.map(function eachPlayer(player) {
-			return {
-				value: String(player.user_id),
-				label: String(player.ship_name || player.username || ('User ' + player.user_id)),
-			};
-		}));
-		reconcileSelectOptions(adminCheatTargetSelect, adminCheatTargetOptionByValue, options);
-
-		const targetStillAvailable = eligiblePlayers.some(function eachPlayer(player) {
-			return String(player.user_id) === String(localDraft.adminCheatTargetUserId || '');
+		reconcileAdminCheatPanelModule({
+			uiState,
+			localDraft,
+			serverSnapshot,
+			adminCheatBusy,
+			adminCheatToggleRow,
+			adminCheatToggleBtn,
+			adminCheatToggleHint,
+			adminCheatPanel,
+			adminCheatTargetSelect,
+			adminCheatTargetOptionByValue,
+			adminCheatAbilityRowsById,
+			adminCheatAbilityRowTemplate,
+			adminCheatAbilityList,
+			adminCheatHint,
+			adminCheatSummary,
+			adminCheatSubmitBtn,
+			adminCheatClearBtn,
+			adminCheatEmptyText,
+			isAdminCheatVisible,
+			getCheatEligiblePlayers,
+			getCheatTargetPlayer,
+			getSelectedCheatAbilityIds,
+			reconcileUi,
 		});
-		if (!targetStillAvailable) {
-			localDraft.adminCheatTargetUserId = '';
-		}
-		if (adminCheatTargetSelect.value !== String(localDraft.adminCheatTargetUserId || '')) {
-			adminCheatTargetSelect.value = String(localDraft.adminCheatTargetUserId || '');
-		}
-
-		const selectedTarget = getCheatTargetPlayer();
-		const selectedAbilityIds = getSelectedCheatAbilityIds();
-		const ownedCounts = {};
-		if (selectedTarget && Array.isArray(selectedTarget.owned_abilities)) {
-			selectedTarget.owned_abilities.forEach(function eachOwnedAbility(ability) {
-				const key = String(ability.id || '');
-				ownedCounts[key] = Math.max(0, Number(ownedCounts[key] || 0)) + 1;
-			});
-		}
-
-		let focusedAbilityId = null;
-		const activeEl = document.activeElement;
-		if (activeEl && activeEl.tagName === 'INPUT' && activeEl.type === 'checkbox') {
-			Array.from(adminCheatAbilityRowsById.entries()).forEach(function eachEntry(entry) {
-				if (entry[1].checkbox === activeEl) {
-					focusedAbilityId = entry[0];
-				}
-			});
-		}
-
-		const active = new Set();
-		serverSnapshot.abilityCatalog.forEach(function eachAbility(ability) {
-			const key = String(ability.id || '');
-			active.add(key);
-			const refs = ensureAdminCheatAbilityRow(ability);
-			const checked = !!(localDraft.adminCheatSelections && localDraft.adminCheatSelections[key]);
-			const ownedCount = Math.max(0, Number(ownedCounts[key] || 0));
-
-			refs.name.textContent = String(ability.title || ability.name || key);
-			refs.meta.textContent = String(ability.template_kind || 'unknown');
-			refs.description.textContent = String(ability.description || '');
-			refs.status.textContent = ownedCount > 0 ? ('Owned x' + ownedCount) : (checked ? 'Will grant' : 'Available');
-			refs.checkbox.disabled = adminCheatBusy;
-			refs.checkbox.checked = checked;
-			placeChildAt(adminCheatAbilityList, refs.row, active.size - 1);
-		});
-
-		Array.from(adminCheatAbilityRowsById.keys()).forEach(function eachExisting(key) {
-			if (active.has(key)) {
-				return;
-			}
-
-			const refs = adminCheatAbilityRowsById.get(key);
-			if (refs && refs.row.parentNode === adminCheatAbilityList) {
-				adminCheatAbilityList.removeChild(refs.row);
-			}
-			adminCheatAbilityRowsById.delete(key);
-		});
-
-		if (focusedAbilityId && adminCheatAbilityRowsById.has(focusedAbilityId)) {
-			const focusedRefs = adminCheatAbilityRowsById.get(focusedAbilityId);
-			if (focusedRefs && !focusedRefs.checkbox.disabled) {
-				focusedRefs.checkbox.focus();
-			}
-		}
-
-		adminCheatHint.textContent = selectedTarget
-			? ('Target: ' + String(selectedTarget.ship_name || selectedTarget.username || ('User ' + selectedTarget.user_id)))
-			: 'Visible only to admins while Admin UI is enabled.';
-		adminCheatSummary.textContent = selectedAbilityIds.length > 0
-			? (selectedAbilityIds.length + ' selected')
-			: 'Select a player and abilities to grant.';
-		adminCheatTargetSelect.disabled = adminCheatBusy || eligiblePlayers.length === 0;
-		adminCheatSubmitBtn.textContent = adminCheatBusy ? 'Granting...' : 'Grant Selected';
-		adminCheatSubmitBtn.disabled = adminCheatBusy || !selectedTarget || selectedAbilityIds.length === 0;
-		adminCheatClearBtn.disabled = adminCheatBusy || selectedAbilityIds.length === 0;
-		adminCheatEmptyText.style.display = serverSnapshot.abilityCatalog.length === 0 ? '' : 'none';
 	}
 
 	function describeActivationReadonly(ability, activationMap) {
-		if (!isActivatedAbility(ability)) {
-			const templateKind = String(ability.template_kind || 'passive');
-			if (templateKind === 'triggered') {
-				return 'Triggered ability. Resolves automatically when conditions are met.';
-			}
-			if (templateKind === 'condition') {
-				return 'Condition tracker. Evaluated automatically by the round resolver.';
-			}
-			return 'Passive ability. Always applied automatically by the resolver.';
-		}
-
-		const abilityKey = getOwnedAbilityDraftKey(ability);
-		const activation = activationMap[abilityKey] || null;
-		if (!activation || activation.is_enabled === false) {
-			return 'Not activated this round.';
-		}
-
-		const parts = ['Activated'];
-		if (Object.prototype.hasOwnProperty.call(activation, 'target_user_id')) {
-			parts.push('target: ' + playerNameById(activation.target_user_id));
-		}
-		if (Object.prototype.hasOwnProperty.call(activation, 'x_cost')) {
-			parts.push('x: ' + Math.max(0, Number(activation.x_cost || 0)));
-		}
-		parts.push('cost: ' + abilityCostFromDraft(ability, activation));
-		return parts.join(' | ');
+		return describeActivationReadonlyValidation(ability, activationMap, serverSnapshot.players);
 	}
 
 	function reconcileAbilityActivationList() {
-		const selfOwnedAbilities = getSelfOwnedAbilities();
-		const activationMap = getEffectiveAbilityActivationMap();
-		const canEdit = !!lastPerms.can_act && uiState.isEditing && !orderBusy && !isBiddingPhase();
-
-		let focusedKey = null;
-		let focusedControl = null;
-		let selectionStart = null;
-		let selectionEnd = null;
-		const activeEl = document.activeElement;
-		if (activeEl) {
-			Array.from(abilityActivationRowsById.entries()).forEach(function eachEntry(entry) {
-				const key = entry[0];
-				const refs = entry[1];
-				if (refs.toggleInput === activeEl) {
-					focusedKey = key;
-					focusedControl = 'toggle';
-				} else if (refs.targetSelect === activeEl) {
-					focusedKey = key;
-					focusedControl = 'target';
-				} else if (refs.xCostInput === activeEl) {
-					focusedKey = key;
-					focusedControl = 'x_cost';
-					selectionStart = refs.xCostInput.selectionStart;
-					selectionEnd = refs.xCostInput.selectionEnd;
-				}
-			});
-		}
-
-		const aliveTargets = serverSnapshot.players.filter(function eachPlayer(player) {
-			return !player.is_self && !player.is_defeated && Number(player.health || 0) > 0;
+		reconcileAbilityActivationListModule({
+			abilityActivationRowsById,
+			abilityActivationRowTemplate,
+			abilityActivationList,
+			serverSnapshot,
+			localDraft,
+			uiState,
+			lastPerms,
+			orderBusy,
+			reconcileUi,
+			getSelfOwnedAbilities,
+			getEffectiveAbilityActivationMap,
+			isBiddingPhase,
+			describeActivationReadonly,
 		});
-
-		const active = new Set();
-		selfOwnedAbilities.forEach(function eachAbility(ability) {
-			const key = getOwnedAbilityDraftKey(ability);
-			active.add(key);
-			const refs = ensureAbilityActivationRow(ability);
-			const abilityName = String(ability.title || ability.name || key);
-			const copyIndex = Math.max(0, Number(ability.ability_copy_index || 0));
-			refs.name.textContent = copyIndex > 1 ? (abilityName + ' #' + copyIndex) : abilityName;
-			refs.meta.textContent = String(ability.template_kind || 'unknown');
-			refs.description.textContent = String(ability.description || '');
-			placeChildAt(abilityActivationList, refs.row, active.size - 1);
-
-			const isActivated = isActivatedAbility(ability);
-			const controlSpec = getAbilityControlSpec(ability);
-			const hasTarget = controlSpec.showTarget;
-			const hasXCost = controlSpec.showXCost;
-
-			const currentActivation = activationMap[key] || { is_enabled: false };
-			const enabled = currentActivation.is_enabled !== false;
-			refs.readonlyText.textContent = describeActivationReadonly(ability, activationMap);
-
-			const showInteractiveControls = isActivated && canEdit;
-			refs.toggleWrap.style.display = showInteractiveControls ? '' : 'none';
-			refs.targetWrap.style.display = showInteractiveControls && hasTarget ? '' : 'none';
-			refs.xCostWrap.style.display = showInteractiveControls && hasXCost ? '' : 'none';
-			refs.readonlyText.style.display = showInteractiveControls ? 'none' : '';
-
-			if (showInteractiveControls) {
-				refs.toggleInput.disabled = !canEdit;
-				refs.toggleInput.checked = enabled;
-				const estimatedCost = abilityCostFromDraft(ability, currentActivation);
-				refs.toggleLabel.textContent = 'Activate (cost: ' + estimatedCost + ')';
-
-				if (hasTarget) {
-					const options = [{ value: '', label: 'Select target' }].concat(aliveTargets.map(function eachTarget(player) {
-						return {
-							value: String(player.user_id),
-							label: String(player.ship_name || player.username || ('User ' + player.user_id)),
-						};
-					}));
-					reconcileSelectOptions(refs.targetSelect, refs.targetOptionByValue, options);
-					const currentTarget = Object.prototype.hasOwnProperty.call(currentActivation, 'target_user_id')
-						? String(currentActivation.target_user_id)
-						: '';
-					if (refs.targetSelect.value !== currentTarget) {
-						refs.targetSelect.value = currentTarget;
-					}
-					refs.targetSelect.disabled = !enabled || !canEdit;
-				}
-
-				if (hasXCost) {
-					const xValue = String(Math.max(0, Number(currentActivation.x_cost || 0)));
-					if (refs.xCostInput.value !== xValue) {
-						refs.xCostInput.value = xValue;
-					}
-					refs.xCostInput.disabled = !enabled || !canEdit;
-				}
-			}
-		});
-
-		Array.from(abilityActivationRowsById.keys()).forEach(function eachExisting(key) {
-			if (active.has(key)) {
-				return;
-			}
-
-			const refs = abilityActivationRowsById.get(key);
-			if (refs && refs.row.parentNode === abilityActivationList) {
-				abilityActivationList.removeChild(refs.row);
-			}
-			abilityActivationRowsById.delete(key);
-		});
-
-		if (focusedKey && abilityActivationRowsById.has(focusedKey)) {
-			const refs = abilityActivationRowsById.get(focusedKey);
-			if (!refs) {
-				return;
-			}
-
-			if (focusedControl === 'toggle' && refs.toggleWrap.style.display !== 'none') {
-				refs.toggleInput.focus();
-			} else if (focusedControl === 'target' && refs.targetWrap.style.display !== 'none' && !refs.targetSelect.disabled) {
-				refs.targetSelect.focus();
-			} else if (focusedControl === 'x_cost' && refs.xCostWrap.style.display !== 'none' && !refs.xCostInput.disabled) {
-				refs.xCostInput.focus();
-				if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
-					refs.xCostInput.setSelectionRange(selectionStart, selectionEnd);
-				}
-			}
-		}
 	}
 
 	function ensureEventRow(eventListMap, key, listNode) {
-		if (eventListMap.has(key)) {
-			return eventListMap.get(key);
-		}
-
-		const line = cloneTemplateNode(eventLogTemplate);
-		const rowRefs = collectRefs(line);
-		const refs = {
-			line,
-			meta: rowRefs.meta,
-			text: rowRefs.text,
-		};
-		listNode.appendChild(line);
-		eventListMap.set(key, refs);
-		return refs;
+		return ensureEventRowModule({ eventLogTemplate }, eventListMap, key, listNode);
 	}
 
 	function reconcileEventLogList(events, listNode, emptyNode, rowMap, labelPrefix) {
-		const list = Array.isArray(events) ? events : [];
-		const active = new Set();
-
-		list.forEach(function eachEvent(event, index) {
-			const idPart = Number(event && event.id ? event.id : 0);
-			const key = idPart > 0 ? String(idPart) : String(index);
-			active.add(key);
-			const refs = ensureEventRow(rowMap, key, listNode);
-			const effectKey = String(event && event.effect_key ? event.effect_key : 'event');
-			refs.meta.textContent = labelPrefix + ' • ' + effectKey;
-			refs.text.textContent = String(event && event.text ? event.text : 'No event details.');
-			placeChildAt(listNode, refs.line, active.size - 1);
+		reconcileEventLogListModule({ eventLogTemplate }, {
+			events,
+			listNode,
+			emptyNode,
+			rowMap,
+			labelPrefix,
 		});
-
-		Array.from(rowMap.keys()).forEach(function eachExisting(key) {
-			if (active.has(key)) {
-				return;
-			}
-
-			const refs = rowMap.get(key);
-			if (refs && refs.line.parentNode === listNode) {
-				listNode.removeChild(refs.line);
-			}
-			rowMap.delete(key);
-		});
-
-		emptyNode.style.display = list.length === 0 ? '' : 'none';
-		if (emptyNode.style.display === '' && emptyNode.parentNode !== listNode) {
-			listNode.appendChild(emptyNode);
-		}
 	}
 
 	function reconcilePlayersList() {
-		let focusedAttackKey = null;
-		let selectionStart = null;
-		let selectionEnd = null;
-		const activeEl = document.activeElement;
-		if (activeEl && activeEl.tagName === 'INPUT') {
-			Array.from(playerRowsById.entries()).forEach(function eachEntry(entry) {
-				const key = entry[0];
-				const refs = entry[1];
-				if (refs.input === activeEl) {
-					focusedAttackKey = key;
-					selectionStart = refs.input.selectionStart;
-					selectionEnd = refs.input.selectionEnd;
-				}
-			});
-		}
-
-		const active = new Set();
-		const submittedAttacks = normalizeAttacksMap(serverSnapshot.currentOrder && serverSnapshot.currentOrder.attacks ? serverSnapshot.currentOrder.attacks : {});
-		const editableAttacks = normalizeAttacksMap(localDraft.attacks || {});
-
-		serverSnapshot.players.forEach(function eachPlayer(player) {
-			const key = String(Number(player.user_id));
-			active.add(key);
-			const refs = ensurePlayerRow(player);
-			const isDefeated = !!player.is_defeated || Number(player.health || 0) <= 0;
-
-			const displayShipName = String(player.ship_name || player.username || 'Unknown');
-			refs.name.textContent = displayShipName + ' | Health: ' + Math.max(0, Number(player.health || 0));
-			const ownedAbilities = Array.isArray(player.owned_abilities) ? player.owned_abilities : [];
-			reconcileOwnedAbilities(refs, ownedAbilities);
-			placeChildAt(playersList, refs.row, active.size - 1);
-
-			if (player.is_self) {
-				refs.label.textContent = isDefeated ? 'Defeated' : 'You';
-				refs.label.style.display = '';
-				refs.input.style.display = 'none';
-				return;
-			}
-
-			if (isDefeated) {
-				refs.label.textContent = 'Defeated';
-				refs.label.style.display = '';
-				refs.input.style.display = 'none';
-				return;
-			}
-
-			if (!lastPerms.can_act) {
-				refs.label.textContent = 'Active';
-				refs.label.style.display = '';
-				refs.input.style.display = 'none';
-				return;
-			}
-
-			if (hasSubmittedOrder() && !uiState.isEditing) {
-				const submittedAmount = Number(submittedAttacks[key] || 0);
-				refs.label.textContent = 'Attack: ' + Math.max(0, Math.floor(submittedAmount));
-				refs.label.style.display = '';
-				refs.input.style.display = 'none';
-				return;
-			}
-
-			refs.label.style.display = 'none';
-			refs.input.style.display = '';
-			const nextValue = String(Math.max(0, Number(editableAttacks[key] || 0)));
-			const isFocused = focusedAttackKey === key && document.activeElement === refs.input;
-			if (!isFocused && refs.input.value !== nextValue) {
-				refs.input.value = nextValue;
-			}
-			refs.input.disabled = !lastPerms.can_act || orderBusy;
+		reconcilePlayersListModule({
+			playerRowsById,
+			playerRowTemplate,
+			playersList,
+			serverSnapshot,
+			localDraft,
+			lastPerms,
+			uiState,
+			orderBusy,
+			reconcileUi,
+			hasSubmittedOrder,
 		});
-
-		Array.from(playerRowsById.keys()).forEach(function eachExisting(key) {
-			if (active.has(key)) {
-				return;
-			}
-
-			const refs = playerRowsById.get(key);
-			if (refs && refs.row.parentNode === playersList) {
-				playersList.removeChild(refs.row);
-			}
-			playerRowsById.delete(key);
-		});
-
-		if (focusedAttackKey && playerRowsById.has(focusedAttackKey)) {
-			const refs = playerRowsById.get(focusedAttackKey);
-			if (refs && refs.input && refs.input.style.display !== 'none' && !refs.input.disabled) {
-				refs.input.focus();
-				if (typeof selectionStart === 'number' && typeof selectionEnd === 'number') {
-					refs.input.setSelectionRange(selectionStart, selectionEnd);
-				}
-			}
-		}
 	}
 
 	function reconcilePreviousOrdersList() {
-		const previousOrders = Array.isArray(serverSnapshot.previousRoundOrders) ? serverSnapshot.previousRoundOrders : [];
-		const active = new Set();
-
-		previousOrders.forEach(function eachOrder(order, index) {
-			const key = String(Number(order.user_id || 0)) + ':' + String(index);
-			active.add(key);
-
-			let refs = previousOrderRowsById.get(key);
-			if (!refs) {
-				const line = cloneTemplateNode(previousOrderTemplate);
-				const rowRefs = collectRefs(line);
-				refs = { line, meta: rowRefs.meta, text: rowRefs.text };
-				previousOrderRowsById.set(key, refs);
-			}
-
-			refs.meta.textContent = String(order.username || 'Unknown');
-			refs.text.textContent = describeOrder(order);
-			placeChildAt(lastTurnList, refs.line, active.size - 1);
+		reconcilePreviousOrdersListModule({
+			serverSnapshot,
+			previousOrderRowsById,
+			previousOrderTemplate,
+			lastTurnList,
+			emptyPreviousOrdersNode,
+			describeOrder,
 		});
-
-		Array.from(previousOrderRowsById.keys()).forEach(function eachExisting(key) {
-			if (active.has(key)) {
-				return;
-			}
-
-			const refs = previousOrderRowsById.get(key);
-			if (refs && refs.line.parentNode === lastTurnList) {
-				lastTurnList.removeChild(refs.line);
-			}
-			previousOrderRowsById.delete(key);
-		});
-
-		emptyPreviousOrdersNode.style.display = previousOrders.length === 0 ? '' : 'none';
-		if (emptyPreviousOrdersNode.style.display === '' && emptyPreviousOrdersNode.parentNode !== lastTurnList) {
-			lastTurnList.appendChild(emptyPreviousOrdersNode);
-		}
 	}
 
 	function reconcileUi() {
@@ -2101,302 +799,87 @@ export function createRumbleGameScreen(deps) {
 		}
 	});
 
-	refreshBtn.addEventListener('click', function onRefreshClick() {
-		refreshRumbleState({ silent: false });
+	bindRefreshHandler({
+		refreshBtn,
+		refreshRumbleState,
 	});
 
-	shipNameInput.addEventListener('input', function onShipNameInput() {
-		localDraft.shipName = String(shipNameInput.value || '');
-		localDraft.dirtyShipName = true;
-		reconcileUi();
+	bindShipNameHandlers({
+		api: deps.api,
+		localDraft,
+		shipNameInput,
+		saveShipNameBtn,
+		canEditShipName,
+		getLastGameId: function getLastGameId() {
+			return lastGameId;
+		},
+		isShipNameBusy: function isShipNameBusy() {
+			return shipNameBusy;
+		},
+		setShipNameBusy: function setShipNameBusy(value) {
+			shipNameBusy = value;
+		},
+		reconcileUi,
+		refreshRumbleState,
+		setStatusNode,
 	});
 
-	shipNameInput.addEventListener('keydown', async function onShipNameKeyDown(event) {
-		if (event.key !== 'Enter') {
-			return;
-		}
-
-		event.preventDefault();
-		saveShipNameBtn.click();
+	bindAdminCheatHandlers({
+		api: deps.api,
+		uiState,
+		localDraft,
+		adminCheatTargetSelect,
+		adminCheatToggleBtn,
+		adminCheatClearBtn,
+		adminCheatSubmitBtn,
+		isAdminCheatVisible,
+		getCheatTargetPlayer,
+		getSelectedCheatAbilityIds,
+		clearAdminCheatSelections,
+		getLastGameId: function getLastGameId() {
+			return lastGameId;
+		},
+		isAdminCheatBusy: function isAdminCheatBusy() {
+			return adminCheatBusy;
+		},
+		setAdminCheatBusy: function setAdminCheatBusy(value) {
+			adminCheatBusy = value;
+		},
+		reconcileUi,
+		refreshRumbleState,
+		setStatusNode,
 	});
 
-	adminCheatTargetSelect.addEventListener('change', function onAdminCheatTargetChange() {
-		localDraft.adminCheatTargetUserId = String(adminCheatTargetSelect.value || '');
-		reconcileUi();
-	});
-
-	adminCheatToggleBtn.addEventListener('click', function onAdminCheatToggle() {
-		if (!isAdminCheatVisible()) {
-			return;
-		}
-
-		uiState.adminCheatExpanded = !uiState.adminCheatExpanded;
-		reconcileUi();
-	});
-
-	adminCheatClearBtn.addEventListener('click', function onAdminCheatClear() {
-		if (adminCheatBusy) {
-			return;
-		}
-
-		clearAdminCheatSelections();
-		reconcileUi();
-	});
-
-	adminCheatSubmitBtn.addEventListener('click', async function onAdminCheatSubmit() {
-		if (!lastGameId || adminCheatBusy || !isAdminCheatVisible()) {
-			return;
-		}
-
-		const targetPlayer = getCheatTargetPlayer();
-		const selectedAbilityIds = getSelectedCheatAbilityIds();
-		if (!targetPlayer) {
-			setStatusNode('Choose a target player first.', 'error');
-			return;
-		}
-		if (selectedAbilityIds.length === 0) {
-			setStatusNode('Select at least one ability to grant.', 'error');
-			return;
-		}
-
-		const confirmed = await showConfirmModal({
-			title: 'Confirm Ability Grant',
-			message: 'Grant ' + selectedAbilityIds.length + ' selected abilities to ' + String(targetPlayer.ship_name || targetPlayer.username || ('User ' + targetPlayer.user_id)) + '?',
-			cancelLabel: 'Cancel',
-			confirmLabel: 'Grant Abilities',
-		});
-		if (!confirmed) {
-			return;
-		}
-
-		adminCheatBusy = true;
-		reconcileUi();
-		try {
-			const result = await deps.api.grantRumbleAbilities(lastGameId, targetPlayer.user_id, selectedAbilityIds);
-			clearAdminCheatSelections();
-			await refreshRumbleState({ silent: true });
-			if (Array.isArray(result.added_ability_ids) && result.added_ability_ids.length > 0) {
-				setStatusNode('Granted ' + result.added_ability_ids.length + ' abilities to ' + String(result.target_username || targetPlayer.username || targetPlayer.ship_name || ('User ' + targetPlayer.user_id)) + '.', 'ok');
-			} else {
-				setStatusNode(String(result.target_username || targetPlayer.username || targetPlayer.ship_name || ('User ' + targetPlayer.user_id)) + ' already had all selected abilities.', 'ok');
-			}
-		} catch (err) {
-			setStatusNode(err.message || 'Unable to grant abilities.', 'error');
-		} finally {
-			adminCheatBusy = false;
-			reconcileUi();
-		}
-	});
-
-	saveShipNameBtn.addEventListener('click', async function onSaveShipName() {
-		if (!lastGameId || shipNameBusy || !canEditShipName()) {
-			return;
-		}
-
-		const nextShipName = String(localDraft.shipName || '');
-		shipNameBusy = true;
-		reconcileUi();
-		try {
-			await deps.api.setRumbleShipName(lastGameId, nextShipName);
-			localDraft.dirtyShipName = false;
-			await refreshRumbleState({ silent: true });
-			setStatusNode('Ship name updated.', 'ok');
-		} catch (err) {
-			setStatusNode(err.message || 'Unable to update ship name.', 'error');
-		} finally {
-			shipNameBusy = false;
-			reconcileUi();
-		}
-	});
-
-	submitBtn.addEventListener('click', async function onSubmitOrder() {
-		if (!lastGameId || !lastPerms.can_act || orderBusy) {
-			return;
-		}
-
-		orderBusy = true;
-		reconcileUi();
-		try {
-			if (isBiddingPhase()) {
-				const bids = normalizeBidsMap(localDraft.bids);
-				const bidValidation = getBidValidation();
-				if (bidValidation.invalidAbilityIds.length > 0) {
-					setStatusNode('Invalid bids: one or more offered abilities are unavailable.', 'error');
-					return;
-				}
-
-				await deps.api.submitRumbleBids(lastGameId, bids);
-				uiState.isEditing = false;
-				localDraft.dirtyBids = false;
-				await refreshRumbleState({ silent: true });
-				setStatusNode('Bids submitted.', 'ok');
-				return;
-			}
-
-			const attacks = normalizeAttacksMap(localDraft.attacks);
-			const abilityActivations = getEffectiveAbilityActivationArray();
-			const validation = getOrderValidation();
-			if (validation.invalidTargets.length > 0) {
-				setStatusNode('Invalid order: remove attacks assigned to defeated or unavailable players.', 'error');
-				return;
-			}
-
-			if (validation.invalidAbilityTargets.length > 0 || validation.missingAbilityTargets.length > 0) {
-				setStatusNode('Invalid ability activations: choose valid living targets for enabled targeted abilities.', 'error');
-				return;
-			}
-
-			if (validation.invalidDefense) {
-				setStatusNode('Invalid order: defense cannot be negative.', 'error');
-				return;
-			}
-
-			if (validation.invalidEnergy) {
-				setStatusNode('Invalid order: total energy spend exceeds your budget.', 'error');
-				return;
-			}
-
-			await deps.api.submitRumbleOrder(lastGameId, attacks, abilityActivations);
-			uiState.isEditing = false;
-			localDraft.dirtyAttacks = false;
-			localDraft.dirtyAbilityActivations = false;
-			await refreshRumbleState({ silent: true });
-			setStatusNode('Orders submitted.', 'ok');
-		} catch (err) {
-			setStatusNode(err.message || 'Unable to submit update.', 'error');
-		} finally {
-			orderBusy = false;
-			reconcileUi();
-		}
-	});
-
-	editBtn.addEventListener('click', function onEditOrders() {
-		if (!lastPerms.can_act || orderBusy) {
-			return;
-		}
-
-		if (isBiddingPhase()) {
-			if (!hasSubmittedBids()) {
-				return;
-			}
-
-			localDraft.bids = normalizeBidsMap(serverSnapshot.currentBids || {});
-			localDraft.dirtyBids = false;
-			uiState.isEditing = true;
-			reconcileUi();
-			return;
-		}
-
-		if (!serverSnapshot.currentOrder) {
-			return;
-		}
-
-		localDraft.attacks = normalizeAttacksMap(serverSnapshot.currentOrder.attacks || {});
-		localDraft.dirtyAttacks = false;
-		localDraft.abilityActivations = activationArrayToMap(serverSnapshot.currentOrder.ability_activations || []);
-		localDraft.dirtyAbilityActivations = false;
-		uiState.isEditing = true;
-		reconcileUi();
-	});
-
-	cancelBtn.addEventListener('click', async function onCancelOrder() {
-		if (!lastGameId || !lastPerms.can_act || orderBusy) {
-			return;
-		}
-
-		orderBusy = true;
-		reconcileUi();
-		try {
-			if (isBiddingPhase()) {
-				if (!hasSubmittedBids()) {
-					return;
-				}
-
-				await deps.api.cancelRumbleBids(lastGameId);
-				localDraft.bids = {};
-				localDraft.dirtyBids = false;
-				uiState.isEditing = true;
-				await refreshRumbleState({ silent: true });
-				setStatusNode('Bids canceled.', 'ok');
-				return;
-			}
-
-			if (!serverSnapshot.currentOrder) {
-				return;
-			}
-
-			await deps.api.cancelRumbleOrder(lastGameId);
-			localDraft.attacks = {};
-			localDraft.dirtyAttacks = false;
-			localDraft.abilityActivations = {};
-			localDraft.dirtyAbilityActivations = false;
-			uiState.isEditing = true;
-			await refreshRumbleState({ silent: true });
-			setStatusNode('Orders canceled.', 'ok');
-		} catch (err) {
-			setStatusNode(err.message || 'Unable to cancel update.', 'error');
-		} finally {
-			orderBusy = false;
-			reconcileUi();
-		}
-	});
-
-	phaseActionBtn.addEventListener('click', async function onPhaseAction() {
-		if (!lastGameId || !lastPerms.can_delete || !lastPerms.can_end_turn || orderBusy) {
-			return;
-		}
-
-		if (isBiddingPhase()) {
-			const confirmedEndBidding = await showConfirmModal({
-				title: 'Confirm End Bidding',
-				message: 'Resolve bidding now and move the game to combat?',
-				cancelLabel: 'Cancel',
-				confirmLabel: 'End Bidding',
-			});
-			if (!confirmedEndBidding) {
-				return;
-			}
-
-			orderBusy = true;
-			reconcileUi();
-			try {
-				await deps.api.endRumbleBidding(lastGameId);
-				clearDraftDirty();
-				await refreshRumbleState({ silent: true });
-				setStatusNode('Bidding ended. Combat phase started.', 'ok');
-			} catch (err) {
-				setStatusNode(err.message || 'Unable to end bidding.', 'error');
-			} finally {
-				orderBusy = false;
-				reconcileUi();
-			}
-			return;
-		}
-
-		const confirmed = await showConfirmModal({
-			title: 'Confirm End Turn',
-			message: 'Resolve this rumble turn now?',
-			cancelLabel: 'Cancel',
-			confirmLabel: 'End Turn',
-		});
-		if (!confirmed) {
-			return;
-		}
-
-		orderBusy = true;
-		reconcileUi();
-		try {
-			await deps.api.endRumbleTurn(lastGameId);
-			localDraft.dirtyAttacks = false;
-			localDraft.dirtyAbilityActivations = false;
-			await refreshRumbleState({ silent: true });
-			setStatusNode('Turn resolved.', 'ok');
-		} catch (err) {
-			setStatusNode(err.message || 'Unable to end turn.', 'error');
-		} finally {
-			orderBusy = false;
-			reconcileUi();
-		}
+	bindPhaseControlHandlers({
+		api: deps.api,
+		localDraft,
+		uiState,
+		serverSnapshot,
+		submitBtn,
+		editBtn,
+		cancelBtn,
+		phaseActionBtn,
+		getBidValidation,
+		getOrderValidation,
+		getEffectiveAbilityActivationArray,
+		isBiddingPhase,
+		hasSubmittedBids,
+		clearDraftDirty,
+		refreshRumbleState,
+		reconcileUi,
+		setStatusNode,
+		getLastGameId: function getLastGameId() {
+			return lastGameId;
+		},
+		getLastPerms: function getLastPerms() {
+			return lastPerms;
+		},
+		isOrderBusy: function isOrderBusy() {
+			return orderBusy;
+		},
+		setOrderBusy: function setOrderBusy(value) {
+			orderBusy = value;
+		},
 	});
 
 	return screen;

@@ -1,0 +1,1 @@
+export { createRumbleGameScreen } from '../rumbleGameScreen.js';
