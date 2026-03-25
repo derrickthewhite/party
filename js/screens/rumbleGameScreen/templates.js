@@ -12,10 +12,6 @@ export const RUMBLE_PANEL_HTML = `
 			<button data-ref="saveShipNameBtn">Save Name</button>
 		</div>
 		<p data-ref="shipNameHint" style="margin: 0 0 8px 0; opacity: 0.85;">Leave blank to use your username.</p>
-		<div class="row mobile-stack" data-ref="adminCheatToggleRow" style="display: none; align-items: center; margin: 0 0 8px 0; gap: 8px;">
-			<button data-ref="adminCheatToggleBtn">Admin Cheat: Show</button>
-			<small data-ref="adminCheatToggleHint" style="opacity: 0.85;">Global Admin UI must also be enabled.</small>
-		</div>
 		<div data-ref="biddingPanel">
 			<p data-ref="bidHelpText">Place secret bids for offered abilities. You can overbid your health, but if bidding leaves you at 0 or less you are eliminated before combat.</p>
 			<p data-ref="bidValidationText"></p>
@@ -61,7 +57,10 @@ export const RUMBLE_PANEL_HTML = `
 		<div class="list" data-ref="previousEventLogList">
 			<p data-ref="emptyPreviousEventLogNode">No previous round events yet.</p>
 		</div>
-		
+			<div class="row mobile-stack" data-ref="adminCheatToggleRow" style="display: none; align-items: center; margin: 0 0 8px 0; gap: 8px;">
+			<button data-ref="adminCheatToggleBtn">Admin Cheat: Show</button>
+			<small data-ref="adminCheatToggleHint" style="opacity: 0.85;">Global Admin UI must also be enabled.</small>
+		</div>
 		<div data-ref="adminCheatPanel" style="display: none; margin: 0 0 10px 0; padding: 10px; border: 1px dashed rgba(0, 0, 0, 0.25); border-radius: 10px; background: rgba(0, 0, 0, 0.03);">
 			<div class="row mobile-stack" style="align-items: center; margin-bottom: 8px;">
 				<h4 style="margin: 0;">Admin Ability Cheat</h4>
