@@ -12,6 +12,7 @@ import { createAdminCheatController } from './rumbleGameScreen/adminCheatPanel.j
 import { bindRefreshHandler, createPhaseControlsController } from './rumbleGameScreen/phaseControls.js';
 import { createBiddingPanelController } from './rumbleGameScreen/biddingPanel.js';
 import { createCombatPanelController } from './rumbleGameScreen/combatPanel.js';
+import { createVictoryScreenController } from './rumbleGameScreen/victoryScreen.js';
 import { createEventLogsController } from './rumbleGameScreen/eventLogs.js';
 import {
 	clearDraftDirty as clearRumbleDraftDirty,
@@ -69,6 +70,7 @@ export function createRumbleGameScreen(deps) {
 		previousRoundOrders: [],
 		currentRoundEventLog: [],
 		previousRoundEventLog: [],
+		finalStandings: null,
 		selfShipName: '',
 	};
 
@@ -252,6 +254,11 @@ export function createRumbleGameScreen(deps) {
 	});
 	refs.biddingMount.appendChild(biddingPanelController.root);
 
+	const victoryScreenController = createVictoryScreenController({
+		serverSnapshot,
+	});
+	refs.victoryMount.appendChild(victoryScreenController.root);
+
 	const combatPanelController = createCombatPanelController({
 		serverSnapshot,
 		localDraft,
@@ -339,6 +346,7 @@ export function createRumbleGameScreen(deps) {
 			combatPanelController.reconcile();
 		}
 
+		victoryScreenController.reconcile();
 		eventLogsController.reconcile();
 	}
 
@@ -366,6 +374,12 @@ export function createRumbleGameScreen(deps) {
 		const nextPreviousOrders = progress && Array.isArray(progress.previous_round_orders) ? progress.previous_round_orders : [];
 		const nextCurrentRoundEvents = progress && Array.isArray(progress.current_round_event_log) ? progress.current_round_event_log : [];
 		const nextPreviousRoundEvents = progress && Array.isArray(progress.previous_round_event_log) ? progress.previous_round_event_log : [];
+		const nextFinalStandings = game && game.final_standings && Array.isArray(game.final_standings.entries)
+			? {
+				winner_name: String(game.final_standings.winner_name || ''),
+				entries: game.final_standings.entries,
+			}
+			: null;
 		const nextSelfPlayer = nextPlayers.find(function eachPlayer(player) {
 			return !!player.is_self;
 		}) || null;
@@ -400,6 +414,7 @@ export function createRumbleGameScreen(deps) {
 		serverSnapshot.previousRoundOrders = nextPreviousOrders;
 		serverSnapshot.currentRoundEventLog = nextCurrentRoundEvents;
 		serverSnapshot.previousRoundEventLog = nextPreviousRoundEvents;
+		serverSnapshot.finalStandings = nextFinalStandings;
 		serverSnapshot.selfShipName = nextSelfShipName;
 
 		if (!localDraft.dirtyShipName) {

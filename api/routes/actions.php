@@ -254,33 +254,63 @@ function actions_force_reveal(int $gameId): void
     }
 
     $type = normalize_game_type((string)$game['game_type']);
-    if ($type !== 'diplomacy') {
-        if ($type !== 'rumble') {
-            error_response('Turn resolution is only available for diplomacy and rumble games.', 409);
+    $stage = 'resolve_type';
+    $contextMeta = [
+        'route' => 'actions_force_reveal',
+        'game_id' => $gameId,
+        'game_type' => $type,
+    ];
+
+    try {
+        if ($type !== 'diplomacy') {
+            if ($type !== 'rumble') {
+                error_response('Turn resolution is only available for diplomacy and rumble games.', 409);
+            }
+
+            $stage = 'load_rumble_state';
+            $stateStmt = db()->prepare('SELECT current_round, phase FROM game_state WHERE game_id = :game_id LIMIT 1');
+            $stateStmt->execute(['game_id' => $gameId]);
+            $state = $stateStmt->fetch();
+            $roundNumber = (int)($state['current_round'] ?? 1);
+            $phase = (string)($state['phase'] ?? 'bidding');
+            $contextMeta['round'] = $roundNumber;
+            $contextMeta['phase'] = $phase;
+
+            if ($phase === 'bidding') {
+                $stage = 'rumble_resolve_bidding';
+                $resolved = rumble_resolve_bidding_and_enter_battle($gameId, $roundNumber);
+                success_response(['resolved' => true, 'phase' => 'battle', 'count' => $resolved, 'round' => $roundNumber]);
+            }
+
+            $stage = 'rumble_resolve_round';
+            $resolvedCount = rumble_resolve_round_and_advance($gameId, $roundNumber);
+            success_response(['resolved' => true, 'phase' => 'battle', 'count' => $resolvedCount, 'round' => $roundNumber]);
         }
 
-        $stateStmt = db()->prepare('SELECT current_round, phase FROM game_state WHERE game_id = :game_id LIMIT 1');
+        $stage = 'load_diplomacy_round';
+        $stateStmt = db()->prepare('SELECT current_round FROM game_state WHERE game_id = :game_id LIMIT 1');
         $stateStmt->execute(['game_id' => $gameId]);
-        $state = $stateStmt->fetch();
-        $roundNumber = (int)($state['current_round'] ?? 1);
-        $phase = (string)($state['phase'] ?? 'bidding');
+        $roundNumber = (int)($stateStmt->fetchColumn() ?: 1);
+        $contextMeta['round'] = $roundNumber;
 
-        if ($phase === 'bidding') {
-            $resolved = rumble_resolve_bidding_and_enter_battle($gameId, $roundNumber);
-            success_response(['resolved' => true, 'phase' => 'battle', 'count' => $resolved, 'round' => $roundNumber]);
-        }
+        $stage = 'diplomacy_reveal_round';
+        $revealedCount = diplomacy_reveal_round_and_advance($gameId, $roundNumber);
 
-        $resolvedCount = rumble_resolve_round_and_advance($gameId, $roundNumber);
-        success_response(['resolved' => true, 'phase' => 'battle', 'count' => $resolvedCount, 'round' => $roundNumber]);
+        success_response(['revealed' => true, 'count' => $revealedCount, 'round' => $roundNumber]);
+    } catch (Throwable $ex) {
+        error_response(
+            'Reveal failed at ' . $stage . ': ' . $ex->getMessage(),
+            500,
+            array_merge($contextMeta, [
+                'stage' => $stage,
+                'exception_class' => get_class($ex),
+                'exception_message' => $ex->getMessage(),
+                'exception_file' => $ex->getFile(),
+                'exception_line' => $ex->getLine(),
+                'trace' => explode("\n", $ex->getTraceAsString()),
+            ])
+        );
     }
-
-    $stateStmt = db()->prepare('SELECT current_round FROM game_state WHERE game_id = :game_id LIMIT 1');
-    $stateStmt->execute(['game_id' => $gameId]);
-    $roundNumber = (int)($stateStmt->fetchColumn() ?: 1);
-
-    $revealedCount = diplomacy_reveal_round_and_advance($gameId, $roundNumber);
-
-    success_response(['revealed' => true, 'count' => $revealedCount, 'round' => $roundNumber]);
 }
 
 function rumble_admin_grant_abilities_route(int $gameId): void

@@ -485,6 +485,7 @@ function games_detail(int $gameId): void
             'permissions' => $permissions,
             'diplomacy_order_progress' => $detailPayload['diplomacy_order_progress'],
             'rumble_turn_progress' => $detailPayload['rumble_turn_progress'],
+            'final_standings' => $detailPayload['final_standings'],
         ],
     ]);
 }

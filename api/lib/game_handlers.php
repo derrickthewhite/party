@@ -12,6 +12,7 @@ function game_detail_payload_defaults(): array
     return [
         'diplomacy_order_progress' => null,
         'rumble_turn_progress' => null,
+        'final_standings' => null,
     ];
 }
 

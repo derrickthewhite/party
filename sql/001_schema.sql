@@ -85,6 +85,26 @@ CREATE TABLE IF NOT EXISTS `game_state` (
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `game_player_standings` (
+  `game_id` BIGINT UNSIGNED NOT NULL,
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `final_rank` INT UNSIGNED NULL DEFAULT NULL,
+  `eliminated_round` INT UNSIGNED NULL DEFAULT NULL,
+  `elimination_order` INT UNSIGNED NULL DEFAULT NULL,
+  `result_status` VARCHAR(20) NOT NULL DEFAULT 'active',
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`game_id`, `user_id`),
+  KEY `idx_game_player_standings_rank` (`game_id`, `final_rank`),
+  KEY `idx_game_player_standings_elimination_order` (`game_id`, `elimination_order`),
+  CONSTRAINT `fk_game_player_standings_game`
+    FOREIGN KEY (`game_id`) REFERENCES `games`(`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_game_player_standings_user`
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `game_actions` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `game_id` BIGINT UNSIGNED NOT NULL,
