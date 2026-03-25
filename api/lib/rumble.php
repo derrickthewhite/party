@@ -1719,51 +1719,115 @@ function rumble_record_eliminations(PDO $pdo, int $gameId, int $roundNumber, arr
     }
 }
 
-function rumble_finalize_standings_if_won(PDO $pdo, int $gameId, int $roundNumber): ?int
+function rumble_list_alive_players(PDO $pdo, int $gameId): array
 {
-    if (!rumble_has_standings_table()) {
-        return null;
-    }
-
-    rumble_ensure_standings_rows($pdo, $gameId);
-
     $aliveStmt = $pdo->prepare(
-        'SELECT gm.user_id, u.username FROM game_members gm '
+        'SELECT gm.user_id, u.username, COALESCE(rps.current_health, 100) AS current_health, rps.owned_abilities_json FROM game_members gm '
         . 'JOIN users u ON u.id = gm.user_id '
         . 'LEFT JOIN rumble_player_state rps ON rps.game_id = gm.game_id AND rps.user_id = gm.user_id '
         . 'WHERE gm.game_id = ? AND gm.role <> ? AND u.is_active = 1 AND COALESCE(rps.current_health, 100) > 0 '
-        . 'ORDER BY u.username ASC'
+        . 'ORDER BY u.username ASC, gm.user_id ASC'
     );
     $aliveStmt->execute([
         $gameId,
         'observer',
     ]);
-    $aliveRows = $aliveStmt->fetchAll();
-    if (count($aliveRows) !== 1) {
+
+    return $aliveStmt->fetchAll();
+}
+
+function rumble_round_end_winners(array $aliveRows, int $roundNumber): array
+{
+    if ($roundNumber !== 10) {
+        return [];
+    }
+
+    $winnerRows = [];
+    foreach ($aliveRows as $row) {
+        $ownedAbilityIds = rumble_parse_owned_abilities(isset($row['owned_abilities_json']) ? (string)$row['owned_abilities_json'] : null);
+        $abilitySet = array_fill_keys($ownedAbilityIds, true);
+        if (!isset($abilitySet['courier_mission'])) {
+            continue;
+        }
+
+        $winnerRows[] = $row;
+    }
+
+    return $winnerRows;
+}
+
+function rumble_finalize_standings(PDO $pdo, int $gameId, int $roundNumber, array $winnerRows): ?int
+{
+    if (!rumble_has_standings_table() || empty($winnerRows)) {
         return null;
     }
 
-    $winnerUserId = (int)$aliveRows[0]['user_id'];
-    $winnerUsername = (string)$aliveRows[0]['username'];
+    rumble_ensure_standings_rows($pdo, $gameId);
 
-    $standingsStmt = $pdo->prepare(
-        'SELECT gps.user_id, gps.elimination_order FROM game_player_standings gps '
-        . 'JOIN users u ON u.id = gps.user_id '
-        . 'WHERE gps.game_id = ? AND u.is_active = 1 '
-        . 'ORDER BY gps.elimination_order IS NULL ASC, gps.elimination_order DESC, u.username ASC, gps.user_id ASC'
-    );
-    $standingsStmt->execute([$gameId]);
-
-    $rankByUserId = [
-        $winnerUserId => 1,
-    ];
-    $nextRank = 2;
-    foreach ($standingsStmt->fetchAll() as $row) {
-        $userId = (int)$row['user_id'];
-        if ($userId === $winnerUserId) {
+    $winnerUserIds = [];
+    $winnerNames = [];
+    foreach ($winnerRows as $row) {
+        $winnerUserId = (int)$row['user_id'];
+        if (isset($winnerUserIds[$winnerUserId])) {
             continue;
         }
-        $rankByUserId[$userId] = $nextRank;
+
+        $winnerUserIds[$winnerUserId] = true;
+        $winnerNames[] = (string)$row['username'];
+    }
+
+    if (empty($winnerUserIds)) {
+        return null;
+    }
+
+    $standingsStmt = $pdo->prepare(
+        'SELECT gps.user_id, gps.elimination_order, u.username FROM game_player_standings gps '
+        . 'JOIN users u ON u.id = gps.user_id '
+        . 'WHERE gps.game_id = ? AND u.is_active = 1'
+    );
+    $standingsStmt->execute([$gameId]);
+    $standingRows = $standingsStmt->fetchAll();
+
+    $nonWinnerRows = [];
+    foreach ($standingRows as $row) {
+        $userId = (int)$row['user_id'];
+        if (isset($winnerUserIds[$userId])) {
+            continue;
+        }
+
+        $nonWinnerRows[] = $row;
+    }
+
+    usort($nonWinnerRows, static function (array $leftRow, array $rightRow): int {
+        $leftSurvived = $leftRow['elimination_order'] === null;
+        $rightSurvived = $rightRow['elimination_order'] === null;
+        if ($leftSurvived !== $rightSurvived) {
+            return $leftSurvived ? -1 : 1;
+        }
+
+        if (!$leftSurvived) {
+            $orderCompare = (int)$rightRow['elimination_order'] <=> (int)$leftRow['elimination_order'];
+            if ($orderCompare !== 0) {
+                return $orderCompare;
+            }
+        }
+
+        $nameCompare = strcasecmp((string)$leftRow['username'], (string)$rightRow['username']);
+        if ($nameCompare !== 0) {
+            return $nameCompare;
+        }
+
+        return (int)$leftRow['user_id'] <=> (int)$rightRow['user_id'];
+    });
+
+    $rankByUserId = [];
+    foreach (array_keys($winnerUserIds) as $winnerUserId) {
+        $rankByUserId[(int)$winnerUserId] = 1;
+    }
+
+    $nextRank = 2;
+    foreach ($nonWinnerRows as $row) {
+        $rankByUserId[(int)$row['user_id']] = $nextRank;
         $nextRank += 1;
     }
 
@@ -1773,11 +1837,14 @@ function rumble_finalize_standings_if_won(PDO $pdo, int $gameId, int $roundNumbe
     foreach ($rankByUserId as $userId => $rank) {
         $updateStandingStmt->execute([
             $rank,
-            $userId === $winnerUserId ? 'winner' : 'eliminated',
+            isset($winnerUserIds[$userId]) ? 'winner' : 'eliminated',
             $gameId,
             $userId,
         ]);
     }
+
+    sort($winnerNames, SORT_NATURAL | SORT_FLAG_CASE);
+    $winnerSummary = implode(', ', $winnerNames);
 
     $closeGameStmt = $pdo->prepare('UPDATE games SET status = ? WHERE id = ?');
     $closeGameStmt->execute([
@@ -1794,10 +1861,28 @@ function rumble_finalize_standings_if_won(PDO $pdo, int $gameId, int $roundNumbe
         $gameId,
         'battle',
         $roundNumber,
-        $winnerUsername,
+        $winnerSummary,
     ]);
 
-    return $winnerUserId;
+    ksort($winnerUserIds, SORT_NUMERIC);
+    return (int)array_key_first($winnerUserIds);
+}
+
+function rumble_finalize_standings_if_won(PDO $pdo, int $gameId, int $roundNumber): ?int
+{
+    if (!rumble_has_standings_table()) {
+        return null;
+    }
+
+    rumble_ensure_standings_rows($pdo, $gameId);
+
+    $aliveRows = rumble_list_alive_players($pdo, $gameId);
+    $winnerRows = rumble_round_end_winners($aliveRows, $roundNumber);
+    if (empty($winnerRows) && count($aliveRows) === 1) {
+        $winnerRows = [$aliveRows[0]];
+    }
+
+    return rumble_finalize_standings($pdo, $gameId, $roundNumber, $winnerRows);
 }
 
 function rumble_build_final_standings(int $gameId): ?array
@@ -1820,13 +1905,13 @@ function rumble_build_final_standings(int $gameId): ?array
         return null;
     }
 
-    $winnerName = '';
+    $winnerNames = [];
     $entries = [];
     foreach ($rows as $row) {
         $rank = (int)$row['final_rank'];
         $username = (string)$row['username'];
         if ($rank === 1) {
-            $winnerName = $username;
+            $winnerNames[] = $username;
         }
         $entries[] = [
             'user_id' => (int)$row['user_id'],
@@ -1839,7 +1924,7 @@ function rumble_build_final_standings(int $gameId): ?array
     }
 
     return [
-        'winner_name' => $winnerName,
+        'winner_name' => implode(', ', $winnerNames),
         'entries' => $entries,
     ];
 }

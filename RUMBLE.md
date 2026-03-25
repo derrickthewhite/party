@@ -125,7 +125,7 @@ Phase 2 uses a static library. Future phases can add custom ability authoring th
 25. Focused Defense: Choose one opponent. Halve attacks from that opponent this round.
 26. Turbo Generator: Passive. Your per-round Energy is Health + 10.
 27. McGuffin Generator: Triggered. At the start of round 3, gain 50 Health.
-28. Courier Mission: Win condition. If you are alive at end of round 10, you win.
+28. Courier Mission: Win condition. If you are alive at end of round 10, you win. If multiple Courier Mission owners survive round 10, they win jointly.
 29. Automated Repair Systems: Passive. Gain 5 Health each round, up to your starting maximum Health.
 30. Replicators: Passive. Gain 5 Health each round.
 31. Mining Rig: Spend 3X Energy. Gain X Health.

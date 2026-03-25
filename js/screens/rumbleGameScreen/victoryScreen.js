@@ -35,6 +35,15 @@ function placementLabel(rank, total) {
 	return 'Placement';
 }
 
+function winnerEntriesFromStandings(entries) {
+	const winners = entries.filter(function eachEntry(entry) {
+		return String(entry && entry.result_status ? entry.result_status : '') === 'winner'
+			|| Number(entry && entry.rank ? entry.rank : 0) === 1;
+	});
+
+	return winners.length > 0 ? winners : (entries[0] ? [entries[0]] : []);
+}
+
 export function createVictoryScreenController(context) {
 	const root = createNodeFromHtml(VICTORY_SCREEN_HTML);
 	const refs = collectRefs(root);
@@ -47,14 +56,22 @@ export function createVictoryScreenController(context) {
 		const hasStandings = entries.length > 0;
 		const active = new Set();
 		const total = entries.length;
-		const winner = hasStandings ? entries.find(function eachEntry(entry) {
-			return Number(entry.rank) === 1;
-		}) || entries[0] : null;
+		const winners = hasStandings ? winnerEntriesFromStandings(entries) : [];
+		const primaryWinner = winners[0] || null;
+		const winnerNames = winners.map(function eachWinner(entry) {
+			return String(entry.username || 'Winner');
+		});
+		const winnerShips = winners.map(function eachWinner(entry) {
+			return String(entry.ship_name || entry.username || 'Unknown');
+		});
+		const hasMultipleWinners = winners.length > 1;
 
 		root.style.display = hasStandings ? '' : 'none';
-		refs.winnerName.textContent = winner ? String(winner.username || 'Winner') : '';
-		refs.winnerShip.textContent = winner
-			? 'Ship: ' + String(winner.ship_name || winner.username || 'Unknown')
+		refs.winnerName.textContent = primaryWinner
+			? (hasMultipleWinners ? 'Winners: ' : '') + winnerNames.join(', ')
+			: '';
+		refs.winnerShip.textContent = primaryWinner
+			? (hasMultipleWinners ? 'Ships: ' : 'Ship: ') + winnerShips.join(', ')
 			: '';
 
 		entries.forEach(function eachEntry(entry, index) {
@@ -78,10 +95,13 @@ export function createVictoryScreenController(context) {
 			}
 
 			const rank = Math.max(1, Number(entry.rank || 0));
+			const isWinner = String(entry.result_status || '') === 'winner' || rank === 1;
 			rowRefs.rank.textContent = '#' + String(rank);
 			rowRefs.name.textContent = String(entry.username || 'Unknown');
 			rowRefs.ship.textContent = String(entry.ship_name || entry.username || 'Unknown');
-			rowRefs.placement.textContent = placementLabel(rank, total);
+			rowRefs.placement.textContent = isWinner && hasMultipleWinners
+				? 'Winner'
+				: placementLabel(rank, total);
 			rowRefs.turn.textContent = entry.eliminated_round === null
 				? 'Survived'
 				: 'Turn ' + String(Number(entry.eliminated_round || 0));
