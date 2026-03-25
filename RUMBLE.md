@@ -112,7 +112,7 @@ Phase 2 uses a static library. Future phases can add custom ability authoring th
 12. Heavy Guns: Passive. Each of your attacks deals +10 damage.
 13. Holoship: Passive. You cannot be targeted by attacks. At end of round, lose 5 Health.
 14. Hyperdrive: Burn 5 to enter or leave Hyperspace. In Hyperspace, you cannot attack or be attacked. If only one non-eliminated player remains outside Hyperspace, that player wins.
-15. Cloaking System: Spend 20 Energy and Burn 5. You cannot be attacked next round.
+15. Cloaking Field: Spend 20 Energy and Burn 5. You cannot be attacked next round.
 16. Shield Capacitors: Spend 10 Energy. Gain +20 Defense this round.
 17. Shield Boosters: Passive. Gain +20 Defense at the start of each round.
 18. Reflective Shield: Passive. Whenever you take attack damage, the attacker takes half that damage.

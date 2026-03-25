@@ -236,6 +236,7 @@ VALUES
     'is_enabled', JSON_OBJECT('type', 'bool', 'required', false)
   ), 1),
   ('activated_self_or_toggle', 'activated', JSON_OBJECT(
+    'target_user_id', JSON_OBJECT('type', 'int', 'required', false),
     'mode', JSON_OBJECT('type', 'string', 'required', false),
     'x_cost', JSON_OBJECT('type', 'int', 'required', false, 'min', 0),
     'is_enabled', JSON_OBJECT('type', 'bool', 'required', false)
@@ -307,7 +308,9 @@ VALUES
     'cost_formula', JSON_OBJECT('kind', 'variable_x'),
     'trigger_effect', JSON_OBJECT('kind', 'retaliation_floor_half_x')
   ), 1),
-  ('hailing_frequencies', 'Hailing Frequencies', 'utility_status', 'activated_self_or_toggle', JSON_ARRAY('utility', 'status', 'duel_lockout'), 'Choose one opponent. Next round, neither of you may attack the other. Not valid if only two players remain.', JSON_OBJECT(), 1),
+  ('hailing_frequencies', 'Hailing Frequencies', 'utility_status', 'activated_self_or_toggle', JSON_ARRAY('utility', 'status', 'duel_lockout'), 'Choose one opponent. Next round, neither of you may attack the other. Not valid if only two players remain.', JSON_OBJECT(
+    'target_policy', 'single_opponent'
+  ), 1),
   ('scheming', 'Scheming', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'retaliation', 'burn'), 'Burn 10. Choose one opponent. If that opponent attacks you this round, you ignore their largest attack and they take that much damage.', JSON_OBJECT(
     'target_policy', 'single_opponent',
     'health_burn', 10,
@@ -316,9 +319,12 @@ VALUES
   ('death_ray', 'Death Ray', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('attack', 'passive'), 'Passive. If you make exactly one attack this round, increase that attack by 50%.', JSON_OBJECT(), 1),
   ('heavy_guns', 'Heavy Guns', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('attack', 'passive'), 'Passive. Each of your attacks deals +10 damage.', JSON_OBJECT(), 1),
   ('holoship', 'Holoship', 'passive_modifier', 'round_end_effect', JSON_ARRAY('defense', 'passive', 'upkeep_cost'), 'Passive. You cannot be targeted by attacks. At end of round, lose 5 Health.', JSON_OBJECT(), 1),
-  ('hyperdrive', 'Hyperdrive', 'utility_status', 'activated_self_or_toggle', JSON_ARRAY('utility', 'status', 'burn', 'win_condition'), 'Burn 5 to enter or leave Hyperspace. In Hyperspace, you cannot attack or be attacked.', JSON_OBJECT(), 1),
-  ('cloaking_system', 'Cloaking System', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'delayed', 'burn'), 'Spend 20 Energy and Burn 5. You cannot be attacked next round.', JSON_OBJECT(
-    'cost_formula', JSON_OBJECT('kind', 'constant', 'value', 20)
+  ('hyperdrive', 'Hyperdrive', 'utility_status', 'activated_self_or_toggle', JSON_ARRAY('utility', 'status', 'burn', 'win_condition'), 'Burn 5 to enter or leave Hyperspace. In Hyperspace, you cannot attack or be attacked.', JSON_OBJECT(
+    'health_burn', 5
+  ), 1),
+  ('cloaking_field', 'Cloaking Field', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'delayed', 'burn'), 'Spend 20 Energy and Burn 5. You cannot be attacked next round.', JSON_OBJECT(
+    'cost_formula', JSON_OBJECT('kind', 'constant', 'value', 20),
+    'health_burn', 5
   ), 1),
   ('shield_capacitors', 'Shield Capacitors', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense'), 'Spend 10 Energy. Gain +20 Defense this round.', JSON_OBJECT(
     'cost_formula', JSON_OBJECT('kind', 'constant', 'value', 10)

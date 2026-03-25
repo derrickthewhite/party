@@ -121,6 +121,7 @@ export function createPlayersListController(context) {
 	function reconcile() {
 		const validation = context.getOrderValidation();
 		const selfPlayer = context.getSelfPlayer();
+		const selfCannotAttack = !!(selfPlayer && selfPlayer.cannot_attack);
 		if (!selfPlayer) {
 			refs.orderValidationText.textContent = '';
 			refs.orderValidationText.style.color = '';
@@ -183,6 +184,13 @@ export function createPlayersListController(context) {
 
 			if (!context.getLastPerms().can_act) {
 				rowRefs.label.textContent = 'Active';
+				rowRefs.label.style.display = '';
+				rowRefs.input.style.display = 'none';
+				return;
+			}
+
+			if (selfCannotAttack || player.can_be_attacked_by_self === false) {
+				rowRefs.label.textContent = 'Unavailable this round';
 				rowRefs.label.style.display = '';
 				rowRefs.input.style.display = 'none';
 				return;

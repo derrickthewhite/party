@@ -174,10 +174,14 @@ export function getOrderValidation(options) {
 
 	const players = Array.isArray(config.players) ? config.players : [];
 	const attackableTargets = {};
+	const abilityTargetableTargets = {};
 	players.forEach(function eachPlayer(player) {
 		const key = String(Number(player.user_id));
 		const isDefeated = !!player.is_defeated || Number(player.health || 0) <= 0;
-		if (!player.is_self && !isDefeated) {
+		if (!player.is_self && !isDefeated && player.is_opponent_targetable !== false) {
+			abilityTargetableTargets[key] = true;
+		}
+		if (!player.is_self && !isDefeated && player.can_be_attacked_by_self !== false) {
 			attackableTargets[key] = true;
 		}
 	});
@@ -217,7 +221,7 @@ export function getOrderValidation(options) {
 		}
 
 		const targetKey = String(Math.max(0, Number(activation.target_user_id || 0)));
-		if (!attackableTargets[targetKey]) {
+		if (!abilityTargetableTargets[targetKey]) {
 			invalidAbilityTargets.push(abilityKey);
 		}
 	});

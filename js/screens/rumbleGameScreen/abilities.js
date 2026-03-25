@@ -28,32 +28,33 @@ export function abilityCostFromDraft(ability, draftActivation) {
 		? ability.template_params
 		: {};
 	const xCost = Math.max(0, Math.floor(Number(activation.x_cost || 0)));
+	const healthBurn = Math.max(0, Math.floor(Number(params.health_burn || 0)));
 	const formulaCost = evaluateAbilityCostFormula(params.cost_formula, xCost);
 	if (formulaCost !== null) {
-		return formulaCost;
+		return formulaCost + healthBurn;
 	}
 
 	if (templateKey === 'activated_spend_with_target_policy') {
 		if (String(params.cost_mode || '') === 'variable') {
-			return xCost;
+			return xCost + healthBurn;
 		}
 
-		return 0;
+		return healthBurn;
 	}
 
 	if (templateKey === 'activated_defense_mode') {
 		if (Object.prototype.hasOwnProperty.call(activation, 'x_cost')) {
-			return xCost;
+			return xCost + healthBurn;
 		}
 
-		return 0;
+		return healthBurn;
 	}
 
 	if (templateKey === 'activated_self_or_toggle') {
-		return xCost;
+		return xCost + healthBurn;
 	}
 
-	return 0;
+	return healthBurn;
 }
 
 export function getAbilityControlSpec(ability) {
@@ -91,15 +92,17 @@ export function getAbilityControlSpec(ability) {
 		return {
 			showTarget: targetPolicy === 'single_opponent' || abilityId === 'focused_defense',
 			targetRequired: targetPolicy === 'single_opponent' || abilityId === 'focused_defense',
-			showXCost: costKind === 'variable_x' || costKind === 'scaled_x' || Object.prototype.hasOwnProperty.call(templateInputs, 'x_cost'),
+			showXCost: costKind === 'variable_x' || costKind === 'scaled_x',
 		};
 	}
 
 	if (templateKey === 'activated_self_or_toggle') {
+		const targetPolicy = String(params.target_policy || '');
+		const costKind = String(params && params.cost_formula && params.cost_formula.kind ? params.cost_formula.kind : '');
 		return {
-			showTarget: false,
-			targetRequired: false,
-			showXCost: abilityId !== 'hyperdrive' && Object.prototype.hasOwnProperty.call(templateInputs, 'x_cost'),
+			showTarget: targetPolicy === 'single_opponent',
+			targetRequired: targetPolicy === 'single_opponent',
+			showXCost: costKind === 'variable_x' || costKind === 'scaled_x',
 		};
 	}
 

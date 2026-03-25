@@ -157,7 +157,10 @@ export function createAbilityActivationController(context) {
 		}
 
 		const aliveTargets = context.serverSnapshot.players.filter(function eachPlayer(player) {
-			return !player.is_self && !player.is_defeated && Number(player.health || 0) > 0;
+			return !player.is_self
+				&& !player.is_defeated
+				&& Number(player.health || 0) > 0
+				&& player.is_opponent_targetable !== false;
 		});
 
 		const active = new Set();
