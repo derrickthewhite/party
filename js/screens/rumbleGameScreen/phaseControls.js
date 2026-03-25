@@ -1,5 +1,14 @@
-import { showConfirmModal } from '../dom.js';
+import { collectRefs, createNodeFromHtml, showConfirmModal } from '../dom.js';
 import { activationArrayToMap, normalizeAttacksMap, normalizeBidsMap } from './normalization.js';
+
+const PHASE_CONTROLS_HTML = `
+	<div class="row mobile-stack" data-ref="buttonRow" style="margin-top: 8px;">
+		<button class="primary" data-ref="submitBtn">Submit Bids</button>
+		<button data-ref="editBtn">Edit Bids</button>
+		<button data-ref="cancelBtn">Cancel Bids</button>
+		<button data-ref="phaseActionBtn">End Bidding</button>
+	</div>
+`;
 
 export function bindRefreshHandler(context) {
 	context.refreshBtn.addEventListener('click', function onRefreshClick() {
@@ -7,8 +16,11 @@ export function bindRefreshHandler(context) {
 	});
 }
 
-export function bindPhaseControlHandlers(context) {
-	context.submitBtn.addEventListener('click', async function onSubmitOrder() {
+export function createPhaseControlsController(context) {
+	const root = createNodeFromHtml(PHASE_CONTROLS_HTML);
+	const refs = collectRefs(root);
+
+	refs.submitBtn.addEventListener('click', async function onSubmitOrder() {
 		if (!context.getLastGameId() || !context.getLastPerms().can_act || context.isOrderBusy()) {
 			return;
 		}
@@ -69,7 +81,7 @@ export function bindPhaseControlHandlers(context) {
 		}
 	});
 
-	context.editBtn.addEventListener('click', function onEditOrders() {
+	refs.editBtn.addEventListener('click', function onEditOrders() {
 		if (!context.getLastPerms().can_act || context.isOrderBusy()) {
 			return;
 		}
@@ -98,7 +110,7 @@ export function bindPhaseControlHandlers(context) {
 		context.reconcileUi();
 	});
 
-	context.cancelBtn.addEventListener('click', async function onCancelOrder() {
+	refs.cancelBtn.addEventListener('click', async function onCancelOrder() {
 		if (!context.getLastGameId() || !context.getLastPerms().can_act || context.isOrderBusy()) {
 			return;
 		}
@@ -140,7 +152,7 @@ export function bindPhaseControlHandlers(context) {
 		}
 	});
 
-	context.phaseActionBtn.addEventListener('click', async function onPhaseAction() {
+	refs.phaseActionBtn.addEventListener('click', async function onPhaseAction() {
 		if (!context.getLastGameId() || !context.getLastPerms().can_delete || !context.getLastPerms().can_end_turn || context.isOrderBusy()) {
 			return;
 		}
@@ -197,4 +209,50 @@ export function bindPhaseControlHandlers(context) {
 			context.reconcileUi();
 		}
 	});
+
+	function reconcile() {
+		const canAct = !!context.getLastPerms().can_act;
+		const orderBusy = context.isOrderBusy();
+		if (context.isBiddingPhase()) {
+			const hasSubmitted = context.hasSubmittedBids();
+			refs.submitBtn.style.display = canAct && !(hasSubmitted && !context.uiState.isEditing) ? '' : 'none';
+			refs.submitBtn.textContent = hasSubmitted ? 'Save Bids' : 'Submit Bids';
+			refs.submitBtn.disabled = orderBusy || !canAct;
+
+			refs.editBtn.style.display = canAct && hasSubmitted && !context.uiState.isEditing ? '' : 'none';
+			refs.editBtn.textContent = 'Edit Bids';
+			refs.editBtn.disabled = orderBusy || !canAct;
+
+			refs.cancelBtn.style.display = canAct && hasSubmitted ? '' : 'none';
+			refs.cancelBtn.textContent = 'Cancel Bids';
+			refs.cancelBtn.disabled = orderBusy || !canAct;
+
+			refs.phaseActionBtn.style.display = context.getLastPerms().can_delete ? '' : 'none';
+			refs.phaseActionBtn.textContent = 'End Bidding';
+			refs.phaseActionBtn.disabled = orderBusy || !context.getLastPerms().can_end_turn;
+			return;
+		}
+
+		const hasSubmitted = context.hasSubmittedOrder();
+		refs.submitBtn.style.display = canAct && !(hasSubmitted && !context.uiState.isEditing) ? '' : 'none';
+		refs.submitBtn.textContent = hasSubmitted ? 'Save Orders' : 'Submit Orders';
+		refs.submitBtn.disabled = orderBusy || !canAct;
+
+		refs.editBtn.style.display = canAct && hasSubmitted && !context.uiState.isEditing ? '' : 'none';
+		refs.editBtn.textContent = 'Edit Orders';
+		refs.editBtn.disabled = orderBusy || !canAct;
+
+		refs.cancelBtn.style.display = canAct && hasSubmitted ? '' : 'none';
+		refs.cancelBtn.textContent = 'Cancel Orders';
+		refs.cancelBtn.disabled = orderBusy || !canAct;
+
+		refs.phaseActionBtn.style.display = context.getLastPerms().can_delete ? '' : 'none';
+		refs.phaseActionBtn.textContent = 'End Turn';
+		refs.phaseActionBtn.disabled = orderBusy || !context.getLastPerms().can_end_turn;
+	}
+
+	return {
+		root,
+		reconcile,
+	};
 }

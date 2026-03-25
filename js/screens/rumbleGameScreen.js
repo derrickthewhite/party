@@ -1,4 +1,4 @@
-import { collectRefs, createNodeFromHtml, createTemplate } from './dom.js';
+import { collectRefs, createNodeFromHtml } from './dom.js';
 import { createBaseGameScreen } from './gameScreen.js';
 import {
 	activationArrayToMap,
@@ -6,42 +6,13 @@ import {
 	normalizeAttacksMap,
 	normalizeBidsMap,
 } from './rumbleGameScreen/normalization.js';
-import {
-	ABILITY_ACTIVATION_ROW_TEMPLATE_HTML,
-	ABILITY_ROW_TEMPLATE_HTML,
-	ADMIN_CHEAT_ABILITY_ROW_TEMPLATE_HTML,
-	EVENT_LOG_TEMPLATE_HTML,
-	PLAYER_ROW_TEMPLATE_HTML,
-	PREVIOUS_ORDER_TEMPLATE_HTML,
-	RUMBLE_PANEL_HTML,
-} from './rumbleGameScreen/templates.js';
-import {
-	bindShipNameHandlers,
-	canEditShipName as canEditShipNameModule,
-	reconcileShipNameEditor as reconcileShipNameEditorModule,
-} from './rumbleGameScreen/shipName.js';
-import {
-	bindAdminCheatHandlers,
-	clearAdminCheatSelections as clearAdminCheatSelectionsModule,
-	ensureAdminCheatAbilityRow as ensureAdminCheatAbilityRowModule,
-	reconcileAdminCheatPanel as reconcileAdminCheatPanelModule,
-} from './rumbleGameScreen/adminCheatPanel.js';
-import { bindPhaseControlHandlers, bindRefreshHandler } from './rumbleGameScreen/phaseControls.js';
-import { ensureAbilityRow as ensureAbilityRowModule, reconcileAbilitiesList as reconcileAbilitiesListModule } from './rumbleGameScreen/biddingPanel.js';
-import {
-	ensurePlayerRow as ensurePlayerRowModule,
-	reconcileOwnedAbilities as reconcileOwnedAbilitiesModule,
-	reconcilePlayersList as reconcilePlayersListModule,
-} from './rumbleGameScreen/playersList.js';
-import {
-	ensureAbilityActivationRow as ensureAbilityActivationRowModule,
-	reconcileAbilityActivationList as reconcileAbilityActivationListModule,
-} from './rumbleGameScreen/abilityActivations.js';
-import {
-	ensureEventRow as ensureEventRowModule,
-	reconcileEventLogList as reconcileEventLogListModule,
-	reconcilePreviousOrdersList as reconcilePreviousOrdersListModule,
-} from './rumbleGameScreen/eventLogs.js';
+import { RUMBLE_PANEL_HTML } from './rumbleGameScreen/templates.js';
+import { canEditShipName as canEditShipNameModule, createShipNameController } from './rumbleGameScreen/shipName.js';
+import { createAdminCheatController } from './rumbleGameScreen/adminCheatPanel.js';
+import { bindRefreshHandler, createPhaseControlsController } from './rumbleGameScreen/phaseControls.js';
+import { createBiddingPanelController } from './rumbleGameScreen/biddingPanel.js';
+import { createCombatPanelController } from './rumbleGameScreen/combatPanel.js';
+import { createEventLogsController } from './rumbleGameScreen/eventLogs.js';
 import {
 	clearDraftDirty as clearRumbleDraftDirty,
 	getCheatEligiblePlayers as getCheatEligiblePlayersState,
@@ -56,96 +27,25 @@ import {
 	hasSubmittedBids as hasSubmittedBidsState,
 	hasSubmittedOrder as hasSubmittedOrderState,
 	isBiddingPhase as getIsBiddingPhase,
-	isDraftDirty as getIsDraftDirty,
 } from './rumbleGameScreen/state.js';
 import {
 	describeActivationReadonly as describeActivationReadonlyValidation,
 	describeOrder as describeOrderValidation,
-	getAttackTotal as getAttackTotalValidation,
-	getBidTotal as getBidTotalValidation,
 	getBidValidation as getBidValidationFromState,
-	getDraftActivationSummary as getDraftActivationSummaryValidation,
 	getOrderValidation as getOrderValidationFromState,
-	playerNameById as playerNameByIdValidation,
 } from './rumbleGameScreen/validation.js';
 
 export function createRumbleGameScreen(deps) {
 	const panel = createNodeFromHtml(RUMBLE_PANEL_HTML);
 	const refs = collectRefs(panel);
-	const abilityRowTemplate = createTemplate(ABILITY_ROW_TEMPLATE_HTML);
-	const playerRowTemplate = createTemplate(PLAYER_ROW_TEMPLATE_HTML);
-	const abilityActivationRowTemplate = createTemplate(ABILITY_ACTIVATION_ROW_TEMPLATE_HTML);
-	const adminCheatAbilityRowTemplate = createTemplate(ADMIN_CHEAT_ABILITY_ROW_TEMPLATE_HTML);
-	const previousOrderTemplate = createTemplate(PREVIOUS_ORDER_TEMPLATE_HTML);
-	const eventLogTemplate = createTemplate(EVENT_LOG_TEMPLATE_HTML);
 	const refreshBtn = refs.refreshBtn;
 	const phaseTitle = refs.phaseTitle;
 	const progressText = refs.progressText;
-	const shipNameRow = refs.shipNameRow;
-	const shipNameInput = refs.shipNameInput;
-	const saveShipNameBtn = refs.saveShipNameBtn;
-	const shipNameHint = refs.shipNameHint;
-	const adminCheatToggleRow = refs.adminCheatToggleRow;
-	const adminCheatToggleBtn = refs.adminCheatToggleBtn;
-	const adminCheatToggleHint = refs.adminCheatToggleHint;
-	const adminCheatPanel = refs.adminCheatPanel;
-	const adminCheatSummary = refs.adminCheatSummary;
-	const adminCheatHint = refs.adminCheatHint;
-	const adminCheatTargetSelect = refs.adminCheatTargetSelect;
-	const adminCheatSubmitBtn = refs.adminCheatSubmitBtn;
-	const adminCheatClearBtn = refs.adminCheatClearBtn;
-	const adminCheatAbilityList = refs.adminCheatAbilityList;
-	const adminCheatEmptyText = refs.adminCheatEmptyText;
-	const biddingPanel = refs.biddingPanel;
-	const bidHelpText = refs.bidHelpText;
-	const bidValidationText = refs.bidValidationText;
-	const abilitiesList = refs.abilitiesList;
-	const battlePanel = refs.battlePanel;
-	const defenseText = refs.defenseText;
-	const energyText = refs.energyText;
-	const attackHelpText = refs.attackHelpText;
-	const orderValidationText = refs.orderValidationText;
-	const playersList = refs.playersList;
-	const abilityActivationPanel = refs.abilityActivationPanel;
-	const abilityActivationHelpText = refs.abilityActivationHelpText;
-	const abilityValidationText = refs.abilityValidationText;
-	const abilityActivationList = refs.abilityActivationList;
-	const submitBtn = refs.submitBtn;
-	const editBtn = refs.editBtn;
-	const cancelBtn = refs.cancelBtn;
-	const phaseActionBtn = refs.phaseActionBtn;
-	const lastTurnList = refs.lastTurnList;
-	const emptyPreviousOrdersNode = refs.emptyPreviousOrdersNode;
-	const currentEventLogTitle = refs.currentEventLogTitle;
-	const currentEventLogList = refs.currentEventLogList;
-	const emptyCurrentEventLogNode = refs.emptyCurrentEventLogNode;
-	const previousEventLogTitle = refs.previousEventLogTitle;
-	const previousEventLogList = refs.previousEventLogList;
-	const emptyPreviousEventLogNode = refs.emptyPreviousEventLogNode;
 
 	panel.style.marginTop = '8px';
 	refs.headerSpacer.style.flex = '1';
-	bidHelpText.style.margin = '4px 0 8px 0';
-	bidValidationText.style.margin = '0 0 8px 0';
-	bidValidationText.style.fontWeight = '600';
-	defenseText.style.margin = '8px 0 6px 0';
-	defenseText.style.fontWeight = '600';
-	energyText.style.margin = '0 0 6px 0';
-	energyText.style.fontWeight = '600';
-	shipNameInput.style.flex = '1';
-	attackHelpText.style.margin = '4px 0 8px 0';
-	orderValidationText.style.margin = '0 0 8px 0';
-	orderValidationText.style.fontWeight = '600';
-	abilityActivationHelpText.style.margin = '4px 0 8px 0';
-	abilityValidationText.style.margin = '0 0 8px 0';
-	abilityValidationText.style.fontWeight = '600';
-	refs.buttonRow.style.marginTop = '8px';
-	refs.lastTurnTitle.style.marginTop = '10px';
-	currentEventLogTitle.style.marginTop = '10px';
-	previousEventLogTitle.style.marginTop = '10px';
 
 	let lastGameId = null;
-	let lastRound = 1;
 	let lastPerms = {};
 	let lastMemberRole = 'none';
 	let setStatusNode = function noop() {};
@@ -189,25 +89,44 @@ export function createRumbleGameScreen(deps) {
 		adminCheatExpanded: false,
 	};
 
-	const abilityRowsById = new Map();
-	const playerRowsById = new Map();
-	const abilityActivationRowsById = new Map();
-	const adminCheatAbilityRowsById = new Map();
-	const previousOrderRowsById = new Map();
-	const currentEventRowsById = new Map();
-	const previousEventRowsById = new Map();
-	const adminCheatTargetOptionByValue = new Map();
-
 	function isBiddingPhase() {
 		return getIsBiddingPhase(serverSnapshot);
 	}
 
-	function isDraftDirty() {
-		return getIsDraftDirty(serverSnapshot, localDraft);
-	}
-
 	function clearDraftDirty() {
 		clearRumbleDraftDirty(localDraft);
+	}
+
+	function getLastPerms() {
+		return lastPerms;
+	}
+
+	function getLastGameId() {
+		return lastGameId;
+	}
+
+	function isOrderBusy() {
+		return orderBusy;
+	}
+
+	function setOrderBusy(value) {
+		orderBusy = value;
+	}
+
+	function isShipNameBusy() {
+		return shipNameBusy;
+	}
+
+	function setShipNameBusy(value) {
+		shipNameBusy = value;
+	}
+
+	function isAdminCheatBusy() {
+		return adminCheatBusy;
+	}
+
+	function setAdminCheatBusy(value) {
+		adminCheatBusy = value;
 	}
 
 	function isAdminCheatVisible() {
@@ -229,10 +148,6 @@ export function createRumbleGameScreen(deps) {
 		return getSelectedCheatAbilityIdsState(localDraft);
 	}
 
-	function clearAdminCheatSelections() {
-		clearAdminCheatSelectionsModule({ localDraft });
-	}
-
 	function getSelfOwnedAbilities() {
 		return getSelfOwnedAbilitiesState(serverSnapshot);
 	}
@@ -241,22 +156,8 @@ export function createRumbleGameScreen(deps) {
 		return getEffectiveAbilityActivationMapState(serverSnapshot, localDraft, uiState);
 	}
 
-	function getDraftActivationSummary() {
-		return getDraftActivationSummaryValidation({
-			hasSubmittedOrder: hasSubmittedOrder(),
-			isEditing: uiState.isEditing,
-			currentOrder: serverSnapshot.currentOrder,
-			activationMap: getEffectiveAbilityActivationMap(),
-			selfOwnedAbilities: getSelfOwnedAbilities(),
-		});
-	}
-
 	function getEffectiveAbilityActivationArray() {
 		return getEffectiveAbilityActivationArrayState(serverSnapshot, localDraft, uiState);
-	}
-
-	function playerNameById(userId) {
-		return playerNameByIdValidation(serverSnapshot.players, userId);
 	}
 
 	function describeOrder(order) {
@@ -287,10 +188,6 @@ export function createRumbleGameScreen(deps) {
 		return getEffectiveBidsState(serverSnapshot, localDraft, uiState);
 	}
 
-	function getAttackTotal() {
-		return getAttackTotalValidation(getEffectiveAttacks());
-	}
-
 	function getOrderValidation() {
 		return getOrderValidationFromState({
 			canAct: !!lastPerms.can_act,
@@ -305,10 +202,6 @@ export function createRumbleGameScreen(deps) {
 		});
 	}
 
-	function getBidTotal() {
-		return getBidTotalValidation(getEffectiveBids());
-	}
-
 	function getBidValidation() {
 		return getBidValidationFromState({
 			offeredAbilities: serverSnapshot.offeredAbilities,
@@ -320,284 +213,125 @@ export function createRumbleGameScreen(deps) {
 		return canEditShipNameModule(lastMemberRole);
 	}
 
-	function reconcileShipNameEditor() {
-		reconcileShipNameEditorModule({
-			canEditShipName,
-			localDraft,
-			serverSnapshot,
-			shipNameRow,
-			shipNameHint,
-			shipNameInput,
-			saveShipNameBtn,
-			shipNameBusy,
-		});
-	}
-
-	function ensureAbilityRow(ability) {
-		return ensureAbilityRowModule({
-			abilityRowsById,
-			abilityRowTemplate,
-			abilitiesList,
-			localDraft,
-			reconcileUi,
-		}, ability);
-	}
-
-	function reconcileAbilitiesList() {
-		reconcileAbilitiesListModule({
-			abilityRowsById,
-			abilityRowTemplate,
-			abilitiesList,
-			serverSnapshot,
-			localDraft,
-			lastPerms,
-			uiState,
-			orderBusy,
-			reconcileUi,
-			hasSubmittedBids,
-		});
-	}
-
-	function ensurePlayerRow(player) {
-		return ensurePlayerRowModule({
-			playerRowsById,
-			playerRowTemplate,
-			playersList,
-			localDraft,
-			reconcileUi,
-		}, player);
-	}
-
-	function reconcileOwnedAbilities(refs, ownedAbilities) {
-		reconcileOwnedAbilitiesModule(refs, ownedAbilities);
-	}
-
-	function ensureAbilityActivationRow(ability) {
-		return ensureAbilityActivationRowModule({
-			abilityActivationRowsById,
-			abilityActivationRowTemplate,
-			abilityActivationList,
-			localDraft,
-			reconcileUi,
-		}, ability);
-	}
-
-	function ensureAdminCheatAbilityRow(ability) {
-		return ensureAdminCheatAbilityRowModule({
-			adminCheatAbilityRowsById,
-			adminCheatAbilityRowTemplate,
-			adminCheatAbilityList,
-			localDraft,
-			reconcileUi,
-		}, ability);
-	}
-
-	function reconcileAdminCheatPanel() {
-		reconcileAdminCheatPanelModule({
-			uiState,
-			localDraft,
-			serverSnapshot,
-			adminCheatBusy,
-			adminCheatToggleRow,
-			adminCheatToggleBtn,
-			adminCheatToggleHint,
-			adminCheatPanel,
-			adminCheatTargetSelect,
-			adminCheatTargetOptionByValue,
-			adminCheatAbilityRowsById,
-			adminCheatAbilityRowTemplate,
-			adminCheatAbilityList,
-			adminCheatHint,
-			adminCheatSummary,
-			adminCheatSubmitBtn,
-			adminCheatClearBtn,
-			adminCheatEmptyText,
-			isAdminCheatVisible,
-			getCheatEligiblePlayers,
-			getCheatTargetPlayer,
-			getSelectedCheatAbilityIds,
-			reconcileUi,
-		});
-	}
-
 	function describeActivationReadonly(ability, activationMap) {
 		return describeActivationReadonlyValidation(ability, activationMap, serverSnapshot.players);
 	}
 
-	function reconcileAbilityActivationList() {
-		reconcileAbilityActivationListModule({
-			abilityActivationRowsById,
-			abilityActivationRowTemplate,
-			abilityActivationList,
-			serverSnapshot,
-			localDraft,
-			uiState,
-			lastPerms,
-			orderBusy,
-			reconcileUi,
-			getSelfOwnedAbilities,
-			getEffectiveAbilityActivationMap,
-			isBiddingPhase,
-			describeActivationReadonly,
-		});
-	}
+	const shipNameController = createShipNameController({
+		api: deps.api,
+		localDraft,
+		serverSnapshot,
+		canEditShipName,
+		getLastGameId,
+		isShipNameBusy,
+		setShipNameBusy,
+		reconcileUi,
+		refreshRumbleState,
+		setStatusNode: function setControllerStatusNode(text, kind) {
+			setStatusNode(text, kind);
+		},
+	});
+	refs.shipNameMount.appendChild(shipNameController.root);
 
-	function ensureEventRow(eventListMap, key, listNode) {
-		return ensureEventRowModule({ eventLogTemplate }, eventListMap, key, listNode);
-	}
+	const biddingPanelController = createBiddingPanelController({
+		localDraft,
+		serverSnapshot,
+		uiState,
+		getLastPerms,
+		isOrderBusy,
+		reconcileUi,
+		hasSubmittedBids,
+		getBidValidation,
+	});
+	refs.biddingMount.appendChild(biddingPanelController.root);
 
-	function reconcileEventLogList(events, listNode, emptyNode, rowMap, labelPrefix) {
-		reconcileEventLogListModule({ eventLogTemplate }, {
-			events,
-			listNode,
-			emptyNode,
-			rowMap,
-			labelPrefix,
-		});
-	}
+	const combatPanelController = createCombatPanelController({
+		serverSnapshot,
+		localDraft,
+		uiState,
+		getLastPerms,
+		isOrderBusy,
+		reconcileUi,
+		hasSubmittedOrder,
+		getOrderValidation,
+		getSelfPlayer,
+		getSelfOwnedAbilities,
+		getEffectiveAbilityActivationMap,
+		isBiddingPhase,
+		describeActivationReadonly,
+	});
+	refs.battleMount.appendChild(combatPanelController.root);
 
-	function reconcilePlayersList() {
-		reconcilePlayersListModule({
-			playerRowsById,
-			playerRowTemplate,
-			playersList,
-			serverSnapshot,
-			localDraft,
-			lastPerms,
-			uiState,
-			orderBusy,
-			reconcileUi,
-			hasSubmittedOrder,
-		});
-	}
+	const phaseControlsController = createPhaseControlsController({
+		api: deps.api,
+		localDraft,
+		uiState,
+		serverSnapshot,
+		getBidValidation,
+		getOrderValidation,
+		getEffectiveAbilityActivationArray,
+		isBiddingPhase,
+		hasSubmittedBids,
+		hasSubmittedOrder,
+		clearDraftDirty,
+		refreshRumbleState,
+		reconcileUi,
+		setStatusNode: function setControllerStatusNode(text, kind) {
+			setStatusNode(text, kind);
+		},
+		getLastGameId,
+		getLastPerms,
+		isOrderBusy,
+		setOrderBusy,
+	});
+	refs.phaseControlsMount.appendChild(phaseControlsController.root);
 
-	function reconcilePreviousOrdersList() {
-		reconcilePreviousOrdersListModule({
-			serverSnapshot,
-			previousOrderRowsById,
-			previousOrderTemplate,
-			lastTurnList,
-			emptyPreviousOrdersNode,
-			describeOrder,
-		});
-	}
+	const eventLogsController = createEventLogsController({
+		serverSnapshot,
+		describeOrder,
+		isBiddingPhase,
+	});
+	refs.eventLogsMount.appendChild(eventLogsController.root);
+
+	const adminCheatController = createAdminCheatController({
+		api: deps.api,
+		uiState,
+		localDraft,
+		serverSnapshot,
+		isAdminCheatVisible,
+		getCheatEligiblePlayers,
+		getCheatTargetPlayer,
+		getSelectedCheatAbilityIds,
+		getLastGameId,
+		isAdminCheatBusy,
+		setAdminCheatBusy,
+		reconcileUi,
+		refreshRumbleState,
+		setStatusNode: function setControllerStatusNode(text, kind) {
+			setStatusNode(text, kind);
+		},
+	});
+	refs.adminCheatMount.appendChild(adminCheatController.root);
 
 	function reconcileUi() {
-		const canAct = !!lastPerms.can_act;
 		const bidding = isBiddingPhase();
-		reconcileShipNameEditor();
-		reconcileAdminCheatPanel();
-
-		biddingPanel.style.display = bidding ? '' : 'none';
-		battlePanel.style.display = bidding ? 'none' : '';
-		lastTurnList.style.display = bidding ? 'none' : '';
-		refs.lastTurnTitle.style.display = bidding ? 'none' : '';
-		currentEventLogTitle.style.display = bidding ? 'none' : '';
-		currentEventLogList.style.display = bidding ? 'none' : '';
-		previousEventLogTitle.style.display = bidding ? 'none' : '';
-		previousEventLogList.style.display = bidding ? 'none' : '';
+		shipNameController.reconcile();
+		adminCheatController.reconcile();
+		phaseControlsController.reconcile();
+		biddingPanelController.setVisible(bidding);
+		combatPanelController.setVisible(!bidding);
 
 		if (bidding) {
 			phaseTitle.textContent = 'Rumble Bidding';
 			progressText.textContent = 'Bidding submissions: ' + serverSnapshot.submittedCount + '/' + serverSnapshot.participantCount;
-
-			const bidValidation = getBidValidation();
-			if (bidValidation.invalidAbilityIds.length > 0) {
-				bidValidationText.textContent = 'Bids are invalid: one or more offered abilities are unavailable.';
-				bidValidationText.style.color = '#b42318';
-			} else {
-				bidValidationText.textContent = 'Total bid: ' + bidValidation.totalBid;
-				bidValidationText.style.color = '';
-			}
-
-			const hasSubmitted = hasSubmittedBids();
-			submitBtn.style.display = canAct && !(hasSubmitted && !uiState.isEditing) ? '' : 'none';
-			submitBtn.textContent = hasSubmitted ? 'Save Bids' : 'Submit Bids';
-			submitBtn.disabled = orderBusy || !canAct;
-
-			editBtn.style.display = canAct && hasSubmitted && !uiState.isEditing ? '' : 'none';
-			editBtn.textContent = 'Edit Bids';
-			editBtn.disabled = orderBusy || !canAct;
-
-			cancelBtn.style.display = canAct && hasSubmitted ? '' : 'none';
-			cancelBtn.textContent = 'Cancel Bids';
-			cancelBtn.disabled = orderBusy || !canAct;
-
-			phaseActionBtn.style.display = lastPerms.can_delete ? '' : 'none';
-			phaseActionBtn.textContent = 'End Bidding';
-			phaseActionBtn.disabled = orderBusy || !lastPerms.can_end_turn;
-
-			reconcileAbilitiesList();
-			return;
-		}
-
-		phaseTitle.textContent = 'Rumble Combat';
-		progressText.textContent = 'Round ' + serverSnapshot.roundNumber + ' players submitted: ' + serverSnapshot.submittedCount + '/' + serverSnapshot.participantCount;
-
-		const selfPlayer = getSelfPlayer();
-		const validation = getOrderValidation();
-		if (!selfPlayer) {
-			defenseText.textContent = 'Defense: n/a';
-			orderValidationText.textContent = '';
-			orderValidationText.style.color = '';
-		} else if (validation.invalidDefense) {
-			defenseText.textContent = 'Defense: ' + validation.defense + ' (invalid: defense cannot be negative)';
-			orderValidationText.textContent = 'Orders are invalid: total attacks exceed your available power.';
-			orderValidationText.style.color = '#b42318';
+			biddingPanelController.reconcile();
 		} else {
-			defenseText.textContent = 'Defense: ' + validation.defense;
-			if (validation.invalidTargets.length > 0) {
-				orderValidationText.textContent = 'Orders are invalid: remove attacks assigned to defeated or unavailable players.';
-				orderValidationText.style.color = '#b42318';
-			} else {
-				orderValidationText.textContent = '';
-				orderValidationText.style.color = '';
-			}
+			phaseTitle.textContent = 'Rumble Combat';
+			progressText.textContent = 'Round ' + serverSnapshot.roundNumber + ' players submitted: ' + serverSnapshot.submittedCount + '/' + serverSnapshot.participantCount;
+			combatPanelController.reconcile();
 		}
 
-		const hasSubmitted = hasSubmittedOrder();
-		submitBtn.style.display = canAct && !(hasSubmitted && !uiState.isEditing) ? '' : 'none';
-		submitBtn.textContent = hasSubmitted ? 'Save Orders' : 'Submit Orders';
-		submitBtn.disabled = orderBusy || !canAct;
-
-		editBtn.style.display = canAct && hasSubmitted && !uiState.isEditing ? '' : 'none';
-		editBtn.textContent = 'Edit Orders';
-		editBtn.disabled = orderBusy || !canAct;
-
-		cancelBtn.style.display = canAct && hasSubmitted ? '' : 'none';
-		cancelBtn.textContent = 'Cancel Orders';
-		cancelBtn.disabled = orderBusy || !canAct;
-
-		phaseActionBtn.style.display = lastPerms.can_delete ? '' : 'none';
-		phaseActionBtn.textContent = 'End Turn';
-		phaseActionBtn.disabled = orderBusy || !lastPerms.can_end_turn;
-
-		reconcilePlayersList();
-		reconcilePreviousOrdersList();
-		reconcileAbilityActivationList();
-		reconcileEventLogList(serverSnapshot.currentRoundEventLog, currentEventLogList, emptyCurrentEventLogNode, currentEventRowsById, 'Current Round');
-		reconcileEventLogList(serverSnapshot.previousRoundEventLog, previousEventLogList, emptyPreviousEventLogNode, previousEventRowsById, 'Previous Round');
-
-		energyText.textContent = 'Energy: ' + validation.energyBudget
-			+ ' | Attacks: ' + validation.attackEnergySpent
-			+ ' | Abilities: ' + validation.abilityEnergySpent
-			+ ' | Remaining: ' + validation.remainingEnergy;
-
-		if (validation.invalidAbilityTargets.length > 0) {
-			abilityValidationText.textContent = 'Ability activation invalid: one or more targets are defeated or unavailable.';
-			abilityValidationText.style.color = '#b42318';
-		} else if (validation.missingAbilityTargets.length > 0) {
-			abilityValidationText.textContent = 'Ability activation invalid: choose targets for enabled targeted abilities.';
-			abilityValidationText.style.color = '#b42318';
-		} else if (validation.invalidEnergy) {
-			abilityValidationText.textContent = 'Energy invalid: total attack + ability spend exceeds your round energy budget.';
-			abilityValidationText.style.color = '#b42318';
-		} else {
-			abilityValidationText.textContent = '';
-			abilityValidationText.style.color = '';
-		}
-
-		abilityActivationPanel.style.display = '';
+		eventLogsController.reconcile();
 	}
 
 	function applyServerSnapshot(game) {
@@ -632,7 +366,6 @@ export function createRumbleGameScreen(deps) {
 			: '';
 
 		const phaseChanged = phaseMode !== serverSnapshot.phaseMode;
-
 		const roundChanged = roundNumber !== serverSnapshot.roundNumber;
 		const hadOrder = !!serverSnapshot.currentOrder;
 		const hasOrderNow = !!nextOrder;
@@ -715,7 +448,6 @@ export function createRumbleGameScreen(deps) {
 			localDraft.abilityActivations = activationArrayToMap(nextOrder.ability_activations || []);
 		}
 
-		lastRound = roundNumber;
 		reconcileUi();
 	}
 
@@ -802,84 +534,6 @@ export function createRumbleGameScreen(deps) {
 	bindRefreshHandler({
 		refreshBtn,
 		refreshRumbleState,
-	});
-
-	bindShipNameHandlers({
-		api: deps.api,
-		localDraft,
-		shipNameInput,
-		saveShipNameBtn,
-		canEditShipName,
-		getLastGameId: function getLastGameId() {
-			return lastGameId;
-		},
-		isShipNameBusy: function isShipNameBusy() {
-			return shipNameBusy;
-		},
-		setShipNameBusy: function setShipNameBusy(value) {
-			shipNameBusy = value;
-		},
-		reconcileUi,
-		refreshRumbleState,
-		setStatusNode,
-	});
-
-	bindAdminCheatHandlers({
-		api: deps.api,
-		uiState,
-		localDraft,
-		adminCheatTargetSelect,
-		adminCheatToggleBtn,
-		adminCheatClearBtn,
-		adminCheatSubmitBtn,
-		isAdminCheatVisible,
-		getCheatTargetPlayer,
-		getSelectedCheatAbilityIds,
-		clearAdminCheatSelections,
-		getLastGameId: function getLastGameId() {
-			return lastGameId;
-		},
-		isAdminCheatBusy: function isAdminCheatBusy() {
-			return adminCheatBusy;
-		},
-		setAdminCheatBusy: function setAdminCheatBusy(value) {
-			adminCheatBusy = value;
-		},
-		reconcileUi,
-		refreshRumbleState,
-		setStatusNode,
-	});
-
-	bindPhaseControlHandlers({
-		api: deps.api,
-		localDraft,
-		uiState,
-		serverSnapshot,
-		submitBtn,
-		editBtn,
-		cancelBtn,
-		phaseActionBtn,
-		getBidValidation,
-		getOrderValidation,
-		getEffectiveAbilityActivationArray,
-		isBiddingPhase,
-		hasSubmittedBids,
-		clearDraftDirty,
-		refreshRumbleState,
-		reconcileUi,
-		setStatusNode,
-		getLastGameId: function getLastGameId() {
-			return lastGameId;
-		},
-		getLastPerms: function getLastPerms() {
-			return lastPerms;
-		},
-		isOrderBusy: function isOrderBusy() {
-			return orderBusy;
-		},
-		setOrderBusy: function setOrderBusy(value) {
-			orderBusy = value;
-		},
 	});
 
 	return screen;
