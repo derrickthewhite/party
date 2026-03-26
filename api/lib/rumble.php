@@ -11,264 +11,14 @@ declare(strict_types=1);
  */
 function rumble_default_ability_library(): array
 {
-    return [
-        'meson_beam' => [
-            'id' => 'meson_beam',
-            'name' => 'Meson Beam',
-            'template_type' => 'activated_attack',
-            'tags' => ['attack', 'single_target', 'unblockable'],
-            'text_short' => 'Spend 10 Energy. Deal 5 unblockable damage to one opponent.',
-        ],
-        'heavy_meson_beam' => [
-            'id' => 'heavy_meson_beam',
-            'name' => 'Heavy Meson Beam',
-            'template_type' => 'activated_attack',
-            'tags' => ['attack', 'single_target', 'unblockable'],
-            'text_short' => 'Spend 20 Energy. Deal 10 unblockable damage to one opponent.',
-        ],
-        'ion_beam' => [
-            'id' => 'ion_beam',
-            'name' => 'Ion Beam',
-            'template_type' => 'activated_attack',
-            'tags' => ['attack', 'single_target', 'defense_only'],
-            'text_short' => 'Spend 10 Energy. Deal 20 defense-only damage to one opponent.',
-        ],
-        'loitering_munitions' => [
-            'id' => 'loitering_munitions',
-            'name' => 'Loitering Munitions',
-            'template_type' => 'activated_attack',
-            'tags' => ['attack', 'single_target', 'delayed'],
-            'text_short' => 'Spend X Energy. At the start of next round, deal X damage to one opponent.',
-        ],
-        'torpedo_bays' => [
-            'id' => 'torpedo_bays',
-            'name' => 'Torpedo Bays',
-            'template_type' => 'activated_attack_modifier',
-            'tags' => ['attack', 'delayed', 'modifier'],
-            'text_short' => 'Spend X Energy. Next round, add X bonus damage to one attack.',
-            'template_params' => [
-                'target_policy' => 'none',
-                'cost_mode' => 'variable',
-                'cost_formula' => ['kind' => 'variable_x'],
-                'effect_formula' => ['kind' => 'next_round_bonus_attack_x'],
-            ],
-        ],
-        'efficient_targeting' => [
-            'id' => 'efficient_targeting',
-            'name' => 'Efficient Targeting',
-            'template_type' => 'activated_attack_modifier',
-            'tags' => ['attack', 'cost_reduction'],
-            'text_short' => 'Spend 10 Energy. Your second-largest attack this round costs 0 Energy.',
-            'template_params' => [
-                'target_policy' => 'none',
-                'cost_mode' => 'fixed',
-                'cost_formula' => ['kind' => 'constant', 'value' => 10],
-                'effect_formula' => ['kind' => 'second_largest_attack_free'],
-            ],
-        ],
-        'phase_bomb' => [
-            'id' => 'phase_bomb',
-            'name' => 'Phase Bomb',
-            'template_type' => 'activated_attack',
-            'tags' => ['attack', 'aoe'],
-            'text_short' => 'Spend X Energy. Deal floor(X/2) damage to all other opponents.',
-        ],
-        'mine_layer' => [
-            'id' => 'mine_layer',
-            'name' => 'Mine Layer',
-            'template_type' => 'activated_defense',
-            'template_key' => 'activated_defense_mode',
-            'tags' => ['defense', 'retaliation'],
-            'text_short' => 'Spend X Energy. This round, each player who attacks you takes floor(X/2) damage.',
-            'template_params' => [
-                'cost_formula' => ['kind' => 'variable_x'],
-                'trigger_effect' => ['kind' => 'retaliation_floor_half_x'],
-            ],
-        ],
-        'hailing_frequencies' => [
-            'id' => 'hailing_frequencies',
-            'name' => 'Hailing Frequencies',
-            'template_type' => 'utility_status',
-            'tags' => ['utility', 'status', 'duel_lockout'],
-            'text_short' => 'Choose one opponent. Next round, neither of you may attack the other. Not valid if only two players remain.',
-            'template_params' => [
-                'target_policy' => 'single_opponent',
-            ],
-        ],
-        'scheming' => [
-            'id' => 'scheming',
-            'name' => 'Scheming',
-            'template_type' => 'activated_defense',
-            'template_key' => 'activated_defense_mode',
-            'tags' => ['defense', 'retaliation', 'burn'],
-            'text_short' => 'Burn 10. Choose one opponent. If that opponent attacks you this round, you ignore their largest attack and they take that much damage.',
-            'template_params' => [
-                'target_policy' => 'single_opponent',
-                'health_burn' => 10,
-                'trigger_effect' => ['kind' => 'scheming_reflect_largest_attack'],
-            ],
-        ],
-        'death_ray' => [
-            'id' => 'death_ray',
-            'name' => 'Death Ray',
-            'template_type' => 'passive_modifier',
-            'tags' => ['attack', 'passive'],
-            'text_short' => 'Passive. If you make exactly one attack this round, increase that attack by 50%.',
-        ],
-        'heavy_guns' => [
-            'id' => 'heavy_guns',
-            'name' => 'Heavy Guns',
-            'template_type' => 'passive_modifier',
-            'tags' => ['attack', 'passive'],
-            'text_short' => 'Passive. Each of your attacks deals +10 damage.',
-        ],
-        'holoship' => [
-            'id' => 'holoship',
-            'name' => 'Holoship',
-            'template_type' => 'passive_modifier',
-            'tags' => ['defense', 'passive', 'upkeep_cost'],
-            'text_short' => 'Passive. You cannot be targeted by attacks. At end of round, lose 5 Health.',
-        ],
-        'hyperdrive' => [
-            'id' => 'hyperdrive',
-            'name' => 'Hyperdrive',
-            'template_type' => 'utility_status',
-            'tags' => ['utility', 'status', 'burn', 'win_condition'],
-            'text_short' => 'Burn 5 to enter or leave Hyperspace. In Hyperspace, you cannot attack or be attacked.',
-            'template_params' => [
-                'health_burn' => 5,
-            ],
-        ],
-        'cloaking_field' => [
-            'id' => 'cloaking_field',
-            'name' => 'Cloaking Field',
-            'template_type' => 'activated_defense',
-            'tags' => ['defense', 'delayed', 'burn'],
-            'text_short' => 'Spend 20 Energy and Burn 5. You cannot be attacked next round.',
-            'template_params' => [
-                'cost_formula' => ['kind' => 'constant', 'value' => 20],
-                'health_burn' => 5,
-            ],
-        ],
-        'shield_capacitors' => [
-            'id' => 'shield_capacitors',
-            'name' => 'Shield Capacitors',
-            'template_type' => 'activated_defense',
-            'tags' => ['defense'],
-            'text_short' => 'Spend 10 Energy. Gain +20 Defense this round.',
-        ],
-        'shield_boosters' => [
-            'id' => 'shield_boosters',
-            'name' => 'Shield Boosters',
-            'template_type' => 'round_start_effect',
-            'tags' => ['defense', 'passive'],
-            'text_short' => 'Passive. Gain +20 Defense at the start of each round.',
-        ],
-        'reflective_shield' => [
-            'id' => 'reflective_shield',
-            'name' => 'Reflective Shield',
-            'template_type' => 'trigger_on_attacked',
-            'tags' => ['defense', 'retaliation', 'passive'],
-            'text_short' => 'Passive. Whenever you take attack damage, the attacker takes half that damage.',
-        ],
-        'energy_absorption' => [
-            'id' => 'energy_absorption',
-            'name' => 'Energy Absorption',
-            'template_type' => 'round_start_effect',
-            'tags' => ['resource', 'delayed'],
-            'text_short' => 'Spend 10 Energy. At the start of next round, gain Energy equal to half the damage your Defense blocked this round.',
-        ],
-        'armor' => [
-            'id' => 'armor',
-            'name' => 'Armor',
-            'template_type' => 'passive_modifier',
-            'tags' => ['defense', 'passive'],
-            'text_short' => 'Passive. Reduce each incoming attack by 5.',
-        ],
-        'heavy_armor' => [
-            'id' => 'heavy_armor',
-            'name' => 'Heavy Armor',
-            'template_type' => 'passive_modifier',
-            'tags' => ['defense', 'passive'],
-            'text_short' => 'Passive. Reduce each incoming attack by 10.',
-        ],
-        'backup_generator' => [
-            'id' => 'backup_generator',
-            'name' => 'Backup Generator',
-            'template_type' => 'trigger_on_defeat',
-            'tags' => ['survival', 'single_use'],
-            'text_short' => 'Triggered. If reduced to 0 Health, lose this ability and set Health to 30.',
-        ],
-        'escape_pods' => [
-            'id' => 'escape_pods',
-            'name' => 'Escape Pods',
-            'template_type' => 'trigger_on_defeat',
-            'tags' => ['survival', 'single_use'],
-            'text_short' => 'Triggered. If reduced to 0 Health, lose this ability and set Health to 20.',
-        ],
-        'nimble_dodge' => [
-            'id' => 'nimble_dodge',
-            'name' => 'Nimble Dodge',
-            'template_type' => 'activated_defense',
-            'tags' => ['defense', 'single_attack_negation'],
-            'text_short' => 'Spend 10 Energy. Negate the largest attack against you this round. Not valid if only two players remain.',
-        ],
-        'focused_defense' => [
-            'id' => 'focused_defense',
-            'name' => 'Focused Defense',
-            'template_type' => 'activated_defense',
-            'tags' => ['defense', 'single_opponent'],
-            'text_short' => 'Choose one opponent. Halve attacks from that opponent this round.',
-        ],
-        'turbo_generator' => [
-            'id' => 'turbo_generator',
-            'name' => 'Turbo Generator',
-            'template_type' => 'passive_modifier',
-            'tags' => ['resource', 'passive'],
-            'text_short' => 'Passive. Your per-round Energy is Health + 10.',
-        ],
-        'mcguffin_generator' => [
-            'id' => 'mcguffin_generator',
-            'name' => 'McGuffin Generator',
-            'template_type' => 'trigger_on_round',
-            'tags' => ['healing', 'timed_trigger'],
-            'text_short' => 'Triggered. At the start of round 3, gain 50 Health.',
-        ],
-        'courier_mission' => [
-            'id' => 'courier_mission',
-            'name' => 'Courier Mission',
-            'template_type' => 'win_condition',
-            'tags' => ['win_condition'],
-            'text_short' => 'Win condition. If you are alive at end of round 10, you win.',
-        ],
-        'automated_repair_systems' => [
-            'id' => 'automated_repair_systems',
-            'name' => 'Automated Repair Systems',
-            'template_type' => 'round_start_effect',
-            'tags' => ['healing', 'passive'],
-            'text_short' => 'Passive. Gain 5 Health each round, up to your starting maximum Health.',
-        ],
-        'replicators' => [
-            'id' => 'replicators',
-            'name' => 'Replicators',
-            'template_type' => 'round_start_effect',
-            'tags' => ['healing', 'passive'],
-            'text_short' => 'Passive. Gain 5 Health each round.',
-        ],
-        'mining_rig' => [
-            'id' => 'mining_rig',
-            'name' => 'Mining Rig',
-            'template_type' => 'activated_utility',
-            'tags' => ['healing', 'resource_conversion'],
-            'text_short' => 'Spend 3X Energy. Gain X Health.',
-            'template_params' => [
-                'target_policy' => 'none',
-                'cost_mode' => 'variable',
-                'cost_formula' => ['kind' => 'scaled_x', 'multiplier' => 3],
-                'effect_formula' => ['kind' => 'heal_x'],
-            ],
-        ],
-    ];
+    /*
+    Intentionally disabled.
+
+    Rumble gameplay numbers and authored runtime metadata must come from
+    rumble_ability_definitions.template_params_json in the database, not from
+    PHP fallback constants.
+    */
+    return [];
 }
 
 function rumble_ability_library(): array
@@ -336,7 +86,7 @@ function rumble_ability_library(): array
             return $cached;
         }
     } catch (Throwable $ignored) {
-        // Fall back to built-in defaults when migration tables are unavailable.
+        // DB-backed ability definitions are required; the built-in fallback is disabled.
     }
 
     $cached = rumble_default_ability_library();
@@ -476,7 +226,6 @@ function rumble_ability_template_key(array $ability): string
         return $explicitTemplateKey;
     }
 
-    $abilityId = (string)($ability['id'] ?? '');
     $type = (string)($ability['template_type'] ?? '');
     $tags = array_values(array_map(static fn ($v): string => (string)$v, (array)($ability['tags'] ?? [])));
     $tagSet = array_fill_keys($tags, true);
@@ -502,7 +251,7 @@ function rumble_ability_template_key(array $ability): string
     if ($type === 'activated_defense') {
         return 'activated_defense_mode';
     }
-    if ($type === 'utility_status' || $abilityId === 'hyperdrive') {
+    if ($type === 'utility_status') {
         return 'activated_self_or_toggle';
     }
     if ($type === 'activated_attack' || $type === 'activated_attack_modifier' || $type === 'activated_utility') {
@@ -513,113 +262,9 @@ function rumble_ability_template_key(array $ability): string
 
 function rumble_ability_template_params(array $ability): array
 {
-    if (isset($ability['template_params']) && is_array($ability['template_params'])) {
-        return $ability['template_params'];
-    }
-
-    $abilityId = (string)($ability['id'] ?? '');
-    $type = (string)($ability['template_type'] ?? '');
-    $tags = array_values(array_map(static fn ($v): string => (string)$v, (array)($ability['tags'] ?? [])));
-    $tagSet = array_fill_keys($tags, true);
-    $templateKey = rumble_ability_template_key($ability);
-
-    if ($templateKey === 'activated_spend_with_target_policy') {
-        $costFormulaByAbilityId = [
-            'meson_beam' => ['kind' => 'constant', 'value' => 10],
-            'heavy_meson_beam' => ['kind' => 'constant', 'value' => 20],
-            'ion_beam' => ['kind' => 'constant', 'value' => 10],
-            'efficient_targeting' => ['kind' => 'constant', 'value' => 10],
-            'loitering_munitions' => ['kind' => 'variable_x'],
-            'torpedo_bays' => ['kind' => 'variable_x'],
-            'phase_bomb' => ['kind' => 'variable_x'],
-            'mining_rig' => ['kind' => 'scaled_x', 'multiplier' => 3],
-        ];
-        $costFormula = $costFormulaByAbilityId[$abilityId] ?? null;
-        if ($costFormula === null && preg_match('/Spend\s+\d*X/i', (string)($ability['text_short'] ?? '')) === 1) {
-            $costFormula = ['kind' => 'variable_x'];
-        }
-        $params = [
-            'target_policy' => isset($tagSet['aoe']) ? 'all_other_players' : (isset($tagSet['single_target']) ? 'single_opponent' : 'optional_target'),
-            'cost_mode' => in_array((string)($costFormula['kind'] ?? ''), ['variable_x', 'scaled_x'], true) ? 'variable' : 'fixed',
-            'cost_formula' => $costFormula,
-            'effect_formula' => null,
-        ];
-        if ($abilityId === 'meson_beam') {
-            $params['effect_formula'] = ['kind' => 'damage_constant', 'value' => 5, 'channel' => 'unblockable'];
-        } elseif ($abilityId === 'heavy_meson_beam') {
-            $params['effect_formula'] = ['kind' => 'damage_constant', 'value' => 10, 'channel' => 'unblockable'];
-        } elseif ($abilityId === 'phase_bomb') {
-            $params['effect_formula'] = ['kind' => 'damage_floor_half_x', 'channel' => 'normal'];
-        }
-        return $params;
-    }
-
-    if ($templateKey === 'activated_defense_mode') {
-        $costFormulaByAbilityId = [
-            'shield_capacitors' => ['kind' => 'constant', 'value' => 10],
-            'nimble_dodge' => ['kind' => 'constant', 'value' => 10],
-            'cloaking_field' => ['kind' => 'constant', 'value' => 20],
-            'mine_layer' => ['kind' => 'variable_x'],
-        ];
-        $params = [
-            'cost_formula' => $costFormulaByAbilityId[$abilityId] ?? null,
-        ];
-        if ($abilityId === 'scheming') {
-            $params['target_policy'] = 'single_opponent';
-            $params['health_burn'] = 10;
-        }
-        if ($abilityId === 'cloaking_field') {
-            $params['health_burn'] = 5;
-        }
-        return $params;
-    }
-
-    if ($templateKey === 'activated_self_or_toggle') {
-        $params = [];
-        if ($abilityId === 'hyperdrive') {
-            $params['health_burn'] = 5;
-        }
-        if ($abilityId === 'hailing_frequencies') {
-            $params['target_policy'] = 'single_opponent';
-        }
-        return $params;
-    }
-    if ($templateKey === 'trigger_on_defeat_single_use') {
-        return [
-            'trigger' => 'on_defeat',
-            'single_use' => true,
-            'restore_health' => $abilityId === 'backup_generator' ? 30 : 20,
-        ];
-    }
-
-    if ($templateKey === 'passive_modifier_round') {
-        if ($abilityId === 'armor') {
-            return ['reduction_per_attack' => 5];
-        }
-        if ($abilityId === 'heavy_armor') {
-            return ['reduction_per_attack' => 10];
-        }
-    }
-
-    if ($templateKey === 'condition_tracker') {
-        if ($type === 'trigger_on_round') {
-            return [
-                'evaluation_window' => 'round_start',
-                'round_number' => 3,
-                'outcome' => ['kind' => 'heal_constant', 'value' => 50],
-            ];
-        }
-        if ($type === 'win_condition') {
-            return [
-                'evaluation_window' => 'round_end',
-                'round_number' => 10,
-                'condition' => 'owner_alive',
-                'outcome' => ['kind' => 'declare_winner'],
-            ];
-        }
-    }
-
-    return [];
+    return isset($ability['template_params']) && is_array($ability['template_params'])
+        ? $ability['template_params']
+        : [];
 }
 
 function rumble_ability_public_view(array $ability): array
@@ -838,6 +483,113 @@ function rumble_apply_runtime_state_to_targeting_maps(array $state, int $ownerUs
             $blockedAttackTargetsByUser[$targetUserId][$ownerUserId] = true;
         }
     }
+}
+
+function rumble_runtime_formula_value(array $formula, array $activation = []): ?float
+{
+    $kind = trim((string)($formula['kind'] ?? ''));
+    if ($kind === 'constant') {
+        return (float)($formula['value'] ?? 0);
+    }
+
+    $xCost = max(0, (int)($activation['x_cost'] ?? 0));
+    if ($kind === 'variable_x') {
+        return (float)$xCost;
+    }
+    if ($kind === 'scaled_x') {
+        return (float)($xCost * (float)($formula['multiplier'] ?? 0));
+    }
+
+    return null;
+}
+
+function rumble_apply_runtime_state_to_battle_context(array $state, int $ownerUserId, ?int $targetUserId, array &$untargetableByUser, array &$cannotAttackByUser, array &$blockedAttackTargetsByUser, array &$nimbleDodgeByUser): void
+{
+    if ((string)($state['state_key'] ?? '') === 'negate_largest_incoming_attack') {
+        $nimbleDodgeByUser[$ownerUserId] = true;
+        return;
+    }
+
+    rumble_apply_runtime_state_to_targeting_maps($state, $ownerUserId, $targetUserId, $untargetableByUser, $cannotAttackByUser, $blockedAttackTargetsByUser);
+}
+
+function rumble_apply_runtime_activation_effect(array $effect, int $ownerUserId, ?int $targetUserId, array $activation, array &$untargetableByUser, array &$cannotAttackByUser, array &$blockedAttackTargetsByUser, array &$nimbleDodgeByUser, array &$focusedDefenseByUser, array &$activatedDefenseBonusByUser, array &$mineLayerDamageByUser, array &$schemingTargetByUser, array &$effectPayload): void
+{
+    $kind = trim((string)($effect['kind'] ?? ''));
+    if ($kind === 'grant_state' && isset($effect['state']) && is_array($effect['state'])) {
+        rumble_apply_runtime_state_to_battle_context((array)$effect['state'], $ownerUserId, $targetUserId, $untargetableByUser, $cannotAttackByUser, $blockedAttackTargetsByUser, $nimbleDodgeByUser);
+        $effectPayload['granted_state'] = (string)($effect['state']['state_key'] ?? 'unknown');
+        return;
+    }
+
+    if ($kind === 'add_defense_bonus') {
+        $formula = is_array($effect['formula'] ?? null) ? (array)$effect['formula'] : [];
+        $value = rumble_runtime_formula_value($formula, $activation);
+        if ($value !== null) {
+            $activatedDefenseBonusByUser[$ownerUserId] = max(0, (int)($activatedDefenseBonusByUser[$ownerUserId] ?? 0)) + (int)floor($value);
+            $effectPayload['applied_defense_bonus'] = (int)floor($value);
+        }
+        return;
+    }
+
+    if ($kind === 'set_retaliation_damage') {
+        $formula = is_array($effect['formula'] ?? null) ? (array)$effect['formula'] : [];
+        $value = rumble_runtime_formula_value($formula, $activation);
+        if ($value !== null) {
+            $mineLayerDamageByUser[$ownerUserId] = max(0, (int)($mineLayerDamageByUser[$ownerUserId] ?? 0)) + (int)floor($value);
+            $effectPayload['retaliation_per_attacker'] = (int)floor($value);
+        }
+        return;
+    }
+
+    if ($kind === 'set_reflect_largest_attack_target' && $targetUserId !== null && $targetUserId > 0) {
+        $schemingTargetByUser[$ownerUserId] = $targetUserId;
+        $effectPayload['scheming_target_user_id'] = $targetUserId;
+        return;
+    }
+
+    if ($kind === 'modify_incoming_attacks' && $targetUserId !== null && $targetUserId > 0) {
+        $modifier = is_array($effect['modifier'] ?? null) ? (array)$effect['modifier'] : [];
+        $formula = is_array($modifier['formula'] ?? null) ? (array)$modifier['formula'] : [];
+        $value = rumble_runtime_formula_value($formula, $activation);
+        if ((string)($modifier['stat'] ?? '') === 'incoming_attack_damage'
+            && (string)($modifier['operation'] ?? '') === 'multiply'
+            && $value !== null
+        ) {
+            $focusedDefenseByUser[$ownerUserId][$targetUserId] = (float)$value;
+            $effectPayload['incoming_attack_multiplier'] = (float)$value;
+            $effectPayload['focused_attacker_user_id'] = $targetUserId;
+        }
+    }
+}
+
+function rumble_append_runtime_scheduled_effect(array $effect, int $gameId, int $roundNumber, int $ownerUserId, ?int $targetUserId, string $abilityId, array &$roundEffectRows): bool
+{
+    if ((string)($effect['kind'] ?? '') !== 'schedule_state' || !isset($effect['state']) || !is_array($effect['state'])) {
+        return false;
+    }
+
+    $state = (array)$effect['state'];
+    $stateKey = trim((string)($state['state_key'] ?? 'state'));
+    $roundEffectRows[] = [
+        'game_id' => $gameId,
+        'round_number' => $roundNumber + 1,
+        'owner_user_id' => $ownerUserId,
+        'target_user_id' => $targetUserId,
+        'ability_instance_id' => null,
+        'effect_key' => 'status:' . $stateKey,
+        'trigger_timing' => 'round_start',
+        'payload' => [
+            'schema_version' => 1,
+            'effect_kind' => 'state_instance',
+            'source_ability_id' => $abilityId,
+            'state' => $state,
+        ],
+        'is_resolved' => 0,
+        'resolved_at' => null,
+    ];
+
+    return true;
 }
 
 function rumble_offer_item_key(int $index, string $abilityId): string
@@ -1591,10 +1343,32 @@ function rumble_activation_energy_cost(array $activation, bool $strict = false):
 
     $templateKey = rumble_ability_template_key($ability);
     $params = rumble_ability_template_params($ability);
+    $contract = rumble_ability_runtime_contract($ability);
     $xCost = max(0, (int)($activation['x_cost'] ?? 0));
     $healthBurn = max(0, (int)($params['health_burn'] ?? 0));
     $costFormula = is_array($params['cost_formula'] ?? null) ? (array)$params['cost_formula'] : [];
     $costFormulaKind = trim((string)($costFormula['kind'] ?? ''));
+
+    $activationContract = is_array($contract['activation'] ?? null) ? (array)$contract['activation'] : [];
+    if ($activationContract !== []) {
+        $totalCost = 0;
+        foreach ((array)($activationContract['costs'] ?? []) as $cost) {
+            if (!is_array($cost)) {
+                continue;
+            }
+            $formula = is_array($cost['formula'] ?? null) ? (array)$cost['formula'] : [];
+            $formulaKind = trim((string)($formula['kind'] ?? ''));
+            if (in_array($formulaKind, ['variable_x', 'scaled_x'], true) && !array_key_exists('x_cost', $activation) && $strict) {
+                throw new InvalidArgumentException('x_cost is required for this variable-cost ability.');
+            }
+            $value = rumble_runtime_formula_value($formula, $activation);
+            if ($value !== null) {
+                $totalCost += (int)floor($value);
+            }
+        }
+        return max(0, $totalCost);
+    }
+
     if (in_array($costFormulaKind, ['variable_x', 'scaled_x'], true) && !array_key_exists('x_cost', $activation) && $strict) {
         throw new InvalidArgumentException('x_cost is required for this variable-cost ability.');
     }
@@ -1634,7 +1408,7 @@ function rumble_fetch_round_start_effects(int $gameId, int $roundNumber): array
 {
     try {
         $stmt = db()->prepare(
-            'SELECT id, owner_user_id, target_user_id, payload FROM rumble_round_effects '
+            'SELECT id, owner_user_id, target_user_id, effect_key, payload FROM rumble_round_effects '
             . 'WHERE game_id = :game_id AND round_number = :round_number AND trigger_timing = :timing AND is_resolved = 0'
         );
         $stmt->execute([
@@ -3441,7 +3215,6 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
     $reflectiveShieldByUser = [];
     $defeatRestoreHealthByUser = [];
     $roundEndUpkeepHealthLossByUser = [];
-    $hyperspaceByUser = [];
     $preRoundEffectRows = [];
 
     foreach ($playerRows as $row) {
@@ -3520,7 +3293,6 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
         $reflectiveShieldByUser[$userId] = isset($abilitySet['reflective_shield']);
         $defeatRestoreHealthByUser[$userId] = isset($abilitySet['backup_generator']) ? 30 : (isset($abilitySet['escape_pods']) ? 20 : 0);
         $roundEndUpkeepHealthLossByUser[$userId] = isset($abilitySet['holoship']) ? 5 : 0;
-        $hyperspaceByUser[$userId] = false;
 
         $preRoundEffectRows[] = [
             'game_id' => $gameId,
@@ -3558,6 +3330,7 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
     $untargetableByUser = array_replace($untargetableByUser, (array)($roundTargetingState['untargetable_by_user'] ?? []));
     $cannotAttackByUser = array_replace(array_fill_keys(array_keys($healthByUser), false), (array)($roundTargetingState['cannot_attack_by_user'] ?? []));
     $blockedAttackTargetsByUser = array_replace(array_fill_keys(array_keys($healthByUser), []), (array)($roundTargetingState['blocked_attack_targets_by_user'] ?? []));
+    $activePersistentRoundStartEffectsByUser = [];
     $roundStartEffectIdsToResolve = [];
     foreach ($pendingRoundStartEffects as $effectRow) {
         $effectId = (int)($effectRow['id'] ?? 0);
@@ -3573,34 +3346,7 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
         }
 
         $scheduledState = rumble_runtime_state_from_payload($payload, $ownerUserId, $targetUserId);
-        if ((string)($payload['effect'] ?? '') === 'cloaked_until_round_end') {
-            $roundEffectRows[] = [
-                'game_id' => $gameId,
-                'round_number' => $roundNumber,
-                'owner_user_id' => $ownerUserId,
-                'target_user_id' => null,
-                'ability_instance_id' => null,
-                'effect_key' => 'step2:scheduled_status',
-                'trigger_timing' => 'resolve',
-                'payload' => ['effect' => 'cloaked_until_round_end', 'state' => $scheduledState],
-                'is_resolved' => 1,
-                'resolved_at' => gmdate('Y-m-d H:i:s'),
-            ];
-        } elseif ((string)($payload['effect'] ?? '') === 'hyperspace_active') {
-            $hyperspaceByUser[$ownerUserId] = true;
-            $roundEffectRows[] = [
-                'game_id' => $gameId,
-                'round_number' => $roundNumber,
-                'owner_user_id' => $ownerUserId,
-                'target_user_id' => null,
-                'ability_instance_id' => null,
-                'effect_key' => 'step2:scheduled_status',
-                'trigger_timing' => 'resolve',
-                'payload' => ['effect' => 'hyperspace_active', 'state' => $scheduledState],
-                'is_resolved' => 1,
-                'resolved_at' => gmdate('Y-m-d H:i:s'),
-            ];
-        } elseif ((string)($payload['effect'] ?? '') === 'hailing_lockout') {
+        if ($scheduledState !== null) {
             $roundEffectRows[] = [
                 'game_id' => $gameId,
                 'round_number' => $roundNumber,
@@ -3609,10 +3355,20 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                 'ability_instance_id' => null,
                 'effect_key' => 'step2:scheduled_status',
                 'trigger_timing' => 'resolve',
-                'payload' => ['effect' => 'hailing_lockout', 'state' => $scheduledState],
+                'payload' => ['effect' => (string)($payload['effect'] ?? ''), 'state' => $scheduledState],
                 'is_resolved' => 1,
                 'resolved_at' => gmdate('Y-m-d H:i:s'),
             ];
+
+            $duration = is_array($scheduledState['duration'] ?? null) ? (array)$scheduledState['duration'] : [];
+            $sourceAbilityId = rumble_canonical_ability_id((string)($payload['source_ability_id'] ?? ''));
+            if ((string)($duration['kind'] ?? '') === 'until_removed' && $sourceAbilityId !== '') {
+                $activePersistentRoundStartEffectsByUser[$ownerUserId][$sourceAbilityId] = [
+                    'target_user_id' => $targetUserId,
+                    'effect_key' => (string)($effectRow['effect_key'] ?? ''),
+                    'payload' => $payload,
+                ];
+            }
         }
 
         $roundStartEffectIdsToResolve[] = $effectId;
@@ -3653,11 +3409,11 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
     $efficientTargetingByUser = [];
     $mineLayerDamageByUser = [];
     $schemingTargetByUser = [];
-    $hyperdriveActivatedByUser = [];
     $retaliationDamageByUser = [];
+    $toggleActivatedByUser = [];
     foreach ($healthByUser as $userId => $health) {
         $retaliationDamageByUser[$userId] = 0;
-        $hyperdriveActivatedByUser[$userId] = false;
+        $toggleActivatedByUser[$userId] = [];
     }
 
     foreach ($orderRows as $row) {
@@ -3717,6 +3473,8 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
 
             $templateKey = rumble_ability_template_key($ability);
             $templateParams = rumble_ability_template_params($ability);
+            $runtimeContract = rumble_ability_runtime_contract($ability);
+            $activationContract = is_array($runtimeContract['activation'] ?? null) ? (array)$runtimeContract['activation'] : [];
             $effectPayload = ['ability_id' => $abilityId, 'activation' => $activation, 'cost' => $activationCost];
             $healthBurn = max(0, (int)($templateParams['health_burn'] ?? 0));
             if ($healthBurn > 0) {
@@ -3724,7 +3482,34 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                 $effectPayload['health_burn'] = $healthBurn;
             }
 
-            if ($templateKey === 'activated_spend_with_target_policy') {
+            if ($activationContract !== []) {
+                $activationKind = trim((string)($activationContract['kind'] ?? 'activated'));
+                $isActiveToggle = !empty($activePersistentRoundStartEffectsByUser[$userId][$abilityId]);
+                if ($activationKind === 'toggle') {
+                    $toggleActivatedByUser[$userId][$abilityId] = true;
+                    $effectPayload['mode'] = $isActiveToggle ? 'deactivate' : 'activate';
+                }
+
+                foreach ((array)($activationContract['effects'] ?? []) as $effect) {
+                    if (!is_array($effect)) {
+                        continue;
+                    }
+                    rumble_apply_runtime_activation_effect($effect, $userId, $targetId > 0 ? $targetId : null, $activation, $untargetableByUser, $cannotAttackByUser, $blockedAttackTargetsByUser, $nimbleDodgeByUser, $focusedDefenseByUser, $activatedDefenseBonusByUser, $mineLayerDamageByUser, $schemingTargetByUser, $effectPayload);
+                }
+
+                if (!$isActiveToggle) {
+                    $scheduledAny = false;
+                    foreach ((array)($activationContract['scheduled_effects'] ?? []) as $effect) {
+                        if (!is_array($effect)) {
+                            continue;
+                        }
+                        $scheduledAny = rumble_append_runtime_scheduled_effect($effect, $gameId, $roundNumber, $userId, $targetId > 0 ? $targetId : null, $abilityId, $roundEffectRows) || $scheduledAny;
+                    }
+                    if ($scheduledAny) {
+                        $effectPayload['scheduled_for_round'] = $roundNumber + 1;
+                    }
+                }
+            } elseif ($templateKey === 'activated_spend_with_target_policy') {
                 $effectFormula = (array)($templateParams['effect_formula'] ?? []);
                 $effectKind = (string)($effectFormula['kind'] ?? '');
                 if ($effectKind === 'damage_constant' && $targetId > 0) {
@@ -3763,91 +3548,6 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                     $effectPayload['enabled'] = true;
                 }
             } elseif ($templateKey === 'activated_defense_mode') {
-                if ($abilityId === 'shield_capacitors') {
-                    $activatedDefenseBonusByUser[$userId] = max(0, (int)($activatedDefenseBonusByUser[$userId] ?? 0)) + 20;
-                    $effectPayload['applied_defense_bonus'] = 20;
-                } elseif ($abilityId === 'nimble_dodge') {
-                    $nimbleDodgeByUser[$userId] = true;
-                    $effectPayload['enabled'] = true;
-                } elseif ($abilityId === 'focused_defense' && $targetId > 0) {
-                    $focusedDefenseByUser[$userId][$targetId] = true;
-                    $effectPayload['focused_attacker_user_id'] = $targetId;
-                } elseif ($abilityId === 'cloaking_field') {
-                    $roundEffectRows[] = [
-                        'game_id' => $gameId,
-                        'round_number' => $roundNumber + 1,
-                        'owner_user_id' => $userId,
-                        'target_user_id' => null,
-                        'ability_instance_id' => null,
-                        'effect_key' => 'status:cloaked',
-                        'trigger_timing' => 'round_start',
-                        'payload' => [
-                            'schema_version' => 1,
-                            'effect_kind' => 'state_instance',
-                            'effect' => 'cloaked_until_round_end',
-                            'source_ability_id' => $abilityId,
-                            'state' => rumble_runtime_state('untargetable', 'self', rumble_runtime_selector('owner'), rumble_runtime_duration('current_round', ['starts_at' => 'round_start', 'ends_at' => 'round_end'])),
-                        ],
-                        'is_resolved' => 0,
-                        'resolved_at' => null,
-                    ];
-                    $effectPayload['scheduled_for_round'] = $roundNumber + 1;
-                } elseif ($abilityId === 'mine_layer') {
-                    $x = max(0, (int)($activation['x_cost'] ?? 0));
-                    $mineLayerDamageByUser[$userId] = max(0, (int)($mineLayerDamageByUser[$userId] ?? 0)) + (int)floor($x / 2);
-                    $effectPayload['retaliation_per_attacker'] = (int)floor($x / 2);
-                } elseif ($abilityId === 'scheming' && $targetId > 0) {
-                    $schemingTargetByUser[$userId] = $targetId;
-                    $effectPayload['scheming_target_user_id'] = $targetId;
-                }
-            } elseif ($templateKey === 'activated_self_or_toggle') {
-                if ($abilityId === 'hyperdrive') {
-                    $hyperdriveActivatedByUser[$userId] = true;
-                    if (!$hyperspaceByUser[$userId]) {
-                        $roundEffectRows[] = [
-                            'game_id' => $gameId,
-                            'round_number' => $roundNumber + 1,
-                            'owner_user_id' => $userId,
-                            'target_user_id' => null,
-                            'ability_instance_id' => null,
-                            'effect_key' => 'status:hyperspace',
-                            'trigger_timing' => 'round_start',
-                            'payload' => [
-                                'schema_version' => 1,
-                                'effect_kind' => 'state_instance',
-                                'effect' => 'hyperspace_active',
-                                'source_ability_id' => $abilityId,
-                                'state' => rumble_runtime_state('hyperspace_active', 'self', rumble_runtime_selector('owner'), rumble_runtime_duration('until_removed', ['starts_at' => 'round_start', 'ends_at' => 'manual_toggle'])),
-                            ],
-                            'is_resolved' => 0,
-                            'resolved_at' => null,
-                        ];
-                        $effectPayload['scheduled_for_round'] = $roundNumber + 1;
-                        $effectPayload['mode'] = 'enter_hyperspace';
-                    } else {
-                        $effectPayload['mode'] = 'leave_hyperspace';
-                    }
-                } elseif ($abilityId === 'hailing_frequencies' && $targetId > 0) {
-                    $roundEffectRows[] = [
-                        'game_id' => $gameId,
-                        'round_number' => $roundNumber + 1,
-                        'owner_user_id' => $userId,
-                        'target_user_id' => $targetId,
-                        'ability_instance_id' => null,
-                        'effect_key' => 'status:hailing_lockout',
-                        'trigger_timing' => 'round_start',
-                        'payload' => [
-                            'schema_version' => 1,
-                            'effect_kind' => 'state_instance',
-                            'effect' => 'hailing_lockout',
-                            'source_ability_id' => $abilityId,
-                            'state' => rumble_runtime_state('blocked_target_pair', 'pair', rumble_runtime_selector('owner'), rumble_runtime_duration('current_round', ['starts_at' => 'round_start', 'ends_at' => 'round_end']), ['relation' => 'symmetric']),
-                        ],
-                        'is_resolved' => 0,
-                        'resolved_at' => null,
-                    ];
-                    $effectPayload['scheduled_for_round'] = $roundNumber + 1;
-                }
             }
 
             $roundEffectRows[] = [
@@ -3945,8 +3645,9 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                 $attackDamage = (int)floor($attackDamage * 1.5);
             }
 
-            if (!empty($focusedDefenseByUser[$targetId][$userId])) {
-                $attackDamage = (int)floor($attackDamage / 2);
+            $incomingAttackMultiplier = (float)($focusedDefenseByUser[$targetId][$userId] ?? 1.0);
+            if ($incomingAttackMultiplier > 0.0 && $incomingAttackMultiplier !== 1.0) {
+                $attackDamage = (int)floor($attackDamage * $incomingAttackMultiplier);
             }
 
             if ($attackDamage > 0) {
@@ -3960,22 +3661,26 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
         $totalEnergySpentByUser[$userId] = $attackEnergySpentByUser[$userId] + $abilityEnergySpentByUser[$userId];
         $defenseByUser[$userId] = max(0, $health - $used);
 
-        if (!empty($hyperspaceByUser[$userId]) && empty($hyperdriveActivatedByUser[$userId])) {
+        foreach ((array)($activePersistentRoundStartEffectsByUser[$userId] ?? []) as $sourceAbilityId => $persistentEffect) {
+            if (!empty(($toggleActivatedByUser[$userId] ?? [])[$sourceAbilityId])) {
+                continue;
+            }
+
+            $persistentPayload = is_array($persistentEffect['payload'] ?? null) ? (array)$persistentEffect['payload'] : [];
+            if (!isset($persistentPayload['state']) || !is_array($persistentPayload['state'])) {
+                continue;
+            }
+
+            $persistentState = (array)$persistentPayload['state'];
             $roundEffectRows[] = [
                 'game_id' => $gameId,
                 'round_number' => $roundNumber + 1,
                 'owner_user_id' => $userId,
-                'target_user_id' => null,
+                'target_user_id' => isset($persistentEffect['target_user_id']) && $persistentEffect['target_user_id'] !== null ? (int)$persistentEffect['target_user_id'] : null,
                 'ability_instance_id' => null,
-                'effect_key' => 'status:hyperspace',
+                'effect_key' => (string)($persistentEffect['effect_key'] ?? ('status:' . (string)($persistentState['state_key'] ?? 'state'))),
                 'trigger_timing' => 'round_start',
-                'payload' => [
-                    'schema_version' => 1,
-                    'effect_kind' => 'state_instance',
-                    'effect' => 'hyperspace_active',
-                    'source_ability_id' => 'hyperdrive',
-                    'state' => rumble_runtime_state('hyperspace_active', 'self', rumble_runtime_selector('owner'), rumble_runtime_duration('until_removed', ['starts_at' => 'round_start', 'ends_at' => 'manual_toggle'])),
-                ],
+                'payload' => $persistentPayload,
                 'is_resolved' => 0,
                 'resolved_at' => null,
             ];

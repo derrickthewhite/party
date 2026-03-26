@@ -325,16 +325,71 @@ VALUES
     'effect_formula', JSON_OBJECT('kind', 'damage_floor_half_x', 'channel', 'normal')
   ), 1),
   ('mine_layer', 'Mine Layer', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'retaliation'), 'Spend X Energy. This round, each player who attacks you takes floor(X/2) damage.', JSON_OBJECT(
-    'cost_formula', JSON_OBJECT('kind', 'variable_x'),
-    'trigger_effect', JSON_OBJECT('kind', 'retaliation_floor_half_x')
+    'schema_version', 1,
+    'activation', JSON_OBJECT(
+      'kind', 'activated',
+      'targeting', JSON_OBJECT('policy', 'none', 'required', false, 'filters', JSON_ARRAY(), 'relation', 'one_way'),
+      'costs', JSON_ARRAY(JSON_OBJECT('resource', 'energy', 'formula', JSON_OBJECT('kind', 'variable_x'), 'timing', 'on_activate')),
+      'effects', JSON_ARRAY(JSON_OBJECT(
+        'kind', 'set_retaliation_damage',
+        'formula', JSON_OBJECT('kind', 'scaled_x', 'multiplier', 0.5)
+      )),
+      'scheduled_effects', JSON_ARRAY(),
+      'mode_options', JSON_ARRAY()
+    ),
+    'passive', JSON_ARRAY(),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY(),
+    'consumption', JSON_ARRAY(),
+    'limits', JSON_ARRAY(),
+    'ui', JSON_ARRAY()
   ), 1),
   ('hailing_frequencies', 'Hailing Frequencies', 'utility_status', 'activated_self_or_toggle', JSON_ARRAY('utility', 'status', 'duel_lockout'), 'Choose one opponent. Next round, neither of you may attack the other. Not valid if only two players remain.', JSON_OBJECT(
-    'target_policy', 'single_opponent'
+    'schema_version', 1,
+    'activation', JSON_OBJECT(
+      'kind', 'activated',
+      'targeting', JSON_OBJECT('policy', 'single_opponent', 'required', true, 'filters', JSON_ARRAY(), 'relation', 'symmetric'),
+      'costs', JSON_ARRAY(),
+      'effects', JSON_ARRAY(),
+      'scheduled_effects', JSON_ARRAY(JSON_OBJECT(
+        'kind', 'schedule_state',
+        'state', JSON_OBJECT(
+          'state_key', 'blocked_target_pair',
+          'scope', 'pair',
+          'selector', JSON_OBJECT('subject', 'activation_target', 'filters', JSON_ARRAY()),
+          'duration', JSON_OBJECT('kind', 'current_round', 'starts_at', 'round_start', 'ends_at', 'round_end'),
+          'stacking', 'replace',
+          'visibility', 'public',
+          'relation', 'symmetric'
+        )
+      )),
+      'mode_options', JSON_ARRAY()
+    ),
+    'passive', JSON_ARRAY(),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY(),
+    'consumption', JSON_ARRAY(),
+    'limits', JSON_ARRAY(),
+    'ui', JSON_ARRAY()
   ), 1),
   ('scheming', 'Scheming', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'retaliation', 'burn'), 'Burn 10. Choose one opponent. If that opponent attacks you this round, you ignore their largest attack and they take that much damage.', JSON_OBJECT(
-    'target_policy', 'single_opponent',
-    'health_burn', 10,
-    'trigger_effect', JSON_OBJECT('kind', 'scheming_reflect_largest_attack')
+    'schema_version', 1,
+    'activation', JSON_OBJECT(
+      'kind', 'activated',
+      'targeting', JSON_OBJECT('policy', 'single_opponent', 'required', true, 'filters', JSON_ARRAY(), 'relation', 'one_way'),
+      'costs', JSON_ARRAY(JSON_OBJECT('resource', 'health', 'formula', JSON_OBJECT('kind', 'constant', 'value', 10), 'timing', 'on_activate')),
+      'effects', JSON_ARRAY(JSON_OBJECT(
+        'kind', 'set_reflect_largest_attack_target'
+      )),
+      'scheduled_effects', JSON_ARRAY(),
+      'mode_options', JSON_ARRAY()
+    ),
+    'passive', JSON_ARRAY(),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY(),
+    'consumption', JSON_ARRAY(),
+    'limits', JSON_ARRAY(),
+    'ui', JSON_ARRAY()
   ), 1),
   ('death_ray', 'Death Ray', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('attack', 'passive'), 'Passive. If you make exactly one attack this round, increase that attack by 50%.', JSON_OBJECT(), 1),
   ('heavy_guns', 'Heavy Guns', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('attack', 'passive'), 'Passive. Each of your attacks deals +10 damage.', JSON_OBJECT(), 1),
@@ -357,14 +412,81 @@ VALUES
     'conditions', JSON_ARRAY()
   ), 1),
   ('hyperdrive', 'Hyperdrive', 'utility_status', 'activated_self_or_toggle', JSON_ARRAY('utility', 'status', 'burn', 'win_condition'), 'Burn 5 to enter or leave Hyperspace. In Hyperspace, you cannot attack or be attacked.', JSON_OBJECT(
-    'health_burn', 5
+    'schema_version', 1,
+    'activation', JSON_OBJECT(
+      'kind', 'toggle',
+      'targeting', JSON_OBJECT('policy', 'none', 'required', false, 'filters', JSON_ARRAY(), 'relation', 'one_way'),
+      'costs', JSON_ARRAY(JSON_OBJECT('resource', 'health', 'formula', JSON_OBJECT('kind', 'constant', 'value', 5), 'timing', 'on_activate')),
+      'effects', JSON_ARRAY(),
+      'scheduled_effects', JSON_ARRAY(JSON_OBJECT(
+        'kind', 'schedule_state',
+        'state', JSON_OBJECT(
+          'state_key', 'hyperspace_active',
+          'scope', 'self',
+          'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+          'duration', JSON_OBJECT('kind', 'until_removed', 'starts_at', 'next_round_start', 'ends_at', 'manual_toggle'),
+          'stacking', 'replace',
+          'visibility', 'public'
+        )
+      )),
+      'mode_options', JSON_ARRAY('enter', 'leave')
+    ),
+    'passive', JSON_ARRAY(),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY(),
+    'consumption', JSON_ARRAY(),
+    'limits', JSON_ARRAY(),
+    'ui', JSON_ARRAY()
   ), 1),
   ('cloaking_field', 'Cloaking Field', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'delayed', 'burn'), 'Spend 20 Energy and Burn 5. You cannot be attacked next round.', JSON_OBJECT(
-    'cost_formula', JSON_OBJECT('kind', 'constant', 'value', 20),
-    'health_burn', 5
+    'schema_version', 1,
+    'activation', JSON_OBJECT(
+      'kind', 'activated',
+      'targeting', JSON_OBJECT('policy', 'none', 'required', false, 'filters', JSON_ARRAY(), 'relation', 'one_way'),
+      'costs', JSON_ARRAY(
+        JSON_OBJECT('resource', 'energy', 'formula', JSON_OBJECT('kind', 'constant', 'value', 20), 'timing', 'on_activate'),
+        JSON_OBJECT('resource', 'health', 'formula', JSON_OBJECT('kind', 'constant', 'value', 5), 'timing', 'on_activate')
+      ),
+      'effects', JSON_ARRAY(),
+      'scheduled_effects', JSON_ARRAY(JSON_OBJECT(
+        'kind', 'schedule_state',
+        'state', JSON_OBJECT(
+          'state_key', 'untargetable',
+          'scope', 'self',
+          'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+          'duration', JSON_OBJECT('kind', 'current_round', 'starts_at', 'round_start', 'ends_at', 'round_end'),
+          'stacking', 'replace',
+          'visibility', 'public'
+        )
+      )),
+      'mode_options', JSON_ARRAY()
+    ),
+    'passive', JSON_ARRAY(),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY(),
+    'consumption', JSON_ARRAY(),
+    'limits', JSON_ARRAY(),
+    'ui', JSON_ARRAY()
   ), 1),
   ('shield_capacitors', 'Shield Capacitors', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense'), 'Spend 10 Energy. Gain +20 Defense this round.', JSON_OBJECT(
-    'cost_formula', JSON_OBJECT('kind', 'constant', 'value', 10)
+    'schema_version', 1,
+    'activation', JSON_OBJECT(
+      'kind', 'activated',
+      'targeting', JSON_OBJECT('policy', 'none', 'required', false, 'filters', JSON_ARRAY(), 'relation', 'one_way'),
+      'costs', JSON_ARRAY(JSON_OBJECT('resource', 'energy', 'formula', JSON_OBJECT('kind', 'constant', 'value', 10), 'timing', 'on_activate')),
+      'effects', JSON_ARRAY(JSON_OBJECT(
+        'kind', 'add_defense_bonus',
+        'formula', JSON_OBJECT('kind', 'constant', 'value', 20)
+      )),
+      'scheduled_effects', JSON_ARRAY(),
+      'mode_options', JSON_ARRAY()
+    ),
+    'passive', JSON_ARRAY(),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY(),
+    'consumption', JSON_ARRAY(),
+    'limits', JSON_ARRAY(),
+    'ui', JSON_ARRAY()
   ), 1),
   ('shield_boosters', 'Shield Boosters', 'round_start_effect', 'round_start_effect', JSON_ARRAY('defense', 'passive'), 'Passive. Gain +20 Defense at the start of each round.', JSON_OBJECT(
     'schema_version', 1,
@@ -459,9 +581,59 @@ VALUES
     'conditions', JSON_ARRAY()
   ), 1),
   ('nimble_dodge', 'Nimble Dodge', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'single_attack_negation'), 'Spend 10 Energy. Negate the largest attack against you this round. Not valid if only two players remain.', JSON_OBJECT(
-    'cost_formula', JSON_OBJECT('kind', 'constant', 'value', 10)
+    'schema_version', 1,
+    'activation', JSON_OBJECT(
+      'kind', 'activated',
+      'targeting', JSON_OBJECT('policy', 'none', 'required', false, 'filters', JSON_ARRAY(), 'relation', 'one_way'),
+      'costs', JSON_ARRAY(JSON_OBJECT('resource', 'energy', 'formula', JSON_OBJECT('kind', 'constant', 'value', 10), 'timing', 'on_activate')),
+      'effects', JSON_ARRAY(JSON_OBJECT(
+        'kind', 'grant_state',
+        'state', JSON_OBJECT(
+          'state_key', 'negate_largest_incoming_attack',
+          'scope', 'self',
+          'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+          'duration', JSON_OBJECT('kind', 'current_round', 'starts_at', 'activation', 'ends_at', 'round_end'),
+          'stacking', 'replace',
+          'visibility', 'private'
+        )
+      )),
+      'scheduled_effects', JSON_ARRAY(),
+      'mode_options', JSON_ARRAY()
+    ),
+    'passive', JSON_ARRAY(),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY(),
+    'consumption', JSON_ARRAY(),
+    'limits', JSON_ARRAY(),
+    'ui', JSON_ARRAY()
   ), 1),
-  ('focused_defense', 'Focused Defense', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'single_opponent'), 'Choose one opponent. Halve attacks from that opponent this round.', JSON_OBJECT(), 1),
+  ('focused_defense', 'Focused Defense', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'single_opponent'), 'Choose one opponent. Halve attacks from that opponent this round.', JSON_OBJECT(
+    'schema_version', 1,
+    'activation', JSON_OBJECT(
+      'kind', 'activated',
+      'targeting', JSON_OBJECT('policy', 'single_opponent', 'required', true, 'filters', JSON_ARRAY(), 'relation', 'one_way'),
+      'costs', JSON_ARRAY(),
+      'effects', JSON_ARRAY(JSON_OBJECT(
+        'kind', 'modify_incoming_attacks',
+        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+        'modifier', JSON_OBJECT(
+          'stat', 'incoming_attack_damage',
+          'operation', 'multiply',
+          'formula', JSON_OBJECT('kind', 'constant', 'value', 0.5),
+          'timing', 'current_round',
+          'selector', JSON_OBJECT('subject', 'activation_target', 'filters', JSON_ARRAY())
+        )
+      )),
+      'scheduled_effects', JSON_ARRAY(),
+      'mode_options', JSON_ARRAY()
+    ),
+    'passive', JSON_ARRAY(),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY(),
+    'consumption', JSON_ARRAY(),
+    'limits', JSON_ARRAY(),
+    'ui', JSON_ARRAY()
+  ), 1),
   ('turbo_generator', 'Turbo Generator', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('resource', 'passive'), 'Passive. Your per-round Energy is Health + 10.', JSON_OBJECT(
     'schema_version', 1,
     'activation', JSON_OBJECT(),
