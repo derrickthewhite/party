@@ -5,5 +5,6 @@ export function createStubGameScreen(deps) {
 		title: 'Stub Game',
 		titleSuffix: 'Stub',
 		showActionComposer: true,
+		showParticipantsPanel: true,
 	});
 }

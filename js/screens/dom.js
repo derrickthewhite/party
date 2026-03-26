@@ -132,3 +132,108 @@ export function showConfirmModal(options) {
 		confirmBtn.focus();
 	});
 }
+
+export function showInfoModal(options) {
+	const config = options || {};
+	const titleText = String(config.title || 'Details');
+	const messageText = String(config.message || '');
+	const closeText = String(config.closeLabel || 'Close');
+	const sections = Array.isArray(config.sections) ? config.sections : [];
+	const priorFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+	return new Promise(function resolvePrompt(resolve) {
+		const overlay = document.createElement('div');
+		overlay.className = 'modal-overlay';
+
+		const dialog = document.createElement('div');
+		dialog.className = 'modal-card modal-card-wide';
+		dialog.setAttribute('role', 'dialog');
+		dialog.setAttribute('aria-modal', 'true');
+		dialog.setAttribute('aria-label', titleText);
+
+		const title = document.createElement('h3');
+		title.textContent = titleText;
+
+		const body = document.createElement('div');
+		body.className = 'modal-body';
+
+		if (messageText) {
+			const message = document.createElement('p');
+			message.className = 'modal-message';
+			message.textContent = messageText;
+			body.appendChild(message);
+		}
+
+		if (sections.length > 0) {
+			const details = document.createElement('div');
+			details.className = 'modal-details';
+			sections.forEach(function eachSection(section) {
+				const row = document.createElement('div');
+				row.className = 'modal-detail-row';
+
+				const label = document.createElement('div');
+				label.className = 'modal-detail-label';
+				label.textContent = String(section && section.label ? section.label : 'Detail');
+
+				const value = document.createElement('div');
+				value.className = 'modal-detail-value';
+				const nextValue = Array.isArray(section && section.value)
+					? section.value.join(', ')
+					: String(section && section.value ? section.value : 'None');
+				value.textContent = nextValue;
+
+				row.appendChild(label);
+				row.appendChild(value);
+				details.appendChild(row);
+			});
+			body.appendChild(details);
+		}
+
+		const actions = document.createElement('div');
+		actions.className = 'modal-actions';
+
+		const closeBtn = document.createElement('button');
+		closeBtn.className = 'primary';
+		closeBtn.textContent = closeText;
+
+		let closed = false;
+
+		function close() {
+			if (closed) {
+				return;
+			}
+
+			closed = true;
+			document.removeEventListener('keydown', onKeyDown);
+			overlay.remove();
+			if (priorFocus && priorFocus.isConnected && typeof priorFocus.focus === 'function') {
+				priorFocus.focus();
+			}
+			resolve();
+		}
+
+		function onKeyDown(event) {
+			if (event.key === 'Escape') {
+				close();
+			}
+		}
+
+		overlay.addEventListener('click', function onOverlayClick(event) {
+			if (event.target === overlay) {
+				close();
+			}
+		});
+
+		closeBtn.addEventListener('click', close);
+
+		actions.appendChild(closeBtn);
+		dialog.appendChild(title);
+		dialog.appendChild(body);
+		dialog.appendChild(actions);
+		overlay.appendChild(dialog);
+
+		document.body.appendChild(overlay);
+		document.addEventListener('keydown', onKeyDown);
+		closeBtn.focus();
+	});
+}

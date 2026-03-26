@@ -465,6 +465,17 @@ function games_detail(int $gameId): void
 
     $memberRole = game_member_role((int)$user['id'], $gameId);
     $permissions = game_permissions_for_user($game, $user, $memberRole);
+    $membersByGame = games_members_by_game([$gameId]);
+    $members = $membersByGame[$gameId] ?? [];
+    $observerCount = 0;
+    $playerCount = 0;
+    foreach ($members as $member) {
+        if ((string)$member['role'] === 'observer') {
+            $observerCount += 1;
+        } else {
+            $playerCount += 1;
+        }
+    }
     $detailPayload = array_merge(
         game_detail_payload_defaults(),
         game_handler_build_detail_payload((string)$game['game_type'], $gameId, $game, $user)
@@ -473,6 +484,7 @@ function games_detail(int $gameId): void
     success_response([
         'game' => [
             'id' => (int)$game['id'],
+			'owner_user_id' => (int)$game['owner_user_id'],
             'title' => (string)$game['title'],
             'game_type' => (string)$game['game_type'],
             'status' => (string)$game['status'],
@@ -480,6 +492,10 @@ function games_detail(int $gameId): void
             'owner_username' => (string)$game['owner_username'],
             'phase' => (string)($game['phase'] ?? default_phase_for_game_type((string)$game['game_type'])),
             'current_round' => (int)($game['current_round'] ?? 1),
+			'member_count' => count($members),
+			'observer_count' => $observerCount,
+			'player_count' => $playerCount,
+			'members' => $members,
             'is_member' => $memberRole !== null,
             'member_role' => $memberRole,
             'permissions' => $permissions,

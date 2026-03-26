@@ -5,6 +5,7 @@ import { createPlayersListController } from './playersList.js';
 const COMBAT_PANEL_HTML = `
 	<div>
 		<p data-ref="defenseText" style="margin: 8px 0 6px 0; font-weight: 600;">Defense: 0</p>
+		<p data-ref="defenseModifiersText" style="margin: 0 0 6px 0;"></p>
 		<p data-ref="energyText" style="margin: 0 0 6px 0; font-weight: 600;">Energy: 0 | Attacks: 0 | Abilities: 0 | Remaining: 0</p>
 		<div data-ref="playersMount"></div>
 		<div data-ref="abilityActivationsMount"></div>
@@ -30,6 +31,10 @@ export function createCombatPanelController(context) {
 		} else {
 			refs.defenseText.textContent = 'Defense: ' + validation.defense;
 		}
+
+		refs.defenseModifiersText.textContent = validation.modifierNotes.length > 0
+			? 'Defensive effects: ' + validation.modifierNotes.join(' | ')
+			: '';
 
 		refs.energyText.textContent = 'Energy: ' + validation.energyBudget
 			+ ' | Attacks: ' + validation.attackEnergySpent

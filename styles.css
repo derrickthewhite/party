@@ -92,6 +92,12 @@ button.primary {
   border-color: var(--accent);
 }
 
+button.button-ready {
+  background: color-mix(in srgb, var(--accent-2) 18%, #fff);
+  border-color: color-mix(in srgb, var(--accent-2) 55%, var(--line));
+  box-shadow: 0 0 0 3px rgba(47, 125, 140, 0.14);
+}
+
 button.secondary {
   background: var(--accent-2);
   color: #fff;
@@ -116,6 +122,25 @@ button:disabled {
 
 .screen {
   animation: fade-in 180ms ease;
+}
+
+.chat-layout-shell {
+  display: block;
+}
+
+.chat-layout-shell-with-sidebar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  gap: 16px;
+  align-items: start;
+}
+
+.chat-layout-main {
+  min-width: 0;
+}
+
+.game-screen-sidebar {
+  min-width: 0;
 }
 
 @keyframes fade-in {
@@ -229,6 +254,93 @@ button:disabled {
   gap: 12px;
 }
 
+.modal-card-wide {
+  width: min(620px, 100%);
+}
+
+.modal-body {
+  display: grid;
+  gap: 12px;
+}
+
+.modal-details {
+  display: grid;
+  gap: 10px;
+}
+
+.modal-detail-row {
+  display: grid;
+  gap: 4px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.75);
+}
+
+.modal-detail-label {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.modal-detail-value {
+  color: var(--ink);
+  line-height: 1.4;
+}
+
+.participant-sidebar {
+  padding: 14px;
+  position: sticky;
+  top: 16px;
+}
+
+.participant-sidebar-title {
+  margin-bottom: 10px;
+}
+
+.participant-sidebar-section {
+  display: grid;
+  gap: 8px;
+}
+
+.participant-sidebar-section + .participant-sidebar-section {
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.participant-sidebar-heading {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.participant-sidebar-list {
+  display: grid;
+  gap: 8px;
+}
+
+.participant-sidebar-item {
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.participant-sidebar-item small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.participant-sidebar-empty {
+  font-size: 13px;
+}
+
 .modal-message {
   color: var(--ink);
   line-height: 1.4;
@@ -241,9 +353,38 @@ button:disabled {
   flex-wrap: wrap;
 }
 
+.ability-chip-button {
+  cursor: pointer;
+  background: rgba(255, 255, 255, 0.85);
+}
+
+.ability-info-button {
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--ink);
+  font-weight: 600;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ability-info-button:hover,
+.ability-chip-button:hover,
+.ability-info-button:focus-visible,
+.ability-chip-button:focus-visible {
+  color: var(--accent);
+  outline: none;
+}
+
 @media (max-width: 760px) {
   #app { padding: 14px; }
   .row.mobile-stack { flex-direction: column; align-items: stretch; }
+  .chat-layout-shell-with-sidebar {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .participant-sidebar {
+    position: static;
+  }
   .game-item-bar {
     align-items: stretch;
   }

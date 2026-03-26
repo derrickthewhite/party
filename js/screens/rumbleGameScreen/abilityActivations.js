@@ -14,7 +14,7 @@ const ABILITY_ACTIVATION_SECTION_HTML = `
 const ABILITY_ACTIVATION_ROW_TEMPLATE_HTML = `
 	<div class="row mobile-stack" style="align-items: flex-start; margin-bottom: 6px;">
 		<div style="flex: 1 1 260px; min-width: 220px;">
-			<div data-ref="name" style="font-weight: 600;"></div>
+			<button type="button" class="ability-info-button" data-ref="name"></button>
 			<small data-ref="meta" style="opacity: 0.8;"></small>
 			<div data-ref="description" style="margin-top: 3px;"></div>
 		</div>
@@ -171,6 +171,9 @@ export function createAbilityActivationController(context) {
 			const abilityName = String(ability.title || ability.name || key);
 			const copyIndex = Math.max(0, Number(ability.ability_copy_index || 0));
 			rowRefs.name.textContent = copyIndex > 1 ? (abilityName + ' #' + copyIndex) : abilityName;
+			rowRefs.name.onclick = function onAbilityClick() {
+				context.showAbilityInfoModal(ability);
+			};
 			rowRefs.meta.textContent = String(ability.template_kind || 'unknown');
 			rowRefs.description.textContent = String(ability.description || '');
 			placeChildAt(refs.abilityActivationList, rowRefs.row, active.size - 1);

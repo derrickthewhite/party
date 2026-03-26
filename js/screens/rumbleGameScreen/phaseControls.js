@@ -213,6 +213,10 @@ export function createPhaseControlsController(context) {
 	function reconcile() {
 		const canAct = !!context.getLastPerms().can_act;
 		const orderBusy = context.isOrderBusy();
+		const allCombatOrdersSubmitted = !context.isBiddingPhase()
+			&& Number(context.serverSnapshot.participantCount || 0) > 0
+			&& Number(context.serverSnapshot.submittedCount || 0) >= Number(context.serverSnapshot.participantCount || 0)
+			&& !!context.getLastPerms().can_end_turn;
 		if (context.isBiddingPhase()) {
 			const hasSubmitted = context.hasSubmittedBids();
 			refs.submitBtn.style.display = canAct && !(hasSubmitted && !context.uiState.isEditing) ? '' : 'none';
@@ -230,6 +234,7 @@ export function createPhaseControlsController(context) {
 			refs.phaseActionBtn.style.display = context.getLastPerms().can_delete ? '' : 'none';
 			refs.phaseActionBtn.textContent = 'End Bidding';
 			refs.phaseActionBtn.disabled = orderBusy || !context.getLastPerms().can_end_turn;
+			refs.phaseActionBtn.classList.remove('button-ready');
 			return;
 		}
 
@@ -249,6 +254,7 @@ export function createPhaseControlsController(context) {
 		refs.phaseActionBtn.style.display = context.getLastPerms().can_delete ? '' : 'none';
 		refs.phaseActionBtn.textContent = 'End Turn';
 		refs.phaseActionBtn.disabled = orderBusy || !context.getLastPerms().can_end_turn;
+		refs.phaseActionBtn.classList.toggle('button-ready', allCombatOrdersSubmitted && !refs.phaseActionBtn.disabled);
 	}
 
 	return {

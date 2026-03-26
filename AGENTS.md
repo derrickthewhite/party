@@ -39,6 +39,8 @@ These rules are mandatory for all JavaScript UI changes in this repository.
 - Focused input remains usable after refresh.
 - Round advance applies new server state and resets draft intentionally.
 - Screen updates are keyed and mutation-based, not rebuild-based.
+- Ask clarifying questions aggressively rather than guessing when requirements or product behavior are ambiguous.
+- Never encode gameplay constants or business rules behind specific ability ids in UI code. Use DB-backed template data, tags, and structured metadata instead; if the data model cannot support the behavior cleanly, stop and ask rather than hard-code it.
 
 ## SQL Migration Consistency Rule
 

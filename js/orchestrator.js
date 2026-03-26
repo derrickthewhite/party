@@ -83,7 +83,15 @@ export function initializePartyApp() {
 
 			startChatPolling(detail.game.id);
 		} catch (err) {
-			landingScreen.setStatus(err.message, 'error');
+			if ((err && err.message) !== 'Game not found.') {
+				landingScreen.setStatus(err && err.message ? err.message : 'Unable to open game.', 'error');
+				return;
+			}
+
+			chat.stopPolling();
+			currentGameId = null;
+			state.patch({ activeGame: null });
+			state.setScreen('landing');
 		}
 	}
 

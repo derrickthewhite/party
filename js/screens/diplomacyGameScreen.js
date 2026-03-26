@@ -238,6 +238,7 @@ export function createDiplomacyGameScreen(deps) {
 		title: 'Diplomacy Game',
 		titleSuffix: 'Diplomacy',
 		showActionComposer: false,
+		showParticipantsPanel: true,
 		onSetGame: function onSetGame(context) {
 			lastGameId = context.game.id;
 			setStatusNode = context.setStatusNode;

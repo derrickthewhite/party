@@ -138,6 +138,9 @@ export function getOrderValidation(options) {
 	if (!config.canAct) {
 		return {
 			defense: selfPlayer ? Number(selfPlayer.health || 0) : 0,
+			baseDefense: selfPlayer ? Number(selfPlayer.health || 0) : 0,
+			directDefenseBonus: 0,
+			modifierNotes: [],
 			energyBudget: 0,
 			attackEnergySpent: 0,
 			abilityEnergySpent: 0,
@@ -159,6 +162,9 @@ export function getOrderValidation(options) {
 		const totalEnergySpent = Math.max(0, Number(currentOrder.total_energy_spent || 0)) || (attackEnergySpent + abilityEnergySpent);
 		return {
 			defense: Number(currentOrder.defense || 0),
+			baseDefense: energyBudget - totalEnergySpent,
+			directDefenseBonus: Math.max(0, Math.max(0, Number(currentOrder.defense || 0)) - (energyBudget - totalEnergySpent)),
+			modifierNotes: [],
 			energyBudget,
 			attackEnergySpent,
 			abilityEnergySpent,
@@ -241,11 +247,14 @@ export function getOrderValidation(options) {
 	});
 	const energyBudget = Math.max(0, Number(selfPlayer ? selfPlayer.health || 0 : 0))
 		+ (ownedAbilityIds.indexOf('turbo_generator') >= 0 ? 10 : 0);
-	const health = selfPlayer ? Number(selfPlayer.health || 0) : 0;
-	const defense = health - getAttackTotal(effectiveAttacks);
+	const baseDefense = energyBudget - totalEnergySpent;
+	const defense = baseDefense;
 
 	return {
 		defense,
+		baseDefense,
+		directDefenseBonus: 0,
+		modifierNotes: [],
 		energyBudget,
 		attackEnergySpent,
 		abilityEnergySpent,

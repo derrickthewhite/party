@@ -5,5 +5,6 @@ export function createMafiaGameScreen(deps) {
 		title: 'Mafia Game',
 		titleSuffix: 'Mafia',
 		showActionComposer: true,
+		showParticipantsPanel: true,
 	});
 }

@@ -5,5 +5,6 @@ export function createChatGameScreen(deps) {
 		title: 'Chat Game',
 		titleSuffix: 'Chat',
 		showActionComposer: false,
+		showParticipantsPanel: true,
 	});
 }

@@ -1,4 +1,5 @@
 import { collectRefs, createNodeFromHtml, setStatus, showConfirmModal } from './dom.js';
+import { createGameParticipantsSidebarController } from './gameParticipantsSidebar.js';
 
 export function createBaseGameScreen(deps, options) {
 	const config = options || {};
@@ -18,10 +19,15 @@ export function createBaseGameScreen(deps, options) {
 			<p class="top-user-label" data-ref="userLabel"></p>
 			<p data-ref="subtitle"></p>
 			<p data-ref="modeInfo"></p>
-			<div class="message-feed" data-ref="feed"></div>
-			<div class="row chat-composer-row" data-ref="composerRow">
-				<input type="text" placeholder="Type a message" class="chat-composer-input" data-ref="messageInput">
-				<button class="primary chat-composer-send" data-ref="sendButton">Send</button>
+			<div class="chat-layout-shell${config.showParticipantsPanel ? ' chat-layout-shell-with-sidebar' : ''}" data-ref="shell">
+				<div class="chat-layout-main" data-ref="chatPanel">
+					<div class="message-feed" data-ref="feed"></div>
+					<div class="row chat-composer-row" data-ref="composerRow">
+						<input type="text" placeholder="Type a message" class="chat-composer-input" data-ref="messageInput">
+						<button class="primary chat-composer-send" data-ref="sendButton">Send</button>
+					</div>
+				</div>
+				<aside class="game-screen-sidebar" data-ref="sidebarPanel"></aside>
 			</div>
 			<div class="row mobile-stack" data-ref="actionRow">
 				<input type="text" placeholder="Action type (example: vote/order/attack)" data-ref="actionType">
@@ -51,6 +57,7 @@ export function createBaseGameScreen(deps, options) {
 	const actionPayload = refs.actionPayload;
 	const actionButton = refs.actionButton;
 	const typePanel = refs.typePanel;
+	const sidebarPanel = refs.sidebarPanel;
 	const status = refs.status;
 	const adminControls = refs.adminControls;
 	const leave = refs.leave;
@@ -58,6 +65,8 @@ export function createBaseGameScreen(deps, options) {
 	const adminEnd = refs.adminEnd;
 	const adminDelete = refs.adminDelete;
 	let mountedTypePanel = null;
+	let mountedSidebarPanel = null;
+	const participantsSidebarController = config.showParticipantsPanel ? createGameParticipantsSidebarController() : null;
 
 	refs.headingSpacer.style.flex = '1';
 	leave.style.display = 'none';
@@ -66,9 +75,15 @@ export function createBaseGameScreen(deps, options) {
 	composerRow.style.marginTop = '10px';
 	actionRow.style.marginTop = '8px';
 	typePanel.style.marginTop = '8px';
+	sidebarPanel.style.display = config.showParticipantsPanel ? '' : 'none';
 	adminControls.style.marginTop = '12px';
 	adminControls.style.paddingTop = '10px';
 	adminControls.style.borderTop = '1px solid rgba(0, 0, 0, 0.15)';
+
+	if (participantsSidebarController) {
+		mountedSidebarPanel = participantsSidebarController.root;
+		sidebarPanel.appendChild(mountedSidebarPanel);
+	}
 
 	refs.back.addEventListener('click', function onBack() {
 		chat.stopPolling();
@@ -285,7 +300,14 @@ export function createBaseGameScreen(deps, options) {
 
 		if (!game) {
 			modeInfo.textContent = '';
+			if (participantsSidebarController) {
+				participantsSidebarController.setGame(null);
+			}
 			return;
+		}
+
+		if (participantsSidebarController) {
+			participantsSidebarController.setGame(game);
 		}
 
 		if (game.status === 'closed') {
@@ -311,6 +333,7 @@ export function createBaseGameScreen(deps, options) {
 				nodes: {
 					root,
 					typePanel,
+					sidebarPanel,
 					composerRow,
 					actionRow,
 					feed,
@@ -363,6 +386,25 @@ export function createBaseGameScreen(deps, options) {
 			mountedTypePanel = node || null;
 			if (mountedTypePanel) {
 				typePanel.appendChild(mountedTypePanel);
+			}
+		},
+		setSidebarPanel: function setSidebarPanel(node) {
+			if (!config.showParticipantsPanel) {
+				return;
+			}
+
+			if (mountedSidebarPanel === node) {
+				return;
+			}
+
+			if (mountedSidebarPanel && mountedSidebarPanel.parentNode === sidebarPanel) {
+				sidebarPanel.removeChild(mountedSidebarPanel);
+			}
+
+			mountedSidebarPanel = node || null;
+			sidebarPanel.style.display = mountedSidebarPanel ? '' : 'none';
+			if (mountedSidebarPanel) {
+				sidebarPanel.appendChild(mountedSidebarPanel);
 			}
 		},
 		setStatus: (text, kind) => setStatus(status, text, kind),

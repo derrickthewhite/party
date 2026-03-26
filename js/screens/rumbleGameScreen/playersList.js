@@ -22,7 +22,7 @@ const PLAYER_ROW_TEMPLATE_HTML = `
 	</div>
 `;
 
-function reconcileOwnedAbilities(refs, ownedAbilities) {
+function reconcileOwnedAbilities(refs, ownedAbilities, showAbilityInfoModal) {
 	const list = Array.isArray(ownedAbilities) ? ownedAbilities : [];
 	if (list.length === 0) {
 		refs.abilities.style.display = 'none';
@@ -55,8 +55,9 @@ function reconcileOwnedAbilities(refs, ownedAbilities) {
 
 		let badge = refs.abilityBadgeById.get(abilityId);
 		if (!badge) {
-			badge = document.createElement('span');
-			badge.style.display = 'inline-block';
+			badge = document.createElement('button');
+			badge.type = 'button';
+			badge.className = 'ability-chip-button';
 			badge.style.padding = '1px 6px';
 			badge.style.border = '1px solid rgba(0, 0, 0, 0.2)';
 			badge.style.borderRadius = '999px';
@@ -67,6 +68,9 @@ function reconcileOwnedAbilities(refs, ownedAbilities) {
 		const description = String(ability && ability.description ? ability.description : 'No description available.');
 		badge.textContent = groupedEntry.count > 1 ? (abilityName + ' x' + groupedEntry.count) : abilityName;
 		badge.title = abilityName + ': ' + description + (groupedEntry.count > 1 ? ' (owned ' + groupedEntry.count + ' copies)' : '');
+		badge.onclick = function onAbilityClick() {
+			showAbilityInfoModal(ability);
+		};
 		placeChildAt(refs.abilities, badge, index);
 	});
 
@@ -165,7 +169,7 @@ export function createPlayersListController(context) {
 			const displayShipName = String(player.ship_name || player.username || 'Unknown');
 			rowRefs.name.textContent = displayShipName + ' | Health: ' + Math.max(0, Number(player.health || 0));
 			const ownedAbilities = Array.isArray(player.owned_abilities) ? player.owned_abilities : [];
-			reconcileOwnedAbilities(rowRefs, ownedAbilities);
+			reconcileOwnedAbilities(rowRefs, ownedAbilities, context.showAbilityInfoModal);
 			placeChildAt(refs.playersList, rowRefs.row, active.size - 1);
 
 			if (player.is_self) {

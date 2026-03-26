@@ -14,6 +14,7 @@ import { createBiddingPanelController } from './rumbleGameScreen/biddingPanel.js
 import { createCombatPanelController } from './rumbleGameScreen/combatPanel.js';
 import { createVictoryScreenController } from './rumbleGameScreen/victoryScreen.js';
 import { createEventLogsController } from './rumbleGameScreen/eventLogs.js';
+import { showRumbleAbilityInfo } from './rumbleGameScreen/abilityInfoModal.js';
 import {
 	clearDraftDirty as clearRumbleDraftDirty,
 	getCheatEligiblePlayers as getCheatEligiblePlayersState,
@@ -273,6 +274,7 @@ export function createRumbleGameScreen(deps) {
 		getEffectiveAbilityActivationMap,
 		isBiddingPhase,
 		describeActivationReadonly,
+		showAbilityInfoModal: showRumbleAbilityInfo,
 	});
 	refs.battleMount.appendChild(combatPanelController.root);
 
@@ -531,6 +533,7 @@ export function createRumbleGameScreen(deps) {
 		title: 'Rumble Game',
 		titleSuffix: 'Rumble',
 		showActionComposer: false,
+		showParticipantsPanel: true,
 		onSetGame: function onSetGame(context) {
 			lastGameId = context.game.id;
 			lastPerms = context.game.permissions || {};
