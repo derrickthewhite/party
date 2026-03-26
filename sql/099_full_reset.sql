@@ -339,7 +339,24 @@ VALUES
   ), 1),
   ('death_ray', 'Death Ray', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('attack', 'passive'), 'Passive. If you make exactly one attack this round, increase that attack by 50%.', JSON_OBJECT(), 1),
   ('heavy_guns', 'Heavy Guns', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('attack', 'passive'), 'Passive. Each of your attacks deals +10 damage.', JSON_OBJECT(), 1),
-  ('holoship', 'Holoship', 'passive_modifier', 'round_end_effect', JSON_ARRAY('defense', 'passive', 'upkeep_cost'), 'Passive. You cannot be targeted by attacks. At end of round, lose 5 Health.', JSON_OBJECT(), 1),
+  ('holoship', 'Holoship', 'passive_modifier', 'round_end_effect', JSON_ARRAY('defense', 'passive', 'upkeep_cost'), 'Passive. You cannot be targeted by attacks. At end of round, lose 5 Health.', JSON_OBJECT(
+    'schema_version', 1,
+    'activation', JSON_OBJECT(),
+    'passive', JSON_ARRAY(JSON_OBJECT(
+      'apply_timing', 'always',
+      'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+      'modifiers', JSON_ARRAY(),
+      'granted_states', JSON_ARRAY(JSON_OBJECT(
+        'state_key', 'untargetable',
+        'scope', 'self',
+        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+        'duration', JSON_OBJECT('kind', 'while_owned'),
+        'metadata', JSON_OBJECT()
+      ))
+    )),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY()
+  ), 1),
   ('hyperdrive', 'Hyperdrive', 'utility_status', 'activated_self_or_toggle', JSON_ARRAY('utility', 'status', 'burn', 'win_condition'), 'Burn 5 to enter or leave Hyperspace. In Hyperspace, you cannot attack or be attacked.', JSON_OBJECT(
     'health_burn', 5
   ), 1),
@@ -350,40 +367,150 @@ VALUES
   ('shield_capacitors', 'Shield Capacitors', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense'), 'Spend 10 Energy. Gain +20 Defense this round.', JSON_OBJECT(
     'cost_formula', JSON_OBJECT('kind', 'constant', 'value', 10)
   ), 1),
-  ('shield_boosters', 'Shield Boosters', 'round_start_effect', 'round_start_effect', JSON_ARRAY('defense', 'passive'), 'Passive. Gain +20 Defense at the start of each round.', JSON_OBJECT(), 1),
+  ('shield_boosters', 'Shield Boosters', 'round_start_effect', 'round_start_effect', JSON_ARRAY('defense', 'passive'), 'Passive. Gain +20 Defense at the start of each round.', JSON_OBJECT(
+    'schema_version', 1,
+    'activation', JSON_OBJECT(),
+    'passive', JSON_ARRAY(JSON_OBJECT(
+      'apply_timing', 'round_start',
+      'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+      'modifiers', JSON_ARRAY(JSON_OBJECT(
+        'stat', 'defense',
+        'operation', 'add',
+        'formula', JSON_OBJECT('kind', 'constant', 'value', 20),
+        'timing', 'round_start',
+        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY())
+      )),
+      'granted_states', JSON_ARRAY()
+    )),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY()
+  ), 1),
   ('reflective_shield', 'Reflective Shield', 'trigger_on_attacked', 'trigger_on_attacked', JSON_ARRAY('defense', 'retaliation', 'passive'), 'Passive. Whenever you take attack damage, the attacker takes half that damage.', JSON_OBJECT(), 1),
   ('energy_absorption', 'Energy Absorption', 'round_start_effect', 'round_start_effect', JSON_ARRAY('resource', 'delayed'), 'Spend 10 Energy. At the start of next round, gain Energy equal to half the damage your Defense blocked this round.', JSON_OBJECT(), 1),
   ('armor', 'Armor', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('defense', 'passive'), 'Passive. Reduce each incoming attack by 5.', JSON_OBJECT(
-    'reduction_per_attack', 5
+    'schema_version', 1,
+    'activation', JSON_OBJECT(),
+    'passive', JSON_ARRAY(JSON_OBJECT(
+      'apply_timing', 'incoming_attack',
+      'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+      'modifiers', JSON_ARRAY(JSON_OBJECT(
+        'stat', 'incoming_attack_damage',
+        'operation', 'reduce_each_instance',
+        'formula', JSON_OBJECT('kind', 'constant', 'value', 5),
+        'timing', 'incoming_attack',
+        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY())
+      )),
+      'granted_states', JSON_ARRAY()
+    )),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY()
   ), 1),
   ('heavy_armor', 'Heavy Armor', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('defense', 'passive'), 'Passive. Reduce each incoming attack by 10.', JSON_OBJECT(
-    'reduction_per_attack', 10
+    'schema_version', 1,
+    'activation', JSON_OBJECT(),
+    'passive', JSON_ARRAY(JSON_OBJECT(
+      'apply_timing', 'incoming_attack',
+      'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+      'modifiers', JSON_ARRAY(JSON_OBJECT(
+        'stat', 'incoming_attack_damage',
+        'operation', 'reduce_each_instance',
+        'formula', JSON_OBJECT('kind', 'constant', 'value', 10),
+        'timing', 'incoming_attack',
+        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY())
+      )),
+      'granted_states', JSON_ARRAY()
+    )),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY()
   ), 1),
   ('backup_generator', 'Backup Generator', 'trigger_on_defeat', 'trigger_on_defeat_single_use', JSON_ARRAY('survival', 'single_use'), 'Triggered. If reduced to 0 Health, lose this ability and set Health to 30.', JSON_OBJECT(
-    'trigger', 'on_defeat',
-    'single_use', true,
-    'restore_health', 30
+    'schema_version', 1,
+    'activation', JSON_OBJECT(),
+    'passive', JSON_ARRAY(),
+    'triggers', JSON_ARRAY(JSON_OBJECT(
+      'event', 'on_defeat',
+      'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+      'conditions', JSON_ARRAY(),
+      'effects', JSON_ARRAY(JSON_OBJECT(
+        'kind', 'restore_health',
+        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+        'formula', JSON_OBJECT('kind', 'constant', 'value', 30)
+      )),
+      'priority', 100,
+      'consumption', JSON_OBJECT('kind', 'consume_on_trigger', 'remove_from_owned', true)
+    )),
+    'conditions', JSON_ARRAY()
   ), 1),
   ('escape_pods', 'Escape Pods', 'trigger_on_defeat', 'trigger_on_defeat_single_use', JSON_ARRAY('survival', 'single_use'), 'Triggered. If reduced to 0 Health, lose this ability and set Health to 20.', JSON_OBJECT(
-    'trigger', 'on_defeat',
-    'single_use', true,
-    'restore_health', 20
+    'schema_version', 1,
+    'activation', JSON_OBJECT(),
+    'passive', JSON_ARRAY(),
+    'triggers', JSON_ARRAY(JSON_OBJECT(
+      'event', 'on_defeat',
+      'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+      'conditions', JSON_ARRAY(),
+      'effects', JSON_ARRAY(JSON_OBJECT(
+        'kind', 'restore_health',
+        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+        'formula', JSON_OBJECT('kind', 'constant', 'value', 20)
+      )),
+      'priority', 100,
+      'consumption', JSON_OBJECT('kind', 'consume_on_trigger', 'remove_from_owned', true)
+    )),
+    'conditions', JSON_ARRAY()
   ), 1),
   ('nimble_dodge', 'Nimble Dodge', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'single_attack_negation'), 'Spend 10 Energy. Negate the largest attack against you this round. Not valid if only two players remain.', JSON_OBJECT(
     'cost_formula', JSON_OBJECT('kind', 'constant', 'value', 10)
   ), 1),
   ('focused_defense', 'Focused Defense', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'single_opponent'), 'Choose one opponent. Halve attacks from that opponent this round.', JSON_OBJECT(), 1),
-  ('turbo_generator', 'Turbo Generator', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('resource', 'passive'), 'Passive. Your per-round Energy is Health + 10.', JSON_OBJECT(), 1),
+  ('turbo_generator', 'Turbo Generator', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('resource', 'passive'), 'Passive. Your per-round Energy is Health + 10.', JSON_OBJECT(
+    'schema_version', 1,
+    'activation', JSON_OBJECT(),
+    'passive', JSON_ARRAY(JSON_OBJECT(
+      'apply_timing', 'always',
+      'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+      'modifiers', JSON_ARRAY(JSON_OBJECT(
+        'stat', 'energy_budget',
+        'operation', 'add',
+        'formula', JSON_OBJECT('kind', 'constant', 'value', 10),
+        'timing', 'always',
+        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY())
+      )),
+      'granted_states', JSON_ARRAY()
+    )),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY()
+  ), 1),
   ('mcguffin_generator', 'McGuffin Generator', 'trigger_on_round', 'condition_tracker', JSON_ARRAY('healing', 'timed_trigger'), 'Triggered. At the start of round 3, gain 50 Health.', JSON_OBJECT(
-    'evaluation_window', 'round_start',
-    'round_number', 3,
-    'outcome', JSON_OBJECT('kind', 'heal_constant', 'value', 50)
+    'schema_version', 1,
+    'activation', JSON_OBJECT(),
+    'passive', JSON_ARRAY(),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY(JSON_OBJECT(
+      'evaluation_timing', 'round_start',
+      'round_rule', JSON_OBJECT('kind', 'exact_round', 'round_number', 3),
+      'predicate', JSON_OBJECT('kind', 'always'),
+      'outcomes', JSON_ARRAY(JSON_OBJECT(
+        'kind', 'heal_constant',
+        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+        'formula', JSON_OBJECT('kind', 'heal_constant', 'value', 50)
+      ))
+    ))
   ), 1),
   ('courier_mission', 'Courier Mission', 'win_condition', 'condition_tracker', JSON_ARRAY('win_condition'), 'Win condition. If you are alive at end of round 10, you win.', JSON_OBJECT(
-    'evaluation_window', 'round_end',
-    'round_number', 10,
-    'condition', 'owner_alive',
-    'outcome', JSON_OBJECT('kind', 'declare_winner')
+    'schema_version', 1,
+    'activation', JSON_OBJECT(),
+    'passive', JSON_ARRAY(),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY(JSON_OBJECT(
+      'evaluation_timing', 'round_end',
+      'round_rule', JSON_OBJECT('kind', 'exact_round', 'round_number', 10),
+      'predicate', JSON_OBJECT('kind', 'owner_alive'),
+      'outcomes', JSON_ARRAY(JSON_OBJECT(
+        'kind', 'declare_winner',
+        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY())
+      ))
+    ))
   ), 1),
   ('automated_repair_systems', 'Automated Repair Systems', 'round_start_effect', 'round_start_effect', JSON_ARRAY('healing', 'passive'), 'Passive. Gain 5 Health each round, up to your starting maximum Health.', JSON_OBJECT(), 1),
   ('replicators', 'Replicators', 'round_start_effect', 'round_start_effect', JSON_ARRAY('healing', 'passive'), 'Passive. Gain 5 Health each round.', JSON_OBJECT(), 1),

@@ -642,6 +642,204 @@ function rumble_ability_public_view(array $ability): array
     ];
 }
 
+function rumble_runtime_formula(string $kind, array $overrides = []): array
+{
+    return array_replace([
+        'kind' => $kind,
+    ], $overrides);
+}
+
+function rumble_runtime_duration(string $kind, array $overrides = []): array
+{
+    return array_replace([
+        'kind' => $kind,
+    ], $overrides);
+}
+
+function rumble_runtime_selector(string $subject, array $overrides = []): array
+{
+    return array_replace([
+        'subject' => $subject,
+        'filters' => [],
+    ], $overrides);
+}
+
+function rumble_runtime_targeting(string $policy, bool $required, array $overrides = []): array
+{
+    return array_replace([
+        'policy' => $policy,
+        'required' => $required,
+        'filters' => [],
+        'relation' => 'one_way',
+    ], $overrides);
+}
+
+function rumble_runtime_cost(string $resource, array $formula, string $timing = 'on_activate'): array
+{
+    return [
+        'resource' => $resource,
+        'formula' => $formula,
+        'timing' => $timing,
+    ];
+}
+
+function rumble_runtime_modifier(string $stat, string $operation, array $formula, string $timing, array $selector, array $overrides = []): array
+{
+    return array_replace([
+        'stat' => $stat,
+        'operation' => $operation,
+        'formula' => $formula,
+        'timing' => $timing,
+        'selector' => $selector,
+    ], $overrides);
+}
+
+function rumble_runtime_state(string $stateKey, string $scope, array $selector, array $duration, array $overrides = []): array
+{
+    return array_replace([
+        'state_key' => $stateKey,
+        'scope' => $scope,
+        'selector' => $selector,
+        'duration' => $duration,
+        'stacking' => 'replace',
+        'visibility' => 'public',
+    ], $overrides);
+}
+
+function rumble_runtime_effect(string $kind, array $overrides = []): array
+{
+    return array_replace([
+        'kind' => $kind,
+    ], $overrides);
+}
+
+function rumble_is_runtime_contract(array $params): bool
+{
+    return isset($params['schema_version'])
+        && array_key_exists('activation', $params)
+        && isset($params['passive'])
+        && isset($params['triggers'])
+        && isset($params['conditions']);
+}
+
+function rumble_empty_runtime_contract(): array
+{
+    return [
+        'schema_version' => 1,
+        'activation' => [],
+        'passive' => [],
+        'triggers' => [],
+        'conditions' => [],
+        'consumption' => [],
+        'limits' => [],
+        'ui' => [],
+    ];
+}
+
+function rumble_ability_runtime_contract(array $ability): array
+{
+    $params = rumble_ability_template_params($ability);
+    if (rumble_is_runtime_contract($params)) {
+        return $params;
+    }
+    return rumble_empty_runtime_contract();
+}
+
+function rumble_ability_state_grants(array $ability, string $timing = 'always'): array
+{
+    $contract = rumble_ability_runtime_contract($ability);
+    $states = [];
+    foreach ((array)($contract['passive'] ?? []) as $rule) {
+        if ((string)($rule['apply_timing'] ?? '') !== $timing) {
+            continue;
+        }
+        foreach ((array)($rule['granted_states'] ?? []) as $state) {
+            if (is_array($state)) {
+                $states[] = $state;
+            }
+        }
+    }
+    return $states;
+}
+
+function rumble_ability_modifier_sum(array $ability, string $stat, string $operation, string $timing): float
+{
+    $contract = rumble_ability_runtime_contract($ability);
+    $total = 0.0;
+    foreach ((array)($contract['passive'] ?? []) as $rule) {
+        if ((string)($rule['apply_timing'] ?? '') !== $timing) {
+            continue;
+        }
+        foreach ((array)($rule['modifiers'] ?? []) as $modifier) {
+            if (!is_array($modifier)) {
+                continue;
+            }
+            if ((string)($modifier['stat'] ?? '') !== $stat || (string)($modifier['operation'] ?? '') !== $operation) {
+                continue;
+            }
+            $formula = is_array($modifier['formula'] ?? null) ? (array)$modifier['formula'] : [];
+            if ((string)($formula['kind'] ?? '') !== 'constant') {
+                continue;
+            }
+            $total += (float)($formula['value'] ?? 0);
+        }
+    }
+    return $total;
+}
+
+function rumble_runtime_state_from_payload(array $payload, int $ownerUserId, ?int $targetUserId = null): ?array
+{
+    if (isset($payload['state']) && is_array($payload['state'])) {
+        return $payload['state'];
+    }
+
+    $effect = trim((string)($payload['effect'] ?? ''));
+    if ($effect === 'cloaked_until_round_end') {
+        return rumble_runtime_state('untargetable', 'self', rumble_runtime_selector('owner'), rumble_runtime_duration('current_round'), [
+            'owner_user_id' => $ownerUserId,
+        ]);
+    }
+    if ($effect === 'hyperspace_active') {
+        return rumble_runtime_state('hyperspace_active', 'self', rumble_runtime_selector('owner'), rumble_runtime_duration('current_round'), [
+            'owner_user_id' => $ownerUserId,
+        ]);
+    }
+    if ($effect === 'hailing_lockout' && $targetUserId !== null && $targetUserId > 0) {
+        return rumble_runtime_state('blocked_target_pair', 'pair', rumble_runtime_selector('owner'), rumble_runtime_duration('current_round'), [
+            'owner_user_id' => $ownerUserId,
+            'target_user_id' => $targetUserId,
+            'relation' => 'symmetric',
+        ]);
+    }
+
+    return null;
+}
+
+function rumble_apply_runtime_state_to_targeting_maps(array $state, int $ownerUserId, ?int $targetUserId, array &$untargetableByUser, array &$cannotAttackByUser, array &$blockedAttackTargetsByUser): void
+{
+    $stateKey = trim((string)($state['state_key'] ?? ''));
+    if ($stateKey === 'untargetable') {
+        $untargetableByUser[$ownerUserId] = true;
+        return;
+    }
+    if ($stateKey === 'cannot_attack') {
+        $cannotAttackByUser[$ownerUserId] = true;
+        return;
+    }
+    if ($stateKey === 'hyperspace_active') {
+        $untargetableByUser[$ownerUserId] = true;
+        $cannotAttackByUser[$ownerUserId] = true;
+        return;
+    }
+    if ($stateKey === 'blocked_target_pair' && $targetUserId !== null && $targetUserId > 0) {
+        $blockedAttackTargetsByUser[$ownerUserId][$targetUserId] = true;
+        $relation = trim((string)($state['relation'] ?? 'symmetric'));
+        if ($relation === 'symmetric') {
+            $blockedAttackTargetsByUser[$targetUserId][$ownerUserId] = true;
+        }
+    }
+}
+
 function rumble_offer_item_key(int $index, string $abilityId): string
 {
     $sanitizedAbilityId = preg_replace('/[^a-z0-9_]+/i', '_', trim($abilityId));
@@ -1340,9 +1538,12 @@ function rumble_normalize_ability_activations($raw, bool $strict = false): array
 function rumble_player_round_energy_budget(int $health, array $ownedAbilityIds): int
 {
     $budget = max(0, $health);
-    $owned = array_fill_keys(array_values(array_map(static fn ($v): string => (string)$v, $ownedAbilityIds)), true);
-    if (isset($owned['turbo_generator'])) {
-        $budget += 10;
+    foreach ($ownedAbilityIds as $ownedAbilityId) {
+        $ability = rumble_ability_by_id((string)$ownedAbilityId);
+        if ($ability === null) {
+            continue;
+        }
+        $budget += (int)floor(rumble_ability_modifier_sum($ability, 'energy_budget', 'add', 'always'));
     }
     return $budget;
 }
@@ -1467,12 +1668,20 @@ function rumble_collect_round_targeting_state(array $playerRows, array $roundSta
         } elseif (isset($row['owned_ability_ids']) && is_array($row['owned_ability_ids'])) {
             $ownedAbilityIds = array_values(array_map(static fn ($value): string => rumble_canonical_ability_id((string)$value), $row['owned_ability_ids']));
         }
-        $abilitySet = array_fill_keys($ownedAbilityIds, true);
-
         $aliveByUser[$userId] = $health > 0;
-        $untargetableByUser[$userId] = isset($abilitySet['holoship']);
+        $untargetableByUser[$userId] = false;
         $cannotAttackByUser[$userId] = false;
         $blockedAttackTargetsByUser[$userId] = [];
+
+        foreach ($ownedAbilityIds as $ownedAbilityId) {
+            $ability = rumble_ability_by_id($ownedAbilityId);
+            if ($ability === null) {
+                continue;
+            }
+            foreach (rumble_ability_state_grants($ability, 'always') as $state) {
+                rumble_apply_runtime_state_to_targeting_maps($state, $userId, null, $untargetableByUser, $cannotAttackByUser, $blockedAttackTargetsByUser);
+            }
+        }
     }
 
     foreach ($roundStartEffects as $effectRow) {
@@ -1486,22 +1695,9 @@ function rumble_collect_round_targeting_state(array $playerRows, array $roundSta
         if (!is_array($payload)) {
             $payload = [];
         }
-        $effect = (string)($payload['effect'] ?? '');
-
-        if ($effect === 'cloaked_until_round_end') {
-            $untargetableByUser[$ownerUserId] = true;
-            continue;
-        }
-
-        if ($effect === 'hyperspace_active') {
-            $untargetableByUser[$ownerUserId] = true;
-            $cannotAttackByUser[$ownerUserId] = true;
-            continue;
-        }
-
-        if ($effect === 'hailing_lockout' && $targetUserId > 0 && isset($aliveByUser[$targetUserId])) {
-            $blockedAttackTargetsByUser[$ownerUserId][$targetUserId] = true;
-            $blockedAttackTargetsByUser[$targetUserId][$ownerUserId] = true;
+        $state = rumble_runtime_state_from_payload($payload, $ownerUserId, $targetUserId > 0 ? $targetUserId : null);
+        if ($state !== null) {
+            rumble_apply_runtime_state_to_targeting_maps($state, $ownerUserId, $targetUserId > 0 ? $targetUserId : null, $untargetableByUser, $cannotAttackByUser, $blockedAttackTargetsByUser);
         }
     }
 
@@ -1541,6 +1737,9 @@ function rumble_round_effect_human_text(array $effectRow, array $nameByUser = []
         return $ownerName . ' gains round-start defense bonus: +' . (int)($payload['defense_bonus'] ?? 0) . '.';
     }
     if ($effectKey === 'step2:scheduled_status') {
+        if (isset($payload['state']) && is_array($payload['state'])) {
+            return $ownerName . ' receives scheduled status: ' . (string)($payload['state']['state_key'] ?? 'unknown') . '.';
+        }
         return $ownerName . ' receives scheduled status: ' . (string)($payload['effect'] ?? 'unknown') . '.';
     }
     if (str_starts_with($effectKey, 'activation:')) {
@@ -1738,19 +1937,35 @@ function rumble_list_alive_players(PDO $pdo, int $gameId): array
 
 function rumble_round_end_winners(array $aliveRows, int $roundNumber): array
 {
-    if ($roundNumber !== 10) {
-        return [];
-    }
-
     $winnerRows = [];
     foreach ($aliveRows as $row) {
         $ownedAbilityIds = rumble_parse_owned_abilities(isset($row['owned_abilities_json']) ? (string)$row['owned_abilities_json'] : null);
-        $abilitySet = array_fill_keys($ownedAbilityIds, true);
-        if (!isset($abilitySet['courier_mission'])) {
-            continue;
+        $isWinner = false;
+        foreach ($ownedAbilityIds as $ownedAbilityId) {
+            $ability = rumble_ability_by_id($ownedAbilityId);
+            if ($ability === null) {
+                continue;
+            }
+            $contract = rumble_ability_runtime_contract($ability);
+            foreach ((array)($contract['conditions'] ?? []) as $condition) {
+                if ((string)($condition['evaluation_timing'] ?? '') !== 'round_end') {
+                    continue;
+                }
+                $roundRule = is_array($condition['round_rule'] ?? null) ? (array)$condition['round_rule'] : [];
+                if ((string)($roundRule['kind'] ?? '') !== 'exact_round' || (int)($roundRule['round_number'] ?? 0) !== $roundNumber) {
+                    continue;
+                }
+                $predicate = is_array($condition['predicate'] ?? null) ? (array)$condition['predicate'] : [];
+                if ((string)($predicate['kind'] ?? 'owner_alive') !== 'owner_alive') {
+                    continue;
+                }
+                $isWinner = true;
+                break 2;
+            }
         }
-
-        $winnerRows[] = $row;
+        if ($isWinner) {
+            $winnerRows[] = $row;
+        }
     }
 
     return $winnerRows;
@@ -3218,6 +3433,8 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
     $roundStartDefenseBonusByUser = [];
     $activatedDefenseBonusByUser = [];
     $untargetableByUser = [];
+    $cannotAttackByUser = [];
+    $blockedAttackTargetsByUser = [];
     $armorReductionByUser = [];
     $nimbleDodgeByUser = [];
     $focusedDefenseByUser = [];
@@ -3287,7 +3504,16 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
 
         $roundStartDefenseBonusByUser[$userId] = isset($abilitySet['shield_boosters']) ? 20 : 0;
         $activatedDefenseBonusByUser[$userId] = 0;
-        $untargetableByUser[$userId] = isset($abilitySet['holoship']);
+        $untargetableByUser[$userId] = false;
+        foreach ($ownedAbilityIds as $ownedAbilityId) {
+            $ownedAbility = rumble_ability_by_id($ownedAbilityId);
+            if ($ownedAbility === null) {
+                continue;
+            }
+            foreach (rumble_ability_state_grants($ownedAbility, 'always') as $state) {
+                rumble_apply_runtime_state_to_targeting_maps($state, $userId, null, $untargetableByUser, $cannotAttackByUser, $blockedAttackTargetsByUser);
+            }
+        }
         $armorReductionByUser[$userId] = isset($abilitySet['heavy_armor']) ? 10 : (isset($abilitySet['armor']) ? 5 : 0);
         $nimbleDodgeByUser[$userId] = false;
         $focusedDefenseByUser[$userId] = [];
@@ -3346,6 +3572,7 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
             $payload = [];
         }
 
+        $scheduledState = rumble_runtime_state_from_payload($payload, $ownerUserId, $targetUserId);
         if ((string)($payload['effect'] ?? '') === 'cloaked_until_round_end') {
             $roundEffectRows[] = [
                 'game_id' => $gameId,
@@ -3355,7 +3582,7 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                 'ability_instance_id' => null,
                 'effect_key' => 'step2:scheduled_status',
                 'trigger_timing' => 'resolve',
-                'payload' => ['effect' => 'cloaked_until_round_end'],
+                'payload' => ['effect' => 'cloaked_until_round_end', 'state' => $scheduledState],
                 'is_resolved' => 1,
                 'resolved_at' => gmdate('Y-m-d H:i:s'),
             ];
@@ -3369,7 +3596,7 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                 'ability_instance_id' => null,
                 'effect_key' => 'step2:scheduled_status',
                 'trigger_timing' => 'resolve',
-                'payload' => ['effect' => 'hyperspace_active'],
+                'payload' => ['effect' => 'hyperspace_active', 'state' => $scheduledState],
                 'is_resolved' => 1,
                 'resolved_at' => gmdate('Y-m-d H:i:s'),
             ];
@@ -3382,7 +3609,7 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                 'ability_instance_id' => null,
                 'effect_key' => 'step2:scheduled_status',
                 'trigger_timing' => 'resolve',
-                'payload' => ['effect' => 'hailing_lockout'],
+                'payload' => ['effect' => 'hailing_lockout', 'state' => $scheduledState],
                 'is_resolved' => 1,
                 'resolved_at' => gmdate('Y-m-d H:i:s'),
             ];
@@ -3554,7 +3781,13 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                         'ability_instance_id' => null,
                         'effect_key' => 'status:cloaked',
                         'trigger_timing' => 'round_start',
-                        'payload' => ['effect' => 'cloaked_until_round_end', 'source_ability_id' => $abilityId],
+                        'payload' => [
+                            'schema_version' => 1,
+                            'effect_kind' => 'state_instance',
+                            'effect' => 'cloaked_until_round_end',
+                            'source_ability_id' => $abilityId,
+                            'state' => rumble_runtime_state('untargetable', 'self', rumble_runtime_selector('owner'), rumble_runtime_duration('current_round', ['starts_at' => 'round_start', 'ends_at' => 'round_end'])),
+                        ],
                         'is_resolved' => 0,
                         'resolved_at' => null,
                     ];
@@ -3579,7 +3812,13 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                             'ability_instance_id' => null,
                             'effect_key' => 'status:hyperspace',
                             'trigger_timing' => 'round_start',
-                            'payload' => ['effect' => 'hyperspace_active', 'source_ability_id' => $abilityId],
+                            'payload' => [
+                                'schema_version' => 1,
+                                'effect_kind' => 'state_instance',
+                                'effect' => 'hyperspace_active',
+                                'source_ability_id' => $abilityId,
+                                'state' => rumble_runtime_state('hyperspace_active', 'self', rumble_runtime_selector('owner'), rumble_runtime_duration('until_removed', ['starts_at' => 'round_start', 'ends_at' => 'manual_toggle'])),
+                            ],
                             'is_resolved' => 0,
                             'resolved_at' => null,
                         ];
@@ -3597,7 +3836,13 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                         'ability_instance_id' => null,
                         'effect_key' => 'status:hailing_lockout',
                         'trigger_timing' => 'round_start',
-                        'payload' => ['effect' => 'hailing_lockout', 'source_ability_id' => $abilityId],
+                        'payload' => [
+                            'schema_version' => 1,
+                            'effect_kind' => 'state_instance',
+                            'effect' => 'hailing_lockout',
+                            'source_ability_id' => $abilityId,
+                            'state' => rumble_runtime_state('blocked_target_pair', 'pair', rumble_runtime_selector('owner'), rumble_runtime_duration('current_round', ['starts_at' => 'round_start', 'ends_at' => 'round_end']), ['relation' => 'symmetric']),
+                        ],
                         'is_resolved' => 0,
                         'resolved_at' => null,
                     ];
@@ -3724,7 +3969,13 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                 'ability_instance_id' => null,
                 'effect_key' => 'status:hyperspace',
                 'trigger_timing' => 'round_start',
-                'payload' => ['effect' => 'hyperspace_active', 'source_ability_id' => 'hyperdrive'],
+                'payload' => [
+                    'schema_version' => 1,
+                    'effect_kind' => 'state_instance',
+                    'effect' => 'hyperspace_active',
+                    'source_ability_id' => 'hyperdrive',
+                    'state' => rumble_runtime_state('hyperspace_active', 'self', rumble_runtime_selector('owner'), rumble_runtime_duration('until_removed', ['starts_at' => 'round_start', 'ends_at' => 'manual_toggle'])),
+                ],
                 'is_resolved' => 0,
                 'resolved_at' => null,
             ];
