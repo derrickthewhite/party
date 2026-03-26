@@ -8,12 +8,36 @@ This project is a lightweight foundation for browser-based multiplayer games.
 - Auth: cookie session + invite-key-gated signup
 - Chat: per-game polling transport (easy to replace later)
 
+## Local Host Mode
+
+The repo now includes a Node host layer that can run the app in place while preserving the PHP backend.
+
+- Public host: Node serves `index.html`, `styles.css`, and `js/`
+- API host: Node starts PHP locally and proxies `/api`
+- Default local database: SQLite stored under `data/party.sqlite`
+- Optional database mode: MySQL by setting `PARTY_DB_DRIVER=mysql` and the existing DB env vars
+
+### Local start
+
+1. Put a portable Windows PHP build at `runtime/php/windows/php.exe`, or set `PARTY_PHP_BIN` to a PHP executable.
+2. Make sure the PHP build includes `pdo_sqlite`, `sqlite3`, `pdo_mysql`, `openssl`, `json`, and `gmp`.
+3. Run `npm start`.
+4. Open `http://127.0.0.1:8080`.
+
+Notes:
+- No PHP or MySQL system install is required for the default SQLite mode.
+- System Node is still required.
+- Local host mode disables the API HTTPS requirement by setting `PARTY_AUTH_ENFORCE_HTTPS=0` for the spawned PHP process.
+- Repo-local writable paths are `data/party.sqlite` and `data/sessions/`.
+
 ## Project Layout
 
 - `index.html` static app shell at the web root
 - `js/` frontend JavaScript modules
 - `api/` REST entrypoint, route handlers, shared helpers
 - `sql/` schema, seed, cleanup, and full reset scripts
+- `server/` Node host, SQLite bootstrap, and PHP router scripts
+- `runtime/php/windows/` expected location of the bundled Windows PHP runtime
 
 ## Quick Start
 

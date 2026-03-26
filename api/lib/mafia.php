@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/sql.php';
+
 function mafia_game_on_start(int $gameId, int $actorUserId): void
 {
     unset($actorUserId);
@@ -51,9 +53,10 @@ function mafia_assign_roles_if_missing(int $gameId): void
     $mafiaCount = max(1, (int)floor(count($memberIds) / 3));
     $selected = array_slice($scored, 0, $mafiaCount);
 
-    $insertStmt = db()->prepare(
-        'INSERT IGNORE INTO game_roles (game_id, user_id, role_key, is_hidden) VALUES (:game_id, :user_id, :role_key, :is_hidden)'
-    );
+    $insertStmt = db()->prepare(db_insert_ignore_sql(
+        'INSERT INTO game_roles (game_id, user_id, role_key, is_hidden) VALUES (:game_id, :user_id, :role_key, :is_hidden)',
+        ['game_id', 'user_id', 'role_key']
+    ));
     foreach ($selected as $row) {
         $insertStmt->execute([
             'game_id' => $gameId,

@@ -12,6 +12,12 @@ function start_session_if_needed(): void
     }
 
     $cfg = config()['session'];
+    if (($cfg['save_path'] ?? '') !== '') {
+        if (!is_dir($cfg['save_path'])) {
+            mkdir($cfg['save_path'], 0777, true);
+        }
+        session_save_path($cfg['save_path']);
+    }
     session_name($cfg['name']);
     session_set_cookie_params([
         'lifetime' => 0,
@@ -55,16 +61,7 @@ function users_has_is_admin_column(): bool
         return $hasColumn;
     }
 
-    $stmt = db()->prepare(
-        'SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS '
-        . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name AND COLUMN_NAME = :column_name'
-    );
-    $stmt->execute([
-        'table_name' => 'users',
-        'column_name' => 'is_admin',
-    ]);
-
-    $hasColumn = (int)$stmt->fetchColumn() > 0;
+    $hasColumn = db_schema_column_exists(db(), 'users', 'is_admin');
     return $hasColumn;
 }
 

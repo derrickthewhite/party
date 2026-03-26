@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/sql.php';
+
 /**
  * Canonical phase-2 ability library for Rumble.
  *
@@ -929,11 +931,14 @@ function rumble_admin_grant_abilities(int $gameId, int $actorUserId, int $target
 
     $db->beginTransaction();
     try {
-        $upsertStmt = $db->prepare(
+        $upsertStmt = $db->prepare(db_upsert_sql(
             'INSERT INTO rumble_player_state (game_id, user_id, current_health, owned_abilities_json) '
-            . 'VALUES (:game_id, :user_id, 100, :owned_abilities_json) '
-            . 'ON DUPLICATE KEY UPDATE owned_abilities_json = VALUES(owned_abilities_json)'
-        );
+            . 'VALUES (:game_id, :user_id, 100, :owned_abilities_json)',
+            ['game_id', 'user_id'],
+            [
+                'owned_abilities_json' => db_insert_value_sql('owned_abilities_json'),
+            ]
+        ));
         $upsertStmt->execute([
             'game_id' => $gameId,
             'user_id' => $targetUserId,
@@ -1024,11 +1029,14 @@ function rumble_admin_revoke_abilities(int $gameId, int $actorUserId, int $targe
 
     $db->beginTransaction();
     try {
-        $upsertStmt = $db->prepare(
+        $upsertStmt = $db->prepare(db_upsert_sql(
             'INSERT INTO rumble_player_state (game_id, user_id, current_health, owned_abilities_json) '
-            . 'VALUES (:game_id, :user_id, 100, :owned_abilities_json) '
-            . 'ON DUPLICATE KEY UPDATE owned_abilities_json = VALUES(owned_abilities_json)'
-        );
+            . 'VALUES (:game_id, :user_id, 100, :owned_abilities_json)',
+            ['game_id', 'user_id'],
+            [
+                'owned_abilities_json' => db_insert_value_sql('owned_abilities_json'),
+            ]
+        ));
         $upsertStmt->execute([
             'game_id' => $gameId,
             'user_id' => $targetUserId,
@@ -1091,11 +1099,14 @@ function rumble_admin_set_health(int $gameId, int $actorUserId, int $targetUserI
 
     $db->beginTransaction();
     try {
-        $upsertStmt = $db->prepare(
+        $upsertStmt = $db->prepare(db_upsert_sql(
             'INSERT INTO rumble_player_state (game_id, user_id, current_health) '
-            . 'VALUES (:game_id, :user_id, :current_health) '
-            . 'ON DUPLICATE KEY UPDATE current_health = VALUES(current_health)'
-        );
+            . 'VALUES (:game_id, :user_id, :current_health)',
+            ['game_id', 'user_id'],
+            [
+                'current_health' => db_insert_value_sql('current_health'),
+            ]
+        ));
         $upsertStmt->execute([
             'game_id' => $gameId,
             'user_id' => $targetUserId,
@@ -1557,10 +1568,13 @@ function rumble_round_effect_human_text(array $effectRow, array $nameByUser = []
 
 function rumble_game_on_join(int $gameId, int $userId): void
 {
-    $stateStmt = db()->prepare(
-        'INSERT INTO rumble_player_state (game_id, user_id, current_health) VALUES (:game_id, :user_id, 100) '
-        . 'ON DUPLICATE KEY UPDATE current_health = current_health'
-    );
+    $stateStmt = db()->prepare(db_upsert_sql(
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health) VALUES (:game_id, :user_id, 100)',
+        ['game_id', 'user_id'],
+        [
+            'current_health' => 'current_health',
+        ]
+    ));
     $stateStmt->execute([
         'game_id' => $gameId,
         'user_id' => $userId,
@@ -1580,15 +1594,7 @@ function rumble_has_standings_table(): bool
         return $hasTable;
     }
 
-    $stmt = db()->prepare(
-        'SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES '
-        . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = :table_name'
-    );
-    $stmt->execute([
-        'table_name' => 'game_player_standings',
-    ]);
-
-    $hasTable = (int)$stmt->fetchColumn() > 0;
+    $hasTable = db_schema_table_exists(db(), 'game_player_standings');
     return $hasTable;
 }
 
@@ -1598,12 +1604,13 @@ function rumble_ensure_standings_rows(PDO $pdo, int $gameId): void
         return;
     }
 
-    $stmt = $pdo->prepare(
-        'INSERT IGNORE INTO game_player_standings (game_id, user_id, result_status) '
+    $stmt = $pdo->prepare(db_insert_ignore_sql(
+        'INSERT INTO game_player_standings (game_id, user_id, result_status) '
         . 'SELECT gm.game_id, gm.user_id, ? FROM game_members gm '
         . 'JOIN users u ON u.id = gm.user_id '
-        . 'WHERE gm.game_id = ? AND u.is_active = 1'
-    );
+        . 'WHERE gm.game_id = ? AND u.is_active = 1',
+        ['game_id', 'user_id']
+    ));
     $stmt->execute([
         'active',
         $gameId,
@@ -1841,11 +1848,15 @@ function rumble_finalize_standings(PDO $pdo, int $gameId, int $roundNumber, arra
         $gameId,
     ]);
 
-    $closeStateStmt = $pdo->prepare(
+    $closeStateStmt = $pdo->prepare(db_upsert_sql(
         'INSERT INTO game_state (game_id, phase, current_round, ended_at, winner_summary) '
-        . 'VALUES (?, ?, ?, NOW(), ?) '
-        . 'ON DUPLICATE KEY UPDATE ended_at = NOW(), winner_summary = VALUES(winner_summary)'
-    );
+        . 'VALUES (?, ?, ?, ' . db_now_sql() . ', ?)',
+        ['game_id'],
+        [
+            'ended_at' => db_now_sql(),
+            'winner_summary' => db_insert_value_sql('winner_summary'),
+        ]
+    ));
     $closeStateStmt->execute([
         $gameId,
         'battle',
@@ -2212,13 +2223,16 @@ function rumble_game_build_detail_payload(int $gameId, array $game, array $user)
 
 function rumble_initialize_player_state(int $gameId): void
 {
-    $stmt = db()->prepare(
+    $stmt = db()->prepare(db_upsert_sql(
         'INSERT INTO rumble_player_state (game_id, user_id, current_health, owned_abilities_json) '
         . 'SELECT gm.game_id, gm.user_id, 100, :owned_abilities_json FROM game_members gm '
         . 'JOIN users u ON u.id = gm.user_id '
-        . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1 '
-        . 'ON DUPLICATE KEY UPDATE current_health = current_health'
-    );
+        . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1',
+        ['game_id', 'user_id'],
+        [
+            'current_health' => 'current_health',
+        ]
+    ));
     $stmt->execute([
         'game_id' => $gameId,
         'observer_role' => 'observer',
@@ -2340,10 +2354,13 @@ function rumble_action_upsert_order(int $gameId): void
         error_response('Rumble orders are only available during battle phase.', 409);
     }
 
-    $ensureStmt = db()->prepare(
-        'INSERT INTO rumble_player_state (game_id, user_id, current_health) VALUES (:game_id, :user_id, 100) '
-        . 'ON DUPLICATE KEY UPDATE current_health = current_health'
-    );
+    $ensureStmt = db()->prepare(db_upsert_sql(
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health) VALUES (:game_id, :user_id, 100)',
+        ['game_id', 'user_id'],
+        [
+            'current_health' => 'current_health',
+        ]
+    ));
     $ensureStmt->execute([
         'game_id' => $gameId,
         'user_id' => (int)$user['id'],
@@ -2580,10 +2597,13 @@ function rumble_action_upsert_bids(int $gameId): void
         error_response('Bids are only allowed during bidding phase.', 409);
     }
 
-    $ensureStmt = db()->prepare(
-        'INSERT INTO rumble_player_state (game_id, user_id, current_health) VALUES (:game_id, :user_id, 100) '
-        . 'ON DUPLICATE KEY UPDATE current_health = current_health'
-    );
+    $ensureStmt = db()->prepare(db_upsert_sql(
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health) VALUES (:game_id, :user_id, 100)',
+        ['game_id', 'user_id'],
+        [
+            'current_health' => 'current_health',
+        ]
+    ));
     $ensureStmt->execute([
         'game_id' => $gameId,
         'user_id' => (int)$user['id'],
@@ -2717,11 +2737,14 @@ function rumble_action_upsert_ship_name(int $gameId): void
 
     $saveValue = $shipName === '' ? null : $shipName;
 
-    $stmt = db()->prepare(
+    $stmt = db()->prepare(db_upsert_sql(
         'INSERT INTO rumble_player_state (game_id, user_id, current_health, ship_name, owned_abilities_json) '
-        . 'VALUES (:game_id, :user_id, 100, :ship_name, :owned_abilities_json) '
-        . 'ON DUPLICATE KEY UPDATE ship_name = :ship_name_update'
-    );
+        . 'VALUES (:game_id, :user_id, 100, :ship_name, :owned_abilities_json)',
+        ['game_id', 'user_id'],
+        [
+            'ship_name' => ':ship_name_update',
+        ]
+    ));
     $stmt->execute([
         'game_id' => $gameId,
         'user_id' => (int)$user['id'],
@@ -2905,13 +2928,16 @@ function rumble_action_resolve_bidding_and_enter_battle(int $gameId, int $roundN
 {
     $pdo = db();
 
-    $ensureStmt = $pdo->prepare(
+    $ensureStmt = $pdo->prepare(db_upsert_sql(
         'INSERT INTO rumble_player_state (game_id, user_id, current_health) '
         . 'SELECT gm.game_id, gm.user_id, 100 FROM game_members gm '
         . 'JOIN users u ON u.id = gm.user_id '
-        . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1 '
-        . 'ON DUPLICATE KEY UPDATE current_health = current_health'
-    );
+        . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1',
+        ['game_id', 'user_id'],
+        [
+            'current_health' => 'current_health',
+        ]
+    ));
     $ensureStmt->execute([
         'game_id' => $gameId,
         'observer_role' => 'observer',
@@ -3047,10 +3073,13 @@ function rumble_action_resolve_bidding_and_enter_battle(int $gameId, int $roundN
 
     $pdo->beginTransaction();
     try {
-        $updateStateStmt = $pdo->prepare(
-            'INSERT INTO game_state (game_id, phase, current_round) VALUES (:game_id, :phase, :current_round) '
-            . 'ON DUPLICATE KEY UPDATE phase = :phase_update'
-        );
+        $updateStateStmt = $pdo->prepare(db_upsert_sql(
+            'INSERT INTO game_state (game_id, phase, current_round) VALUES (:game_id, :phase, :current_round)',
+            ['game_id'],
+            [
+                'phase' => ':phase_update',
+            ]
+        ));
         $updateStateStmt->execute([
             'game_id' => $gameId,
             'phase' => 'battle',
@@ -3172,13 +3201,16 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
 {
     $pdo = db();
 
-    $ensureStmt = $pdo->prepare(
+    $ensureStmt = $pdo->prepare(db_upsert_sql(
         'INSERT INTO rumble_player_state (game_id, user_id, current_health) '
         . 'SELECT gm.game_id, gm.user_id, 100 FROM game_members gm '
         . 'JOIN users u ON u.id = gm.user_id '
-        . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1 '
-        . 'ON DUPLICATE KEY UPDATE current_health = current_health'
-    );
+        . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1',
+        ['game_id', 'user_id'],
+        [
+            'current_health' => 'current_health',
+        ]
+    ));
     $ensureStmt->execute([
         'game_id' => $gameId,
         'observer_role' => 'observer',
@@ -3973,10 +4005,14 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
             }
         }
 
-        $stateStmt = $pdo->prepare(
-            'INSERT INTO game_state (game_id, phase, current_round) VALUES (:game_id, :phase, :current_round) '
-            . 'ON DUPLICATE KEY UPDATE current_round = GREATEST(current_round, :next_round), phase = :phase_update'
-        );
+        $stateStmt = $pdo->prepare(db_upsert_sql(
+            'INSERT INTO game_state (game_id, phase, current_round) VALUES (:game_id, :phase, :current_round)',
+            ['game_id'],
+            [
+                'current_round' => db_greatest_sql('current_round', ':next_round'),
+                'phase' => ':phase_update',
+            ]
+        ));
         $stateStmt->execute([
             'game_id' => $gameId,
             'phase' => 'battle',

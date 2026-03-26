@@ -7,14 +7,22 @@ declare(strict_types=1);
 
 return [
     'db' => [
+        'driver' => 'mysql',
         'host' => 'localhost',
         'port' => '3306',
         'name' => 'u709836584_party',
         'user' => 'u709836584_party_app',
         'pass' => 'BaconTreasureMonkeyBible',
         'charset' => 'utf8mb4',
+        'sqlite_path' => __DIR__ . '/../data/party.sqlite',
+    ],
+    'session' => [
+        'save_path' => __DIR__ . '/../data/sessions',
     ],
     'cors' => [
         'allow_origin' => '*',
+    ],
+    'auth' => [
+        'enforce_https' => true,
     ],
 ];

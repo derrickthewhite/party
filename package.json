@@ -1,0 +1,9 @@
+{
+  "name": "party-local-host",
+  "private": true,
+  "version": "0.1.0",
+  "description": "In-place Node host for the Party PHP app",
+  "scripts": {
+    "start": "node server/index.js"
+  }
+}

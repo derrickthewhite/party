@@ -248,10 +248,13 @@ function games_join(int $gameId): void
         error_response('Game is not joinable.', 409);
     }
 
-    $stmt = db()->prepare(
-        'INSERT INTO game_members (game_id, user_id, role) VALUES (:game_id, :user_id, :role) '
-        . 'ON DUPLICATE KEY UPDATE role = CASE WHEN role = :owner_role THEN role ELSE :player_role END'
-    );
+    $stmt = db()->prepare(db_upsert_sql(
+        'INSERT INTO game_members (game_id, user_id, role) VALUES (:game_id, :user_id, :role)',
+        ['game_id', 'user_id'],
+        [
+            'role' => 'CASE WHEN role = :owner_role THEN role ELSE :player_role END',
+        ]
+    ));
     $stmt->execute([
         'game_id' => $gameId,
         'user_id' => $user['id'],
@@ -317,11 +320,16 @@ function games_start(int $gameId): void
             'id' => $gameId,
         ]);
 
-        $stateStmt = $pdo->prepare(
+        $stateStmt = $pdo->prepare(db_upsert_sql(
             'INSERT INTO game_state (game_id, phase, current_round, started_at, ended_at) '
-            . 'VALUES (:game_id, :phase, :round_number, NOW(), NULL) '
-            . 'ON DUPLICATE KEY UPDATE started_at = NOW(), ended_at = NULL, phase = :phase_update'
-        );
+            . 'VALUES (:game_id, :phase, :round_number, ' . db_now_sql() . ', NULL)',
+            ['game_id'],
+            [
+                'started_at' => db_now_sql(),
+                'ended_at' => 'NULL',
+                'phase' => ':phase_update',
+            ]
+        ));
         $phase = default_phase_for_game_type((string)$game['game_type']);
         $stateStmt->execute([
             'game_id' => $gameId,
@@ -369,11 +377,14 @@ function games_end(int $gameId): void
             'id' => $gameId,
         ]);
 
-        $stateStmt = $pdo->prepare(
+        $stateStmt = $pdo->prepare(db_upsert_sql(
             'INSERT INTO game_state (game_id, phase, current_round, ended_at) '
-            . 'VALUES (:game_id, :phase, :round_number, NOW()) '
-            . 'ON DUPLICATE KEY UPDATE ended_at = NOW()'
-        );
+            . 'VALUES (:game_id, :phase, :round_number, ' . db_now_sql() . ')',
+            ['game_id'],
+            [
+                'ended_at' => db_now_sql(),
+            ]
+        ));
         $stateStmt->execute([
             'game_id' => $gameId,
             'phase' => default_phase_for_game_type((string)$game['game_type']),

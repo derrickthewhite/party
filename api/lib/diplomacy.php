@@ -2,6 +2,8 @@
 
 declare(strict_types=1);
 
+require_once __DIR__ . '/sql.php';
+
 function diplomacy_game_build_detail_payload(int $gameId, array $game, array $user): array
 {
     unset($user);
@@ -97,7 +99,7 @@ function diplomacy_reveal_round_and_advance(int $gameId, int $roundNumber): int
     try {
         $revealStmt = $pdo->prepare(
             'UPDATE game_actions '
-            . 'SET revealed_at = NOW() '
+            . 'SET revealed_at = ' . db_now_sql() . ' '
             . 'WHERE game_id = :game_id AND round_number = :round_number AND action_type = :action_type AND revealed_at IS NULL'
         );
         $revealStmt->execute([
@@ -107,10 +109,14 @@ function diplomacy_reveal_round_and_advance(int $gameId, int $roundNumber): int
         ]);
         $updated = $revealStmt->rowCount();
 
-        $stateStmt = $pdo->prepare(
-            'INSERT INTO game_state (game_id, phase, current_round) VALUES (:game_id, :phase, :current_round) '
-            . 'ON DUPLICATE KEY UPDATE current_round = GREATEST(current_round, :next_round), phase = :phase_update'
-        );
+        $stateStmt = $pdo->prepare(db_upsert_sql(
+            'INSERT INTO game_state (game_id, phase, current_round) VALUES (:game_id, :phase, :current_round)',
+            ['game_id'],
+            [
+                'current_round' => db_greatest_sql('current_round', ':next_round'),
+                'phase' => ':phase_update',
+            ]
+        ));
         $stateStmt->execute([
             'game_id' => $gameId,
             'phase' => 'orders',
