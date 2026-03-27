@@ -2,3 +2,7 @@ api/config.local.php
 data/*.sqlite
 data/sessions/
 runtime/php/windows/
+.tmp/
+playwright-report/
+test-results/
+node_modules/

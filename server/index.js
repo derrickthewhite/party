@@ -5,7 +5,6 @@ const { spawn, spawnSync } = require('child_process');
 
 const rootDir = path.resolve(__dirname, '..');
 const dataDir = path.join(rootDir, 'data');
-const sessionDir = path.join(dataDir, 'sessions');
 const bundledPhp = path.join(rootDir, 'runtime', 'php', 'windows', 'php.exe');
 
 const publicHost = process.env.PARTY_HOST || '127.0.0.1';
@@ -14,6 +13,8 @@ const phpHost = process.env.PARTY_PHP_HOST || '127.0.0.1';
 const phpPort = Number(process.env.PARTY_PHP_PORT || 8081);
 const dbDriver = (process.env.PARTY_DB_DRIVER || 'sqlite').toLowerCase() === 'mysql' ? 'mysql' : 'sqlite';
 const sqlitePath = process.env.PARTY_DB_SQLITE_PATH || path.join(dataDir, 'party.sqlite');
+// Test harnesses can override the session path so E2E runs do not reuse normal local session files.
+const sessionDir = process.env.PARTY_SESSION_SAVE_PATH || path.join(dataDir, 'sessions');
 const phpBin = process.env.PARTY_PHP_BIN || (fs.existsSync(bundledPhp) ? bundledPhp : 'php');
 
 const phpEnv = {

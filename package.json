@@ -3,7 +3,14 @@
   "private": true,
   "version": "0.1.0",
   "description": "In-place Node host for the Party PHP app",
+  "devDependencies": {
+    "@playwright/test": "^1.54.2"
+  },
   "scripts": {
-    "start": "node server/index.js"
+    "start": "node server/index.js",
+    "e2e": "playwright test",
+    "e2e:headed": "playwright test --headed",
+    "e2e:debug": "playwright test --debug",
+    "e2e:install": "playwright install chromium"
   }
 }
