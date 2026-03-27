@@ -24,6 +24,11 @@ module.exports = defineConfig({
       testMatch: /games\.spec\.js/,
       dependencies: ['setup'],
     },
+    {
+      name: 'rumble',
+      testMatch: /rumble\.spec\.js/,
+      dependencies: ['setup'],
+    },
   ],
   reporter: [
     ['list'],

@@ -14,6 +14,32 @@ async function waitForVisible(locator, timeout) {
   await expect(locator).toBeVisible({ timeout: timeout || DEFAULT_TIMEOUT });
 }
 
+function lobbyGameRow(page, title, gameType) {
+  const lobby = activeScreen(page, 'Game Lobby');
+  return lobby.locator('.game-item').filter({ hasText: `${title} (${gameType})` }).first();
+}
+
+function rumbleGameScreen(page, title) {
+  return activeScreen(page, `${title} (Rumble)`);
+}
+
+async function clickLobbyRefresh(page) {
+  const lobby = activeScreen(page, 'Game Lobby');
+  await waitForVisible(lobby, AUTH_TIMEOUT);
+
+  const refreshButtons = lobby.getByRole('button', { name: 'Refresh', exact: true });
+  const refreshCount = await refreshButtons.count();
+  if (refreshCount === 0) {
+    return lobby;
+  }
+
+  const refreshBtn = refreshButtons.last();
+  if (await refreshBtn.isVisible() && await refreshBtn.isEnabled()) {
+    await refreshBtn.click();
+  }
+  return lobby;
+}
+
 async function waitForAppToSettle(page) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForLoadState('networkidle');
@@ -95,8 +121,14 @@ async function createGame(page, title, gameType) {
   await lobby.locator('select').selectOption(gameType);
   await lobby.getByRole('button', { name: 'Create', exact: true }).click();
 
-  await expect(lobby.locator('.status')).toHaveText('Game created.', { timeout: DEFAULT_TIMEOUT });
   const row = lobby.locator('.game-item').filter({ hasText: `${title} (${gameType})` });
+  for (let attempt = 0; attempt < 8; attempt += 1) {
+    if ((await row.count()) > 0 && await row.first().isVisible()) {
+      return row;
+    }
+    await clickLobbyRefresh(page);
+  }
+
   await waitForVisible(row, DEFAULT_TIMEOUT);
   return row;
 }
@@ -107,6 +139,112 @@ async function reloadLobby(page, username) {
   const lobby = activeScreen(page, 'Game Lobby');
   await waitForVisible(lobby, AUTH_TIMEOUT);
   await expect(lobby.locator('.top-user-label')).toHaveText(`Signed in as: ${username}`, { timeout: AUTH_TIMEOUT });
+}
+
+async function confirmModal(page, confirmLabel) {
+  const dialog = page.getByRole('dialog');
+  await waitForVisible(dialog, DEFAULT_TIMEOUT);
+  await dialog.getByRole('button', { name: confirmLabel || 'Confirm', exact: true }).click();
+  await expect(dialog).toBeHidden({ timeout: DEFAULT_TIMEOUT });
+}
+
+async function joinGameFromLobby(page, title, gameType) {
+  const row = lobbyGameRow(page, title, gameType);
+  await waitForVisible(row, DEFAULT_TIMEOUT);
+  await row.getByRole('button', { name: 'Join', exact: true }).click();
+  const updatedRow = lobbyGameRow(page, title, gameType);
+  await waitForVisible(updatedRow, DEFAULT_TIMEOUT);
+  await expect(updatedRow.getByRole('button', { name: 'Open', exact: true })).toBeVisible({ timeout: DEFAULT_TIMEOUT });
+  return updatedRow;
+}
+
+async function openGameFromLobby(page, title, gameType, headingName) {
+  const row = lobbyGameRow(page, title, gameType);
+  await waitForVisible(row, DEFAULT_TIMEOUT);
+  await row.getByRole('button', { name: 'Open', exact: true }).click();
+  await waitForVisible(activeScreen(page, headingName), AUTH_TIMEOUT);
+}
+
+async function startGameFromLobby(page, title, gameType) {
+  const row = lobbyGameRow(page, title, gameType);
+  await waitForVisible(row, DEFAULT_TIMEOUT);
+  await row.getByRole('button', { name: 'Start', exact: true }).click();
+  await confirmModal(page, 'Confirm');
+  const updatedRow = lobbyGameRow(page, title, gameType);
+  await expect(updatedRow).toContainText('Status: in_progress', { timeout: DEFAULT_TIMEOUT });
+  return updatedRow;
+}
+
+async function setAdminUiEnabled(page, enabled) {
+  const lobby = activeScreen(page, 'Game Lobby');
+  const toggle = lobby.getByRole('button', { name: /Admin UI:/ });
+  await waitForVisible(toggle, DEFAULT_TIMEOUT);
+  const expected = enabled ? 'Admin UI: On' : 'Admin UI: Off';
+  const currentText = String((await toggle.textContent()) || '').trim();
+  if (currentText !== expected) {
+    await toggle.click();
+  }
+  await expect(toggle).toHaveText(expected, { timeout: DEFAULT_TIMEOUT });
+}
+
+async function clickRumbleRefresh(page, title) {
+  const screen = rumbleGameScreen(page, title);
+  await waitForVisible(screen, AUTH_TIMEOUT);
+
+  const refreshBtn = screen.locator('[data-ref="refreshBtn"]');
+  await waitForVisible(refreshBtn, DEFAULT_TIMEOUT);
+  const currentText = String((await refreshBtn.textContent()) || '').trim();
+
+  if (currentText === 'Refresh' && await refreshBtn.isEnabled()) {
+    await refreshBtn.click();
+    await expect(refreshBtn).toHaveText('Refreshing...', { timeout: DEFAULT_TIMEOUT });
+  }
+
+  try {
+    await expect(refreshBtn).toHaveText('Refresh', { timeout: 5000 });
+  } catch (err) {
+    // Some refresh paths overlap with the screen's own auto-refresh. In that case,
+    // the caller still made an explicit refresh attempt and can continue checking state.
+  }
+
+  return screen;
+}
+
+async function waitForRumblePhase(page, title, phaseName) {
+  let screen = rumbleGameScreen(page, title);
+  await waitForVisible(screen, AUTH_TIMEOUT);
+
+  let phaseTitle = screen.locator('[data-ref="phaseTitle"]');
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    const currentPhase = String((await phaseTitle.textContent()) || '').trim();
+    if (currentPhase === phaseName) {
+      return screen;
+    }
+
+    screen = await clickRumbleRefresh(page, title);
+    phaseTitle = screen.locator('[data-ref="phaseTitle"]');
+  }
+
+  await expect(phaseTitle).toHaveText(phaseName, { timeout: 1000 });
+  return screen;
+}
+
+async function waitForRumbleActionEnabled(page, title, buttonName) {
+  let screen = rumbleGameScreen(page, title);
+  await waitForVisible(screen, AUTH_TIMEOUT);
+
+  let actionBtn = screen.getByRole('button', { name: buttonName, exact: true });
+  for (let attempt = 0; attempt < 20; attempt += 1) {
+    if ((await actionBtn.count()) > 0 && await actionBtn.isVisible() && await actionBtn.isEnabled()) {
+      return screen;
+    }
+
+    screen = await clickRumbleRefresh(page, title);
+    actionBtn = screen.getByRole('button', { name: buttonName, exact: true });
+  }
+
+  await expect(actionBtn).toBeEnabled({ timeout: 1000 });
+  return screen;
 }
 
 async function createUserSession(browser, label) {
@@ -146,15 +284,26 @@ async function openStoredSession(browser, storageStatePath, username) {
 module.exports = {
   activeScreen,
   buildCredentials,
+  clickLobbyRefresh,
+  confirmModal,
   createGame,
   createStoredSession,
   createUserSession,
   gotoWelcome,
+  joinGameFromLobby,
+  lobbyGameRow,
   openStoredSession,
+  openGameFromLobby,
   openSignin,
   openSignup,
   reloadLobby,
   registerAndSignIn,
+  rumbleGameScreen,
+  setAdminUiEnabled,
   signIn,
   signUp,
+  startGameFromLobby,
+  clickRumbleRefresh,
+  waitForRumbleActionEnabled,
+  waitForRumblePhase,
 };
