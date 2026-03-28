@@ -103,7 +103,7 @@ INSERT INTO `game_state` (`game_id`, `phase`, `current_round`, `started_at`, `en
 SELECT
   g.id,
   CASE
-    WHEN LOWER(g.game_type) = 'mafia' THEN 'day'
+    WHEN LOWER(g.game_type) = 'mafia' THEN 'start'
     WHEN LOWER(g.game_type) = 'diplomacy' THEN 'orders'
     WHEN LOWER(g.game_type) = 'rumble' THEN 'bidding'
     ELSE 'chat'

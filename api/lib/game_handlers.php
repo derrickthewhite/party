@@ -10,6 +10,7 @@ require_once __DIR__ . '/rumble.php';
 function game_detail_payload_defaults(): array
 {
     return [
+        'mafia_state' => null,
         'diplomacy_order_progress' => null,
         'rumble_turn_progress' => null,
         'final_standings' => null,
@@ -28,6 +29,7 @@ function game_handler_registry(): array
         'stub' => [],
         'mafia' => [
             'on_start' => 'mafia_game_on_start',
+            'build_detail_payload' => 'mafia_game_build_detail_payload',
         ],
         'diplomacy' => [
             'build_detail_payload' => 'diplomacy_game_build_detail_payload',
@@ -66,21 +68,31 @@ function game_action_row_is_visible(string $gameType, array $row): bool
         return false;
     }
 
+    if ($type === 'mafia' && ($row['revealed_at'] ?? null) === null) {
+        return false;
+    }
+
     return true;
 }
 
-function game_action_validate_generic_create(string $gameType, string $actionType): void
+function game_action_validate_generic_create(string $gameType, string $actionType, int $gameId = 0, int $userId = 0, array $payload = []): void
 {
     $type = normalize_game_type($gameType);
 
     if ($type === 'rumble' && $actionType === 'order') {
         error_response('Use the rumble order endpoint for order submission.', 409);
     }
+
+    if ($type === 'mafia') {
+        mafia_validate_action_create($gameId, $userId, $actionType, $payload);
+    }
 }
 
 function game_action_default_revealed_at(string $gameType): ?string
 {
-    return normalize_game_type($gameType) === 'diplomacy'
+    $type = normalize_game_type($gameType);
+
+    return ($type === 'diplomacy' || $type === 'mafia')
         ? null
         : gmdate('Y-m-d H:i:s');
 }
@@ -91,6 +103,11 @@ function game_action_after_generic_create(string $gameType, int $gameId, int $ro
 
     if ($type === 'diplomacy' && $actionType === 'order') {
         diplomacy_maybe_auto_reveal($gameId, $roundNumber);
+        return;
+    }
+
+    if ($type === 'mafia') {
+        mafia_after_action_create($gameId, $roundNumber, $actionType);
     }
 }
 

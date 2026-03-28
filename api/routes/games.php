@@ -458,61 +458,92 @@ function games_leave(int $gameId): void
 function games_detail(int $gameId): void
 {
     $user = require_user();
+    $stage = 'games_detail.load_game';
 
-    $stmt = db()->prepare(
-        'SELECT g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, u.username AS owner_username, '
-        . 'gs.phase, gs.current_round '
-        . 'FROM games g '
-        . 'JOIN users u ON u.id = g.owner_user_id '
-        . 'LEFT JOIN game_state gs ON gs.game_id = g.id '
-        . 'WHERE g.id = :id LIMIT 1'
-    );
-    $stmt->execute(['id' => $gameId]);
-    $game = $stmt->fetch();
+    try {
+        $stmt = db()->prepare(
+            'SELECT g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, u.username AS owner_username, '
+            . 'gs.phase, gs.current_round '
+            . 'FROM games g '
+            . 'JOIN users u ON u.id = g.owner_user_id '
+            . 'LEFT JOIN game_state gs ON gs.game_id = g.id '
+            . 'WHERE g.id = :id LIMIT 1'
+        );
+        $stmt->execute(['id' => $gameId]);
+        $game = $stmt->fetch();
 
-    if (!$game) {
-        error_response('Game not found.', 404);
-    }
-
-    $memberRole = game_member_role((int)$user['id'], $gameId);
-    $permissions = game_permissions_for_user($game, $user, $memberRole);
-    $membersByGame = games_members_by_game([$gameId]);
-    $members = $membersByGame[$gameId] ?? [];
-    $observerCount = 0;
-    $playerCount = 0;
-    foreach ($members as $member) {
-        if ((string)$member['role'] === 'observer') {
-            $observerCount += 1;
-        } else {
-            $playerCount += 1;
+        if (!$game) {
+            error_response('Game not found.', 404);
         }
-    }
-    $detailPayload = array_merge(
-        game_detail_payload_defaults(),
-        game_handler_build_detail_payload((string)$game['game_type'], $gameId, $game, $user)
-    );
 
-    success_response([
-        'game' => [
-            'id' => (int)$game['id'],
-			'owner_user_id' => (int)$game['owner_user_id'],
-            'title' => (string)$game['title'],
-            'game_type' => (string)$game['game_type'],
-            'status' => (string)$game['status'],
-            'created_at' => (string)$game['created_at'],
-            'owner_username' => (string)$game['owner_username'],
-            'phase' => (string)($game['phase'] ?? default_phase_for_game_type((string)$game['game_type'])),
-            'current_round' => (int)($game['current_round'] ?? 1),
-			'member_count' => count($members),
-			'observer_count' => $observerCount,
-			'player_count' => $playerCount,
-			'members' => $members,
-            'is_member' => $memberRole !== null,
-            'member_role' => $memberRole,
-            'permissions' => $permissions,
-            'diplomacy_order_progress' => $detailPayload['diplomacy_order_progress'],
-            'rumble_turn_progress' => $detailPayload['rumble_turn_progress'],
-            'final_standings' => $detailPayload['final_standings'],
-        ],
-    ]);
+        $stage = 'games_detail.build_detail_payload';
+        $detailPayload = array_merge(
+            game_detail_payload_defaults(),
+            game_handler_build_detail_payload((string)$game['game_type'], $gameId, $game, $user)
+        );
+
+        $stage = 'games_detail.refresh_game';
+        $refreshStmt = db()->prepare(
+            'SELECT g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, u.username AS owner_username, '
+            . 'gs.phase, gs.current_round '
+            . 'FROM games g '
+            . 'JOIN users u ON u.id = g.owner_user_id '
+            . 'LEFT JOIN game_state gs ON gs.game_id = g.id '
+            . 'WHERE g.id = :id LIMIT 1'
+        );
+        $refreshStmt->execute(['id' => $gameId]);
+        $refreshedGame = $refreshStmt->fetch();
+        if ($refreshedGame) {
+            $game = $refreshedGame;
+        }
+
+        $stage = 'games_detail.members';
+        $memberRole = game_member_role((int)$user['id'], $gameId);
+        $permissions = game_permissions_for_user($game, $user, $memberRole);
+        $membersByGame = games_members_by_game([$gameId]);
+        $members = $membersByGame[$gameId] ?? [];
+        $observerCount = 0;
+        $playerCount = 0;
+        foreach ($members as $member) {
+            if ((string)$member['role'] === 'observer') {
+                $observerCount += 1;
+            } else {
+                $playerCount += 1;
+            }
+        }
+
+        success_response([
+            'game' => [
+                'id' => (int)$game['id'],
+				'owner_user_id' => (int)$game['owner_user_id'],
+                'title' => (string)$game['title'],
+                'game_type' => (string)$game['game_type'],
+                'status' => (string)$game['status'],
+                'created_at' => (string)$game['created_at'],
+                'owner_username' => (string)$game['owner_username'],
+                'phase' => (string)($game['phase'] ?? default_phase_for_game_type((string)$game['game_type'])),
+                'current_round' => (int)($game['current_round'] ?? 1),
+				'member_count' => count($members),
+				'observer_count' => $observerCount,
+				'player_count' => $playerCount,
+				'members' => $members,
+                'is_member' => $memberRole !== null,
+                'member_role' => $memberRole,
+                'permissions' => $permissions,
+                'mafia_state' => $detailPayload['mafia_state'],
+                'diplomacy_order_progress' => $detailPayload['diplomacy_order_progress'],
+                'rumble_turn_progress' => $detailPayload['rumble_turn_progress'],
+                'final_standings' => $detailPayload['final_standings'],
+            ],
+        ]);
+    } catch (Throwable $ex) {
+        if (isset($game) && is_array($game) && normalize_game_type((string)($game['game_type'] ?? '')) === 'mafia') {
+            mafia_error_response('Unable to load mafia game detail.', 500, $stage, $ex, [
+                'game_id' => $gameId,
+                'viewer_user_id' => (int)($user['id'] ?? 0),
+            ]);
+        }
+
+        throw $ex;
+    }
 }

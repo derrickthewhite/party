@@ -26,7 +26,7 @@ function default_phase_for_game_type(string $gameType): string
 {
     $type = normalize_game_type($gameType);
     if ($type === 'mafia') {
-        return 'day';
+        return 'start';
     }
     if ($type === 'diplomacy') {
         return 'orders';

@@ -178,59 +178,77 @@ function actions_create(int $gameId): void
 {
     $user = require_user();
     $role = game_require_member_or_403((int)$user['id'], $gameId);
+    $stage = 'actions_create.member_role';
 
     if ($role === 'observer') {
         error_response('Observers cannot submit actions.', 403);
     }
 
-    $game = game_find_by_id($gameId);
-    if ($game === null) {
-        error_response('Game not found.', 404);
+    try {
+        $stage = 'actions_create.load_game';
+        $game = game_find_by_id($gameId);
+        if ($game === null) {
+            error_response('Game not found.', 404);
+        }
+
+        if ((string)$game['status'] !== 'in_progress') {
+            error_response('Game actions are only allowed while game is in progress.', 409);
+        }
+
+        $stage = 'actions_create.parse_body';
+        $body = json_input();
+        $actionType = trim((string)($body['action_type'] ?? ''));
+        $payload = $body['payload'] ?? [];
+        if ($actionType === '' || strlen($actionType) > 40) {
+            error_response('Action type is required and must be at most 40 characters.', 422);
+        }
+
+        if (!is_array($payload)) {
+            error_response('Action payload must be an object.', 422);
+        }
+
+        $stage = 'actions_create.validate';
+        game_action_validate_generic_create((string)$game['game_type'], $actionType, $gameId, (int)$user['id'], $payload);
+
+        $stage = 'actions_create.load_state';
+        $stateStmt = db()->prepare('SELECT current_round, phase FROM game_state WHERE game_id = :game_id LIMIT 1');
+        $stateStmt->execute(['game_id' => $gameId]);
+        $state = $stateStmt->fetch();
+
+        $roundNumber = (int)($state['current_round'] ?? 1);
+        $phase = (string)($state['phase'] ?? default_phase_for_game_type((string)$game['game_type']));
+
+        $revealedAt = game_action_default_revealed_at((string)$game['game_type']);
+
+        $stage = 'actions_create.insert';
+        $insert = db()->prepare(
+            'INSERT INTO game_actions (game_id, user_id, action_type, payload, round_number, phase, revealed_at) '
+            . 'VALUES (:game_id, :user_id, :action_type, :payload, :round_number, :phase, :revealed_at)'
+        );
+        $insert->execute([
+            'game_id' => $gameId,
+            'user_id' => $user['id'],
+            'action_type' => $actionType,
+            'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
+            'round_number' => $roundNumber,
+            'phase' => $phase,
+            'revealed_at' => $revealedAt,
+        ]);
+
+        $stage = 'actions_create.after_create';
+        game_action_after_generic_create((string)$game['game_type'], $gameId, $roundNumber, $actionType);
+
+        success_response(['created' => true], 201);
+    } catch (Throwable $ex) {
+        if (isset($game) && is_array($game) && normalize_game_type((string)($game['game_type'] ?? '')) === 'mafia') {
+            mafia_error_response('Unable to create mafia action.', 500, $stage, $ex, [
+                'game_id' => $gameId,
+                'user_id' => (int)$user['id'],
+            ]);
+        }
+
+        throw $ex;
     }
-
-    if ((string)$game['status'] !== 'in_progress') {
-        error_response('Game actions are only allowed while game is in progress.', 409);
-    }
-
-    $body = json_input();
-    $actionType = trim((string)($body['action_type'] ?? ''));
-    $payload = $body['payload'] ?? [];
-    if ($actionType === '' || strlen($actionType) > 40) {
-        error_response('Action type is required and must be at most 40 characters.', 422);
-    }
-
-    if (!is_array($payload)) {
-        error_response('Action payload must be an object.', 422);
-    }
-
-    game_action_validate_generic_create((string)$game['game_type'], $actionType);
-
-    $stateStmt = db()->prepare('SELECT current_round, phase FROM game_state WHERE game_id = :game_id LIMIT 1');
-    $stateStmt->execute(['game_id' => $gameId]);
-    $state = $stateStmt->fetch();
-
-    $roundNumber = (int)($state['current_round'] ?? 1);
-    $phase = (string)($state['phase'] ?? default_phase_for_game_type((string)$game['game_type']));
-
-    $revealedAt = game_action_default_revealed_at((string)$game['game_type']);
-
-    $insert = db()->prepare(
-        'INSERT INTO game_actions (game_id, user_id, action_type, payload, round_number, phase, revealed_at) '
-        . 'VALUES (:game_id, :user_id, :action_type, :payload, :round_number, :phase, :revealed_at)'
-    );
-    $insert->execute([
-        'game_id' => $gameId,
-        'user_id' => $user['id'],
-        'action_type' => $actionType,
-        'payload' => json_encode($payload, JSON_UNESCAPED_UNICODE),
-        'round_number' => $roundNumber,
-        'phase' => $phase,
-        'revealed_at' => $revealedAt,
-    ]);
-
-    game_action_after_generic_create((string)$game['game_type'], $gameId, $roundNumber, $actionType);
-
-    success_response(['created' => true], 201);
 }
 
 function actions_force_reveal(int $gameId): void

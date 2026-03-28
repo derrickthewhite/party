@@ -182,6 +182,76 @@ button:disabled {
   margin-top: 10px;
 }
 
+.mafia-panel {
+  display: grid;
+  gap: 12px;
+}
+
+.mafia-summary,
+.mafia-ready-card,
+.mafia-vote-card,
+.mafia-history {
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.82);
+  padding: 12px;
+}
+
+.mafia-summary {
+  color: var(--ink);
+  background: color-mix(in srgb, var(--accent-2) 10%, #fff);
+}
+
+.mafia-selection-row {
+  justify-content: space-between;
+  align-items: center;
+}
+
+.mafia-selection-text {
+  color: var(--ink);
+}
+
+.mafia-target-list {
+  margin-top: 12px;
+}
+
+.mafia-target-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: #fff;
+}
+
+.mafia-target-row.is-selected {
+  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
+  box-shadow: 0 0 0 3px rgba(208, 74, 42, 0.12);
+}
+
+.mafia-target-copy {
+  min-width: 0;
+}
+
+.mafia-target-name {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.mafia-target-meta {
+  color: var(--muted);
+}
+
+.mafia-result-row {
+  background: rgba(255, 255, 255, 0.72);
+  border-radius: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  margin-bottom: 0;
+}
+
 .game-item {
   border: 1px solid var(--line);
   border-radius: 10px;

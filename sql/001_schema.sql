@@ -73,6 +73,7 @@ CREATE TABLE IF NOT EXISTS `game_messages` (
 
 CREATE TABLE IF NOT EXISTS `game_state` (
   `game_id` BIGINT UNSIGNED NOT NULL,
+  -- Shared per-game phase state. Mafia uses start|day|night.
   `phase` VARCHAR(40) NOT NULL DEFAULT 'chat',
   `current_round` INT UNSIGNED NOT NULL DEFAULT 1,
   `started_at` TIMESTAMP NULL DEFAULT NULL,
@@ -109,10 +110,16 @@ CREATE TABLE IF NOT EXISTS `game_actions` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `game_id` BIGINT UNSIGNED NOT NULL,
   `user_id` BIGINT UNSIGNED NOT NULL,
+  -- Mafia stores player submissions and server-generated summaries here:
+  -- mafia_ready, mafia_day_vote, mafia_night_vote,
+  -- mafia_day_result, mafia_night_result, mafia_game_over.
   `action_type` VARCHAR(40) NOT NULL,
   `payload` JSON NOT NULL,
   `round_number` INT UNSIGNED NOT NULL DEFAULT 1,
+  -- Shared per-action phase stamp. Mafia uses start|day|night.
   `phase` VARCHAR(40) NOT NULL DEFAULT 'chat',
+  -- Mafia keeps player submissions hidden until resolution and reveals only
+  -- server-generated result rows immediately.
   `revealed_at` TIMESTAMP NULL DEFAULT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
