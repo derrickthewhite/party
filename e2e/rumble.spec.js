@@ -17,6 +17,8 @@ const { readCredentials, storageStatePath } = require('./helpers/sessionArtifact
 
 test.setTimeout(180000);
 
+const ADMIN_CHEAT_TIMEOUT = 45000;
+
 function tlog(...args) {
   console.log(new Date().toISOString(), ...args);
 }
@@ -139,21 +141,88 @@ async function endBidding(screen) {
   await confirmModal(screen.page(), 'End Bidding');
 }
 
-async function grantArmor(screen, targetUsername) {
+async function openAdminCheatPanel(screen) {
   const toggle = screen.getByRole('button', { name: 'Admin Cheat: Show', exact: true });
-  await expect(toggle).toBeVisible();
-  await toggle.click();
-
   const panel = screen.locator('[data-ref="adminCheatPanel"]');
+  if (!(await panel.isVisible())) {
+    await expect(toggle).toBeVisible();
+    await toggle.click();
+  }
   await expect(panel).toBeVisible();
+  return panel;
+}
+
+async function selectAdminCheatTarget(panel, targetUsername) {
   await panel.locator('#rumble-admin-cheat-target').selectOption({ label: targetUsername });
+}
 
-  const armorRow = panel.locator('[data-ref="adminCheatAbilityList"] label').filter({ hasText: 'Reduce each incoming attack by 5.' }).first();
-  await expect(armorRow).toBeVisible();
-  await armorRow.locator('input[type="checkbox"]').check();
+async function selectAdminCheatAbilities(panel, abilityIds) {
+  const selectedIds = new Set((abilityIds || []).map(function mapAbilityId(abilityId) {
+    return String(abilityId);
+  }));
+  const checkboxes = panel.locator('[data-ref="adminCheatAbilityList"] input[type="checkbox"][data-ability-id]');
+  const checkboxCount = await checkboxes.count();
 
-  await panel.getByRole('button', { name: 'Grant Selected', exact: true }).click();
-  await confirmModal(screen.page(), 'Grant Abilities');
+  for (let index = 0; index < checkboxCount; index += 1) {
+    const checkbox = checkboxes.nth(index);
+    const abilityId = String((await checkbox.getAttribute('data-ability-id')) || '');
+    if (!abilityId) {
+      continue;
+    }
+
+    if (selectedIds.has(abilityId)) {
+      await checkbox.check();
+    } else {
+      await checkbox.uncheck();
+    }
+  }
+
+  for (const abilityId of selectedIds) {
+    const checkbox = panel.locator(`[data-ref="adminCheatAbilityList"] input[type="checkbox"][data-ability-id="${abilityId}"]`).first();
+    await expect(checkbox).toBeVisible();
+    await checkbox.check();
+  }
+}
+
+async function updateAdminCheatAbilities(screen, targetUsername, abilityIds, actionButtonRef, actionButtonLabel, confirmLabel) {
+  const panel = await openAdminCheatPanel(screen);
+  await selectAdminCheatTarget(panel, targetUsername);
+  await selectAdminCheatAbilities(panel, abilityIds);
+  const actionButton = panel.locator(`[data-ref="${actionButtonRef}"]`);
+  await actionButton.click();
+  await confirmModal(screen.page(), confirmLabel);
+  await expect(actionButton).toHaveText(actionButtonLabel, { timeout: ADMIN_CHEAT_TIMEOUT });
+}
+
+async function grantAbilities(screen, targetUsername, abilityIds) {
+  await updateAdminCheatAbilities(screen, targetUsername, abilityIds, 'adminCheatGrantBtn', 'Grant Selected', 'Grant Abilities');
+}
+
+async function removeAbilities(screen, targetUsername, abilityIds) {
+  await updateAdminCheatAbilities(screen, targetUsername, abilityIds, 'adminCheatRevokeBtn', 'Remove Selected', 'Remove Abilities');
+}
+
+async function setPlayerHealthValue(screen, targetUsername, health) {
+  const panel = await openAdminCheatPanel(screen);
+  await selectAdminCheatTarget(panel, targetUsername);
+  const healthInput = panel.locator('#rumble-admin-cheat-health');
+  const setHealthButton = panel.locator('[data-ref="adminCheatSetHealthBtn"]');
+  await expect(healthInput).toBeVisible();
+  await healthInput.fill(String(health));
+  await setHealthButton.click();
+  await confirmModal(screen.page(), 'Set Health');
+  await expect(setHealthButton).toHaveText('Set Health', { timeout: ADMIN_CHEAT_TIMEOUT });
+}
+
+async function setPlayersHealthValue(screen, title, usernames, health) {
+  for (const username of usernames) {
+    await setPlayerHealthValue(screen, username, health);
+  }
+}
+
+async function refreshRumblePlayers(session, title) {
+  await clickRumbleRefresh(session.creator.page, title);
+  await clickRumbleRefresh(session.bob.page, title);
 }
 
 async function openStartedRumble(browser, title, options) {
@@ -247,6 +316,8 @@ test('two players can submit empty rumble bids and reach combat', async ({ brows
 });
 
 test('armor test', async ({ browser }) => {
+  test.setTimeout(360000);
+  const armorAbilityId = 'armor';
   const title = `rumble-armor-${Date.now().toString(36)}`;
   const session = await openStartedRumble(browser, title, { enableAdminUi: true });
 
@@ -263,14 +334,13 @@ test('armor test', async ({ browser }) => {
 
     const creatorCombatScreen = await waitForRumblePhase(session.creator.page, title, 'Rumble Combat');
     const bobCombatScreen = await waitForRumblePhase(session.bob.page, title, 'Rumble Combat');
+    const players = [session.creatorCredentials.username, session.bobCredentials.username];
 
     tlog('armor test: granting armor');
-    await grantArmor(creatorCombatScreen, session.creatorCredentials.username);
+    await grantAbilities(creatorCombatScreen, session.creatorCredentials.username, [armorAbilityId]);
     tlog('armor test: armor granted');
-    await clickRumbleRefresh(session.creator.page, title);
+    await refreshRumblePlayers(session, title);
     tlog('armor test: refreshed after grant (creator)');
-    await clickRumbleRefresh(session.bob.page, title);
-    tlog('armor test: refreshed after grant (bob)');
 
     await expect(getPlayerRow(creatorCombatScreen, session.creatorCredentials.username)).toBeVisible();
     await expectPlayerHealth(creatorCombatScreen, session.creatorCredentials.username, 100);
@@ -294,6 +364,31 @@ test('armor test', async ({ browser }) => {
 
     const resolvedScreen = await waitForPlayerHealth(session.bob.page, title, session.creatorCredentials.username, 85);
     await expectPlayerHealth(resolvedScreen, session.bobCredentials.username, 80);
+
+    tlog('armor test: resetting both players to 100');
+    await setPlayersHealthValue(creatorCombatScreen, title, players, 100);
+    await refreshRumblePlayers(session, title);
+    await waitForPlayerHealth(session.creator.page, title, session.creatorCredentials.username, 100);
+    const resetScreen = await waitForPlayerHealth(session.bob.page, title, session.bobCredentials.username, 100);
+    await expectPlayerHealth(resetScreen, session.creatorCredentials.username, 100);
+
+    tlog('armor test: removing armor');
+    await removeAbilities(creatorCombatScreen, session.creatorCredentials.username, [armorAbilityId]);
+    await refreshRumblePlayers(session, title);
+
+    tlog('armor test: setting attacks after armor removal');
+    await setAttack(creatorCombatScreen, session.bobCredentials.username, 60);
+    await setAttack(bobCombatScreen, session.creatorCredentials.username, 60);
+
+    await submitOrders(creatorCombatScreen);
+    await submitOrders(bobCombatScreen);
+
+    const secondTurnScreen = await waitForRumbleActionEnabled(session.creator.page, title, 'End Turn');
+    await secondTurnScreen.getByRole('button', { name: 'End Turn', exact: true }).click();
+    await confirmModal(session.creator.page, 'End Turn');
+
+    const unarmoredScreen = await waitForPlayerHealth(session.bob.page, title, session.creatorCredentials.username, 80);
+    await expectPlayerHealth(unarmoredScreen, session.bobCredentials.username, 80);
     tlog('armor test: verification complete');
   } finally {
     await closeSessionContexts(session.creator, session.bob);

@@ -339,6 +339,8 @@ export function createAdminCheatController(context) {
 			const checked = !!(context.localDraft.adminCheatSelections && context.localDraft.adminCheatSelections[key]);
 			const ownedCount = Math.max(0, Number(ownedCounts[key] || 0));
 
+			rowRefs.row.setAttribute('data-ability-id', key);
+			rowRefs.checkbox.setAttribute('data-ability-id', key);
 			rowRefs.name.textContent = String(ability.title || ability.name || key);
 			rowRefs.meta.textContent = String(ability.template_kind || 'unknown');
 			rowRefs.description.textContent = String(ability.description || '');
