@@ -28,6 +28,9 @@ module.exports = defineConfig({
       name: 'rumble',
       testMatch: /rumble\.spec\.js/,
       dependencies: ['setup'],
+      use: {
+        video: 'off',
+      },
     },
   ],
   reporter: [
