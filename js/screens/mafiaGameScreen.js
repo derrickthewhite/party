@@ -20,8 +20,8 @@ const MAFIA_PANEL_HTML = `
 		</div>
 		<div class="mafia-vote-card" data-ref="voteCard">
 			<div class="row mobile-stack mafia-selection-row">
-				<div class="mafia-selection-text" data-ref="selectionText"></div>
-				<button class="primary" data-ref="submitVoteBtn">Submit Vote</button>
+				<p class="mafia-selection-text" data-ref="voteText"></p>
+				<button data-ref="withdrawVoteBtn">Withdraw Vote</button>
 			</div>
 			<div class="list mafia-target-list" data-ref="targetsList"></div>
 			<p class="top-user-label" data-ref="emptyTargets">No valid targets right now.</p>
@@ -38,9 +38,13 @@ const TARGET_ROW_TEMPLATE_HTML = `
 	<div class="mafia-target-row">
 		<div class="mafia-target-copy">
 			<div class="mafia-target-name" data-ref="name"></div>
+			<div class="mafia-target-state" data-ref="state"></div>
 			<small class="mafia-target-meta" data-ref="meta"></small>
 		</div>
-		<button data-ref="selectBtn">Select</button>
+		<div class="mafia-target-actions" data-ref="actions">
+			<button class="button-ready" data-ref="suggestBtn">Suggest</button>
+			<button class="primary" data-ref="voteBtn">Vote</button>
+		</div>
 	</div>
 `;
 
@@ -67,8 +71,8 @@ export function createMafiaGameScreen(deps) {
 	const readyText = refs.readyText;
 	const readyBtn = refs.readyBtn;
 	const voteCard = refs.voteCard;
-	const selectionText = refs.selectionText;
-	const submitVoteBtn = refs.submitVoteBtn;
+	const voteText = refs.voteText;
+	const withdrawVoteBtn = refs.withdrawVoteBtn;
 	const targetsList = refs.targetsList;
 	const emptyTargets = refs.emptyTargets;
 	const historyList = refs.historyList;
@@ -81,6 +85,7 @@ export function createMafiaGameScreen(deps) {
 	let refreshBusy = false;
 	let submitBusy = false;
 	let autoRefreshId = null;
+	let pendingAction = null;
 	let setStatusNode = function noop() {};
 
 	const serverSnapshot = {
@@ -91,8 +96,12 @@ export function createMafiaGameScreen(deps) {
 		selfRole: 'town',
 		selfIsAlive: true,
 		submissionActionType: null,
+		suggestionActionType: null,
+		voteActionType: null,
 		canSubmit: false,
 		hasSubmitted: false,
+		currentSuggestionTargetUserId: null,
+		currentDisplaySuggestionTargetUserId: null,
 		currentVoteTargetUserId: null,
 		submittedCount: 0,
 		requiredCount: 0,
@@ -103,51 +112,124 @@ export function createMafiaGameScreen(deps) {
 		status: 'open',
 	};
 
-	const localDraft = {
-		selectedTargetUserId: '',
-		dirtyTarget: false,
-	};
-
 	const targetRowsByUserId = new Map();
 	const resultRowsByKey = new Map();
 
-	function currentSelectionUserId() {
-		if (localDraft.selectedTargetUserId && /^\d+$/.test(localDraft.selectedTargetUserId)) {
-			return Number(localDraft.selectedTargetUserId);
-		}
-		return null;
-	}
-
 	function targetPlayerById(userId) {
+		if (userId == null) {
+			return null;
+		}
+
 		return serverSnapshot.players.find(function eachPlayer(player) {
 			return Number(player.user_id) === Number(userId);
 		}) || null;
+	}
+
+	function selfPlayer() {
+		return serverSnapshot.players.find(function eachPlayer(player) {
+			return !!player.is_self;
+		}) || null;
+	}
+
+	function targetPlayerName(userId) {
+		const player = targetPlayerById(userId);
+		return player ? String(player.username || 'Unknown') : 'Unknown';
 	}
 
 	function isVotePhase() {
 		return serverSnapshot.phase === 'day' || serverSnapshot.phase === 'night';
 	}
 
-	function canSubmitCurrentVote() {
-		if (!isVotePhase() || !serverSnapshot.canSubmit || submitBusy) {
+	function canSendLiveAction(actionType, player) {
+		if (!isVotePhase() || !actionType || !serverSnapshot.canSubmit || submitBusy) {
 			return false;
 		}
 
-		const selectedUserId = currentSelectionUserId();
-		if (!selectedUserId) {
-			return false;
-		}
-
-		const player = targetPlayerById(selectedUserId);
 		if (!player || !player.can_target_by_self) {
 			return false;
 		}
 
-		if (!localDraft.dirtyTarget && serverSnapshot.hasSubmitted && Number(serverSnapshot.currentVoteTargetUserId || 0) === selectedUserId) {
-			return false;
+		return true;
+	}
+
+	function canWithdrawVote() {
+		return isVotePhase()
+			&& !!serverSnapshot.voteActionType
+			&& serverSnapshot.canSubmit
+			&& serverSnapshot.currentVoteTargetUserId != null
+			&& !submitBusy;
+	}
+
+	function buildVoteSummaryText() {
+		if (!isVotePhase()) {
+			return '';
 		}
 
-		return true;
+		if (!serverSnapshot.canSubmit) {
+			if (serverSnapshot.phase === 'night') {
+				if (serverSnapshot.selfRole === 'mafia' && !serverSnapshot.selfIsAlive) {
+					return 'You are eliminated. Night coordination is hidden until resolution.';
+				}
+				return 'Night actions are hidden from town until resolution.';
+			}
+
+			return 'You cannot act in this phase.';
+		}
+
+		const suggestionName = serverSnapshot.currentDisplaySuggestionTargetUserId != null
+			? targetPlayerName(serverSnapshot.currentDisplaySuggestionTargetUserId)
+			: '';
+		const voteName = serverSnapshot.currentVoteTargetUserId != null
+			? targetPlayerName(serverSnapshot.currentVoteTargetUserId)
+			: '';
+
+		if (suggestionName && voteName && suggestionName === voteName) {
+			return 'You suggest and vote ' + suggestionName + '.';
+		}
+
+		if (suggestionName && voteName) {
+			return 'You suggest ' + suggestionName + ' and vote ' + voteName + '.';
+		}
+
+		if (suggestionName) {
+			return 'You suggest ' + suggestionName + '.';
+		}
+
+		if (voteName) {
+			return 'You vote ' + voteName + '.';
+		}
+
+		return 'Use Suggest to float a target and Vote when you want your choice to count.';
+	}
+
+	function buildPlayerLiveStateText(player) {
+		const suggestionTargetUserId = player && player.display_suggestion_target_user_id != null
+			? Number(player.display_suggestion_target_user_id)
+			: null;
+		const voteTargetUserId = player && player.vote_target_user_id != null
+			? Number(player.vote_target_user_id)
+			: null;
+
+		if (suggestionTargetUserId != null && voteTargetUserId != null && suggestionTargetUserId === voteTargetUserId) {
+			return 'Suggests and votes ' + targetPlayerName(voteTargetUserId);
+		}
+
+		const bits = [];
+		if (suggestionTargetUserId != null) {
+			bits.push('Suggests ' + targetPlayerName(suggestionTargetUserId));
+		}
+		if (voteTargetUserId != null) {
+			bits.push('Votes ' + targetPlayerName(voteTargetUserId));
+		}
+
+		return bits.join(' | ');
+	}
+
+	async function fetchAndApplyGameDetail() {
+		const detail = await deps.api.gameDetail(lastGameId);
+		deps.state.patch({ activeGame: detail.game });
+		screen.setGame(detail.game);
+		return detail;
 	}
 
 	function ensureTargetRow(userId) {
@@ -159,14 +241,11 @@ export function createMafiaGameScreen(deps) {
 		const row = cloneTemplateNode(targetTemplate);
 		const rowRefs = collectRefs(row);
 		rowRefs.row = row;
-		rowRefs.selectBtn.addEventListener('click', function onSelect() {
-			if (rowRefs.selectBtn.disabled) {
-				return;
-			}
-
-			localDraft.selectedTargetUserId = key;
-			localDraft.dirtyTarget = true;
-			reconcileUi();
+		rowRefs.suggestBtn.addEventListener('click', function onSuggest() {
+			submitLiveAction(Number(key), 'suggest');
+		});
+		rowRefs.voteBtn.addEventListener('click', function onVote() {
+			submitLiveAction(Number(key), 'vote');
 		});
 		targetRowsByUserId.set(key, rowRefs);
 		return rowRefs;
@@ -185,6 +264,16 @@ export function createMafiaGameScreen(deps) {
 	}
 
 	function reconcileTargets() {
+		const viewer = selfPlayer();
+		const viewerSuggestionTargetUserId = viewer && viewer.suggestion_target_user_id != null
+			? Number(viewer.suggestion_target_user_id)
+			: null;
+		const viewerDisplaySuggestionTargetUserId = viewer && viewer.display_suggestion_target_user_id != null
+			? Number(viewer.display_suggestion_target_user_id)
+			: null;
+		const viewerVoteTargetUserId = viewer && viewer.vote_target_user_id != null
+			? Number(viewer.vote_target_user_id)
+			: null;
 		const activeKeys = new Set();
 		serverSnapshot.players.forEach(function eachPlayer(player) {
 			const userId = Number(player.user_id || 0);
@@ -200,13 +289,25 @@ export function createMafiaGameScreen(deps) {
 				bits.push(player.known_role === 'mafia' ? 'Mafia' : 'Town');
 			}
 
-			const selected = currentSelectionUserId() === userId;
+			const liveStateText = buildPlayerLiveStateText(player);
+			const isSelfSuggested = viewerSuggestionTargetUserId === userId;
+			const isSelfVoted = viewerVoteTargetUserId === userId;
+			const isPendingSuggestion = pendingAction && pendingAction.kind === 'suggest' && pendingAction.targetUserId === userId;
+			const isPendingVote = pendingAction && pendingAction.kind === 'vote' && pendingAction.targetUserId === userId;
+			const canSuggest = canSendLiveAction(serverSnapshot.suggestionActionType, player) && !isSelfSuggested && !isPendingVote;
+			const canVote = canSendLiveAction(serverSnapshot.voteActionType, player) && !isSelfVoted && !isPendingSuggestion;
+
 			rowRefs.name.textContent = String(player.username || 'Unknown');
+			rowRefs.state.textContent = liveStateText;
+			rowRefs.state.style.display = liveStateText ? '' : 'none';
 			rowRefs.meta.textContent = bits.join(' | ');
-			rowRefs.row.classList.toggle('is-selected', selected);
-			rowRefs.selectBtn.className = selected ? 'primary' : '';
-			rowRefs.selectBtn.textContent = selected ? 'Selected' : 'Select';
-			rowRefs.selectBtn.disabled = !player.can_target_by_self || !serverSnapshot.canSubmit || submitBusy;
+			rowRefs.actions.style.display = player.is_self ? 'none' : '';
+			rowRefs.row.classList.toggle('is-suggested', viewerDisplaySuggestionTargetUserId === userId);
+			rowRefs.row.classList.toggle('is-voted', isSelfVoted);
+			rowRefs.suggestBtn.textContent = isPendingSuggestion ? 'Suggesting...' : (isSelfSuggested ? 'Suggested' : 'Suggest');
+			rowRefs.voteBtn.textContent = isPendingVote ? 'Voting...' : (isSelfVoted ? 'Voted' : 'Vote');
+			rowRefs.suggestBtn.disabled = !canSuggest;
+			rowRefs.voteBtn.disabled = !canVote;
 			targetsList.appendChild(rowRefs.row);
 		});
 
@@ -224,6 +325,9 @@ export function createMafiaGameScreen(deps) {
 		const hasTargetablePlayer = serverSnapshot.players.some(function eachPlayer(player) {
 			return !!player.can_target_by_self;
 		});
+		emptyTargets.textContent = serverSnapshot.canSubmit
+			? 'No valid targets right now.'
+			: (serverSnapshot.phase === 'night' ? 'Only living mafia can act at night.' : 'You cannot act in this phase.');
 		emptyTargets.style.display = hasTargetablePlayer ? 'none' : '';
 	}
 
@@ -265,7 +369,7 @@ export function createMafiaGameScreen(deps) {
 		if (serverSnapshot.phase === 'start') {
 			progressText.textContent = 'Ready: ' + Number(serverSnapshot.submittedCount || 0) + '/' + Number(serverSnapshot.requiredCount || 0);
 		} else {
-			progressText.textContent = 'Submissions: ' + Number(serverSnapshot.submittedCount || 0) + '/' + Number(serverSnapshot.requiredCount || 0);
+			progressText.textContent = 'Votes: ' + Number(serverSnapshot.submittedCount || 0) + '/' + Number(serverSnapshot.requiredCount || 0);
 		}
 
 		if (serverSnapshot.latestResult && serverSnapshot.latestResult.summary_text) {
@@ -279,17 +383,9 @@ export function createMafiaGameScreen(deps) {
 			latestSummary.style.display = 'none';
 		}
 
-		const selectedPlayer = targetPlayerById(currentSelectionUserId());
-		if (selectedPlayer) {
-			selectionText.textContent = 'Selected target: ' + String(selectedPlayer.username || 'Unknown');
-		} else if (serverSnapshot.hasSubmitted && serverSnapshot.currentVoteTargetUserId) {
-			const currentPlayer = targetPlayerById(serverSnapshot.currentVoteTargetUserId);
-			selectionText.textContent = currentPlayer
-				? 'Current submitted target: ' + String(currentPlayer.username || 'Unknown')
-				: 'Current submitted target is locked in.';
-		} else {
-			selectionText.textContent = 'Choose a target from the list below.';
-		}
+		voteText.textContent = buildVoteSummaryText();
+		withdrawVoteBtn.style.display = canWithdrawVote() ? '' : 'none';
+		withdrawVoteBtn.disabled = !canWithdrawVote();
 
 		readyCard.style.display = serverSnapshot.phase === 'start' ? '' : 'none';
 		voteCard.style.display = isVotePhase() ? '' : 'none';
@@ -297,7 +393,6 @@ export function createMafiaGameScreen(deps) {
 			? 'Ready submitted. Waiting for the rest of the table.'
 			: 'Confirm that you have reviewed your role.';
 		readyBtn.disabled = !serverSnapshot.canSubmit || serverSnapshot.hasSubmitted || submitBusy;
-		submitVoteBtn.disabled = !canSubmitCurrentVote();
 
 		reconcileTargets();
 		reconcileHistory();
@@ -305,21 +400,19 @@ export function createMafiaGameScreen(deps) {
 
 	function applyServerSnapshot(game) {
 		const mafiaState = game && game.mafia_state ? game.mafia_state : {};
-		const nextPhase = String(mafiaState.phase || 'start');
-		const nextRound = Number(mafiaState.round_number || 1);
-		const transitioned = nextPhase !== serverSnapshot.phase
-			|| nextRound !== serverSnapshot.roundNumber
-			|| String(mafiaState.submission_action_type || '') !== String(serverSnapshot.submissionActionType || '');
-
-		serverSnapshot.phase = nextPhase;
-		serverSnapshot.roundNumber = nextRound;
+		serverSnapshot.phase = String(mafiaState.phase || 'start');
+		serverSnapshot.roundNumber = Number(mafiaState.round_number || 1);
 		serverSnapshot.phaseTitle = String(mafiaState.phase_title || 'Mafia');
 		serverSnapshot.phaseInstructions = String(mafiaState.phase_instructions || '');
 		serverSnapshot.selfRole = String(mafiaState.self_role || 'town');
 		serverSnapshot.selfIsAlive = !!mafiaState.self_is_alive;
 		serverSnapshot.submissionActionType = mafiaState.submission_action_type || null;
+		serverSnapshot.suggestionActionType = mafiaState.suggestion_action_type || null;
+		serverSnapshot.voteActionType = mafiaState.vote_action_type || null;
 		serverSnapshot.canSubmit = !!mafiaState.can_submit;
 		serverSnapshot.hasSubmitted = !!mafiaState.has_submitted;
+		serverSnapshot.currentSuggestionTargetUserId = mafiaState.current_suggestion_target_user_id == null ? null : Number(mafiaState.current_suggestion_target_user_id);
+		serverSnapshot.currentDisplaySuggestionTargetUserId = mafiaState.current_display_suggestion_target_user_id == null ? null : Number(mafiaState.current_display_suggestion_target_user_id);
 		serverSnapshot.currentVoteTargetUserId = mafiaState.current_vote_target_user_id == null ? null : Number(mafiaState.current_vote_target_user_id);
 		serverSnapshot.submittedCount = Number(mafiaState.submitted_count || 0);
 		serverSnapshot.requiredCount = Number(mafiaState.required_count || 0);
@@ -328,17 +421,6 @@ export function createMafiaGameScreen(deps) {
 		serverSnapshot.recentResults = Array.isArray(mafiaState.recent_results) ? mafiaState.recent_results.slice() : [];
 		serverSnapshot.winnerSummary = mafiaState.winner_summary || null;
 		serverSnapshot.status = String((game && game.status) || 'open');
-
-		if (transitioned) {
-			localDraft.selectedTargetUserId = serverSnapshot.currentVoteTargetUserId != null
-				? String(serverSnapshot.currentVoteTargetUserId)
-				: '';
-			localDraft.dirtyTarget = false;
-		} else if (!localDraft.dirtyTarget) {
-			localDraft.selectedTargetUserId = serverSnapshot.currentVoteTargetUserId != null
-				? String(serverSnapshot.currentVoteTargetUserId)
-				: '';
-		}
 
 		reconcileUi();
 	}
@@ -353,9 +435,7 @@ export function createMafiaGameScreen(deps) {
 		refreshBtn.disabled = true;
 		refreshBtn.textContent = 'Refreshing...';
 		try {
-			const detail = await deps.api.gameDetail(lastGameId);
-			deps.state.patch({ activeGame: detail.game });
-			screen.setGame(detail.game);
+			await fetchAndApplyGameDetail();
 			if (!config.silent) {
 				setStatusNode('Mafia updates refreshed.', 'ok');
 			}
@@ -396,32 +476,78 @@ export function createMafiaGameScreen(deps) {
 		}, 4000);
 	}
 
-	async function submitCurrentAction() {
-		if (!lastGameId || submitBusy || !serverSnapshot.submissionActionType) {
+	async function submitReadyAction() {
+		if (!lastGameId || submitBusy || serverSnapshot.phase !== 'start' || !serverSnapshot.submissionActionType) {
 			return;
 		}
 
 		submitBusy = true;
 		reconcileUi();
 		try {
-			if (serverSnapshot.phase === 'start') {
-				await deps.api.sendAction(lastGameId, serverSnapshot.submissionActionType, {});
-			} else {
-				const selectedUserId = currentSelectionUserId();
-				if (!selectedUserId) {
-					throw new Error('Select a target before submitting.');
-				}
-				await deps.api.sendAction(lastGameId, serverSnapshot.submissionActionType, {
-					target_user_id: selectedUserId,
-				});
-			}
-
-			localDraft.dirtyTarget = false;
-			await refreshMafiaState({ silent: true });
-			setStatusNode('Action submitted.', 'ok');
+			await deps.api.sendAction(lastGameId, serverSnapshot.submissionActionType, {});
+			await fetchAndApplyGameDetail();
+			setStatusNode('Ready submitted.', 'ok');
 		} catch (err) {
 			setStatusNode(err.message || 'Unable to submit mafia action.', 'error');
 		} finally {
+			submitBusy = false;
+			reconcileUi();
+		}
+	}
+
+	async function submitLiveAction(targetUserId, kind) {
+		if (!lastGameId || submitBusy) {
+			return;
+		}
+
+		const player = targetPlayerById(targetUserId);
+		const actionType = kind === 'suggest' ? serverSnapshot.suggestionActionType : serverSnapshot.voteActionType;
+		if (!canSendLiveAction(actionType, player)) {
+			return;
+		}
+
+		submitBusy = true;
+		pendingAction = {
+			kind: kind,
+			targetUserId: Number(targetUserId),
+		};
+		reconcileUi();
+		try {
+			await deps.api.sendAction(lastGameId, actionType, {
+				target_user_id: Number(targetUserId),
+			});
+			await fetchAndApplyGameDetail();
+			setStatusNode(kind === 'suggest' ? 'Suggestion updated.' : 'Vote updated.', 'ok');
+		} catch (err) {
+			setStatusNode(err.message || 'Unable to update mafia action.', 'error');
+		} finally {
+			pendingAction = null;
+			submitBusy = false;
+			reconcileUi();
+		}
+	}
+
+	async function withdrawVote() {
+		if (!lastGameId || !canWithdrawVote()) {
+			return;
+		}
+
+		submitBusy = true;
+		pendingAction = {
+			kind: 'withdraw',
+			targetUserId: Number(serverSnapshot.currentVoteTargetUserId || 0),
+		};
+		reconcileUi();
+		try {
+			await deps.api.sendAction(lastGameId, serverSnapshot.voteActionType, {
+				clear: true,
+			});
+			await fetchAndApplyGameDetail();
+			setStatusNode('Vote withdrawn.', 'ok');
+		} catch (err) {
+			setStatusNode(err.message || 'Unable to withdraw vote.', 'error');
+		} finally {
+			pendingAction = null;
 			submitBusy = false;
 			reconcileUi();
 		}
@@ -431,8 +557,8 @@ export function createMafiaGameScreen(deps) {
 		refreshMafiaState({ silent: false });
 	});
 
-	readyBtn.addEventListener('click', submitCurrentAction);
-	submitVoteBtn.addEventListener('click', submitCurrentAction);
+	readyBtn.addEventListener('click', submitReadyAction);
+	withdrawVoteBtn.addEventListener('click', withdrawVote);
 
 	const screen = createBaseGameScreen(deps, {
 		title: 'Mafia Game',

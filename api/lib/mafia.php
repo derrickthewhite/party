@@ -194,19 +194,42 @@ function mafia_game_build_detail_payload(int $gameId, array $game, array $user):
         $stage = 'detail.roles';
         $roleMap = mafia_role_map($gameId);
         $selfRole = mafia_role_for_user($roleMap, $viewerUserId);
+        $alivePlayerIds = mafia_alive_player_ids($gameId);
+        $viewerIsAlive = in_array($viewerUserId, $alivePlayerIds, true);
 
         $stage = 'detail.players';
-        $players = mafia_build_player_payload($gameId, $viewerUserId, $status, $roleMap);
+        $voteActionType = mafia_vote_action_type_for_phase($phase);
+        $suggestionActionType = mafia_suggestion_action_type_for_phase($phase);
+        $progressActionType = mafia_progress_action_type_for_phase($phase);
+        $latestVotes = $voteActionType !== null
+            ? mafia_latest_phase_actions($gameId, $roundNumber, $voteActionType)
+            : [];
+        $latestSuggestions = $suggestionActionType !== null
+            ? mafia_latest_phase_actions($gameId, $roundNumber, $suggestionActionType)
+            : [];
+        $players = mafia_build_player_payload(
+            $gameId,
+            $viewerUserId,
+            $status,
+            $phase,
+            $roleMap,
+            $selfRole,
+            $viewerIsAlive,
+            $latestSuggestions,
+            $latestVotes
+        );
         $requiredVoterIds = $status === 'in_progress' ? mafia_required_voter_ids($gameId, $phase, $roleMap) : [];
 
         $stage = 'detail.submissions';
-        $submissionActionType = mafia_submission_action_type_for_phase($phase);
-        $latestSubmissions = $submissionActionType !== null
-            ? mafia_latest_phase_submissions($gameId, $roundNumber, $submissionActionType)
+        $latestProgressActions = $progressActionType !== null
+            ? mafia_latest_phase_actions($gameId, $roundNumber, $progressActionType)
             : [];
-        $submittedCount = mafia_submitted_count_for_required_voters($latestSubmissions, $requiredVoterIds);
-        $currentSubmission = isset($latestSubmissions[$viewerUserId]) ? $latestSubmissions[$viewerUserId] : null;
-        $alivePlayerIds = mafia_alive_player_ids($gameId);
+        $submittedCount = $phase === 'start'
+            ? mafia_submitted_count_for_required_voters($latestProgressActions, $requiredVoterIds)
+            : mafia_active_vote_count_for_required_voters($latestProgressActions, $requiredVoterIds);
+        $currentVote = isset($latestVotes[$viewerUserId]) ? $latestVotes[$viewerUserId] : null;
+        $currentSuggestion = isset($latestSuggestions[$viewerUserId]) ? $latestSuggestions[$viewerUserId] : null;
+        $currentDisplaySuggestionTargetUserId = mafia_displayed_suggestion_target_user_id($currentSuggestion, $currentVote);
 
         $stage = 'detail.results';
         $latestResult = mafia_latest_result_payload($gameId);
@@ -225,11 +248,15 @@ function mafia_game_build_detail_payload(int $gameId, array $game, array $user):
                 'phase_title' => $phaseTitle,
                 'phase_instructions' => $phaseInstructions,
                 'self_role' => $selfRole,
-                'self_is_alive' => in_array($viewerUserId, $alivePlayerIds, true),
-                'submission_action_type' => $submissionActionType,
+                'self_is_alive' => $viewerIsAlive,
+                'submission_action_type' => $progressActionType,
+                'suggestion_action_type' => $suggestionActionType,
+                'vote_action_type' => $voteActionType,
                 'can_submit' => $status === 'in_progress' && mafia_can_user_submit_for_phase($gameId, $viewerUserId, $phase, $roleMap),
-                'has_submitted' => $currentSubmission !== null,
-                'current_vote_target_user_id' => isset($currentSubmission['target_user_id']) ? $currentSubmission['target_user_id'] : null,
+                'has_submitted' => mafia_progress_action_is_complete_for_user($phase, $viewerUserId, $latestProgressActions),
+                'current_suggestion_target_user_id' => isset($currentSuggestion['target_user_id']) ? $currentSuggestion['target_user_id'] : null,
+                'current_display_suggestion_target_user_id' => $currentDisplaySuggestionTargetUserId,
+                'current_vote_target_user_id' => isset($currentVote['target_user_id']) ? $currentVote['target_user_id'] : null,
                 'submitted_count' => $submittedCount,
                 'required_count' => count($requiredVoterIds),
                 'players' => $players,
@@ -269,10 +296,10 @@ function mafia_validate_action_create(int $gameId, int $userId, string $actionTy
         $state = mafia_game_state($gameId, (string)($game['game_type'] ?? 'mafia'));
         $phase = $state['phase'];
         $roundNumber = $state['current_round'];
-        $expectedActionType = mafia_submission_action_type_for_phase($phase);
-        if ($expectedActionType === null || $actionType !== $expectedActionType) {
+        $allowedActionTypes = mafia_allowed_action_types_for_phase($phase);
+        if (empty($allowedActionTypes) || !in_array($actionType, $allowedActionTypes, true)) {
             error_response('This action is not allowed in the current mafia phase.', 409, [
-                'expected_action_type' => $expectedActionType,
+                'expected_action_types' => $allowedActionTypes,
                 'actual_action_type' => $actionType,
                 'phase' => $phase,
             ]);
@@ -291,7 +318,24 @@ function mafia_validate_action_create(int $gameId, int $userId, string $actionTy
             return;
         }
 
+        $isVoteAction = $actionType === mafia_vote_action_type_for_phase($phase);
+        $isClearingVote = $isVoteAction && !empty($payload['clear']);
+
         $stage = 'action.validate_target';
+        $stage = 'action.check_duplicate';
+        $latestActions = mafia_latest_phase_actions($gameId, $roundNumber, $actionType);
+        $latestAction = isset($latestActions[$userId]) ? $latestActions[$userId] : null;
+        if ($isClearingVote) {
+            if (!mafia_action_has_target($latestAction)) {
+                error_response('You do not have a vote to withdraw.', 409, [
+                    'phase' => $phase,
+                    'round_number' => $roundNumber,
+                ]);
+            }
+
+            return;
+        }
+
         $targetRaw = $payload['target_user_id'] ?? null;
         if (!is_int($targetRaw) && !ctype_digit((string)$targetRaw)) {
             error_response('A valid target_user_id is required.', 422);
@@ -307,10 +351,11 @@ function mafia_validate_action_create(int $gameId, int $userId, string $actionTy
             ]);
         }
 
-        $stage = 'action.check_duplicate';
-        $latestSubmissions = mafia_latest_phase_submissions($gameId, $roundNumber, $actionType);
-        if (isset($latestSubmissions[$userId]) && isset($latestSubmissions[$userId]['target_user_id']) && $latestSubmissions[$userId]['target_user_id'] === $targetUserId) {
-            error_response('You already submitted that vote.', 409, [
+        if (mafia_action_targets_user($latestAction, $targetUserId)) {
+            $message = $actionType === mafia_suggestion_action_type_for_phase($phase)
+                ? 'You already suggested that player.'
+                : 'You already voted for that player.';
+            error_response($message, 409, [
                 'target_user_id' => $targetUserId,
                 'phase' => $phase,
                 'round_number' => $roundNumber,
@@ -441,12 +486,22 @@ function mafia_alive_mafia_ids(int $gameId, array $roleMap): array
     return $mafiaIds;
 }
 
-function mafia_build_player_payload(int $gameId, int $viewerUserId, string $gameStatus, array $roleMap): array
+function mafia_build_player_payload(
+    int $gameId,
+    int $viewerUserId,
+    string $gameStatus,
+    string $phase,
+    array $roleMap,
+    string $viewerRole,
+    bool $viewerIsAlive,
+    array $latestSuggestions,
+    array $latestVotes
+): array
 {
-    $viewerRole = mafia_role_for_user($roleMap, $viewerUserId);
-    $phase = mafia_game_state($gameId)['phase'];
     $rows = mafia_alive_player_rows($gameId);
     $players = [];
+    $eligibleTargets = mafia_eligible_target_ids_for_user($gameId, $viewerUserId, $phase, $roleMap);
+    $canViewLiveChoices = mafia_can_view_live_choices($gameStatus, $phase, $viewerRole, $viewerIsAlive);
 
     foreach ($rows as $row) {
         $userId = (int)$row['user_id'];
@@ -460,7 +515,17 @@ function mafia_build_player_payload(int $gameId, int $viewerUserId, string $game
             $knownRole = 'mafia';
         }
 
-        $eligibleTargets = mafia_eligible_target_ids_for_user($gameId, $viewerUserId, $phase, $roleMap);
+        $suggestionTargetUserId = null;
+        $displaySuggestionTargetUserId = null;
+        $voteTargetUserId = null;
+        if ($canViewLiveChoices) {
+            $suggestion = isset($latestSuggestions[$userId]) ? $latestSuggestions[$userId] : null;
+            $vote = isset($latestVotes[$userId]) ? $latestVotes[$userId] : null;
+            $suggestionTargetUserId = isset($suggestion['target_user_id']) ? $suggestion['target_user_id'] : null;
+            $voteTargetUserId = isset($vote['target_user_id']) ? $vote['target_user_id'] : null;
+            $displaySuggestionTargetUserId = mafia_displayed_suggestion_target_user_id($suggestion, $vote);
+        }
+
         $players[] = [
             'user_id' => $userId,
             'username' => (string)$row['username'],
@@ -468,6 +533,9 @@ function mafia_build_player_payload(int $gameId, int $viewerUserId, string $game
             'is_alive' => $isAlive,
             'is_eliminated' => !$isAlive,
             'known_role' => $knownRole,
+            'suggestion_target_user_id' => $suggestionTargetUserId,
+            'display_suggestion_target_user_id' => $displaySuggestionTargetUserId,
+            'vote_target_user_id' => $voteTargetUserId,
             'can_target_by_self' => in_array($userId, $eligibleTargets, true),
         ];
     }
@@ -475,11 +543,17 @@ function mafia_build_player_payload(int $gameId, int $viewerUserId, string $game
     return $players;
 }
 
-function mafia_submission_action_type_for_phase(string $phase): ?string
+function mafia_progress_action_type_for_phase(string $phase): ?string
 {
     if ($phase === 'start') {
         return 'mafia_ready';
     }
+
+    return mafia_vote_action_type_for_phase($phase);
+}
+
+function mafia_vote_action_type_for_phase(string $phase): ?string
+{
     if ($phase === 'day') {
         return 'mafia_day_vote';
     }
@@ -488,6 +562,33 @@ function mafia_submission_action_type_for_phase(string $phase): ?string
     }
 
     return null;
+}
+
+function mafia_suggestion_action_type_for_phase(string $phase): ?string
+{
+    if ($phase === 'day') {
+        return 'mafia_day_suggest';
+    }
+    if ($phase === 'night') {
+        return 'mafia_night_suggest';
+    }
+
+    return null;
+}
+
+function mafia_allowed_action_types_for_phase(string $phase): array
+{
+    $types = [];
+    $progressActionType = mafia_progress_action_type_for_phase($phase);
+    $suggestionActionType = mafia_suggestion_action_type_for_phase($phase);
+    if ($progressActionType !== null) {
+        $types[] = $progressActionType;
+    }
+    if ($suggestionActionType !== null) {
+        $types[] = $suggestionActionType;
+    }
+
+    return $types;
 }
 
 function mafia_required_voter_ids(int $gameId, string $phase, array $roleMap): array
@@ -534,7 +635,7 @@ function mafia_eligible_target_ids_for_user(int $gameId, int $userId, string $ph
     return $targets;
 }
 
-function mafia_latest_phase_submissions(int $gameId, int $roundNumber, string $actionType): array
+function mafia_latest_phase_actions(int $gameId, int $roundNumber, string $actionType): array
 {
     $stmt = db()->prepare(
         'SELECT id, user_id, payload FROM game_actions '
@@ -559,7 +660,7 @@ function mafia_latest_phase_submissions(int $gameId, int $roundNumber, string $a
             $payload = [];
         }
         $map[$userId] = [
-            'id' => (int)$row['id'],
+            'action_id' => (int)$row['id'],
             'user_id' => $userId,
             'target_user_id' => isset($payload['target_user_id']) && (is_int($payload['target_user_id']) || ctype_digit((string)$payload['target_user_id']))
                 ? (int)$payload['target_user_id']
@@ -568,6 +669,33 @@ function mafia_latest_phase_submissions(int $gameId, int $roundNumber, string $a
     }
 
     return $map;
+}
+
+function mafia_can_view_live_choices(string $gameStatus, string $phase, string $viewerRole, bool $viewerIsAlive): bool
+{
+    if ($gameStatus === 'closed') {
+        return true;
+    }
+
+    if ($phase !== 'night') {
+        return true;
+    }
+
+    return $viewerRole === 'mafia' && $viewerIsAlive;
+}
+
+function mafia_displayed_suggestion_target_user_id(?array $suggestion, ?array $vote): ?int
+{
+    $suggestionActionId = isset($suggestion['action_id']) ? (int)$suggestion['action_id'] : 0;
+    $voteActionId = isset($vote['action_id']) ? (int)$vote['action_id'] : 0;
+    $suggestionTargetUserId = isset($suggestion['target_user_id']) ? (int)$suggestion['target_user_id'] : null;
+    $voteTargetUserId = isset($vote['target_user_id']) ? (int)$vote['target_user_id'] : null;
+
+    if ($voteTargetUserId !== null && $voteActionId >= $suggestionActionId) {
+        return $voteTargetUserId;
+    }
+
+    return $suggestionTargetUserId;
 }
 
 function mafia_submitted_count_for_required_voters(array $submissionMap, array $requiredVoterIds): int
@@ -579,6 +707,73 @@ function mafia_submitted_count_for_required_voters(array $submissionMap, array $
         }
     }
     return $count;
+}
+
+function mafia_active_vote_count_for_required_voters(array $submissionMap, array $requiredVoterIds): int
+{
+    $count = 0;
+    foreach ($requiredVoterIds as $userId) {
+        if (mafia_progress_action_is_complete_for_user('day', $userId, $submissionMap)) {
+            $count += 1;
+        }
+    }
+
+    return $count;
+}
+
+function mafia_action_has_target(?array $action): bool
+{
+    return is_array($action) && array_key_exists('target_user_id', $action) && $action['target_user_id'] !== null;
+}
+
+function mafia_action_targets_user(?array $action, int $targetUserId): bool
+{
+    return mafia_action_has_target($action) && (int)$action['target_user_id'] === $targetUserId;
+}
+
+function mafia_progress_action_is_complete_for_user(string $phase, int $userId, array $submissionMap): bool
+{
+    if (!isset($submissionMap[$userId])) {
+        return false;
+    }
+
+    if ($phase === 'start') {
+        return true;
+    }
+
+    return mafia_action_has_target($submissionMap[$userId]);
+}
+
+function mafia_majority_threshold(int $requiredCount): int
+{
+    return (int)floor($requiredCount / 2) + 1;
+}
+
+function mafia_majority_target_user_id(array $voteCounts, int $requiredCount): ?int
+{
+    if (empty($voteCounts) || $requiredCount <= 0) {
+        return null;
+    }
+
+    $threshold = mafia_majority_threshold($requiredCount);
+    if ((int)$voteCounts[0]['count'] < $threshold) {
+        return null;
+    }
+
+    return (int)$voteCounts[0]['user_id'];
+}
+
+function mafia_phase_is_ready_to_resolve(string $phase, array $submissionMap, array $requiredVoterIds, array $voteCounts = []): bool
+{
+    if ($phase === 'start') {
+        return mafia_submitted_count_for_required_voters($submissionMap, $requiredVoterIds) >= count($requiredVoterIds);
+    }
+
+    if (mafia_majority_target_user_id($voteCounts, count($requiredVoterIds)) !== null) {
+        return true;
+    }
+
+    return mafia_active_vote_count_for_required_voters($submissionMap, $requiredVoterIds) >= count($requiredVoterIds);
 }
 
 function mafia_phase_title(string $phase): string
@@ -601,10 +796,10 @@ function mafia_phase_instructions(string $phase): string
         return 'Review your role. The game moves into Day once every living player clicks Ready.';
     }
     if ($phase === 'day') {
-        return 'Every living player votes to eliminate one target. The phase advances automatically once all living players have voted.';
+        return 'Use Suggest to float a target and Vote to lock one in. A simple majority advances the phase immediately.';
     }
     if ($phase === 'night') {
-        return 'Only living mafia vote at night. The phase advances automatically once all living mafia have voted.';
+        return 'Only living mafia can suggest and vote at night. A simple majority advances the phase immediately.';
     }
     return 'Follow the current phase instructions.';
 }
@@ -700,14 +895,15 @@ function mafia_maybe_auto_advance(int $gameId): void
             return;
         }
 
-        $actionType = mafia_submission_action_type_for_phase($phase);
+        $actionType = mafia_progress_action_type_for_phase($phase);
         if ($actionType === null) {
             return;
         }
 
         $requiredVoterIds = mafia_required_voter_ids($gameId, $phase, $roleMap);
-        $submissionMap = mafia_latest_phase_submissions($gameId, $roundNumber, $actionType);
-        if (mafia_submitted_count_for_required_voters($submissionMap, $requiredVoterIds) < count($requiredVoterIds)) {
+        $submissionMap = mafia_latest_phase_actions($gameId, $roundNumber, $actionType);
+        $voteCounts = $phase === 'start' ? [] : mafia_vote_counts($gameId, $submissionMap);
+        if (!mafia_phase_is_ready_to_resolve($phase, $submissionMap, $requiredVoterIds, $voteCounts)) {
             return;
         }
 
@@ -730,8 +926,9 @@ function mafia_resolve_phase(int $gameId, string $phase, int $roundNumber, array
         }
 
         $requiredVoterIds = mafia_required_voter_ids($gameId, $phase, $roleMap);
-        $submissionMap = mafia_latest_phase_submissions($gameId, $roundNumber, (string)mafia_submission_action_type_for_phase($phase));
-        if (mafia_submitted_count_for_required_voters($submissionMap, $requiredVoterIds) < count($requiredVoterIds)) {
+        $submissionMap = mafia_latest_phase_actions($gameId, $roundNumber, (string)mafia_progress_action_type_for_phase($phase));
+        $voteCounts = $phase === 'start' ? [] : mafia_vote_counts($gameId, $submissionMap);
+        if (!mafia_phase_is_ready_to_resolve($phase, $submissionMap, $requiredVoterIds, $voteCounts)) {
             $pdo->commit();
             return false;
         }
@@ -742,7 +939,6 @@ function mafia_resolve_phase(int $gameId, string $phase, int $roundNumber, array
             return true;
         }
 
-        $voteCounts = mafia_vote_counts($gameId, $submissionMap);
         $eliminatedUserId = mafia_pick_vote_target($voteCounts, $gameId, $roundNumber, $phase);
         $eliminatedUsername = mafia_username($eliminatedUserId);
         $eliminatedRole = mafia_eliminate_player($gameId, $eliminatedUserId, $roundNumber);

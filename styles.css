@@ -226,9 +226,14 @@ button:disabled {
   background: #fff;
 }
 
-.mafia-target-row.is-selected {
+.mafia-target-row.is-suggested {
+  border-color: color-mix(in srgb, var(--accent-2) 55%, var(--line));
+  box-shadow: 0 0 0 3px rgba(47, 125, 140, 0.12);
+}
+
+.mafia-target-row.is-voted {
   border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
-  box-shadow: 0 0 0 3px rgba(208, 74, 42, 0.12);
+  box-shadow: 0 0 0 3px rgba(208, 74, 42, 0.14);
 }
 
 .mafia-target-copy {
@@ -240,8 +245,25 @@ button:disabled {
   font-weight: 700;
 }
 
+.mafia-target-state {
+  margin-top: 4px;
+  color: var(--accent-2);
+  font-size: 13px;
+  font-weight: 700;
+}
+
 .mafia-target-meta {
+  display: block;
+  margin-top: 4px;
   color: var(--muted);
+}
+
+.mafia-target-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
 }
 
 .mafia-result-row {
@@ -463,5 +485,16 @@ button:disabled {
   }
   .chat-composer-row {
     align-items: stretch;
+  }
+  .mafia-target-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .mafia-target-actions {
+    justify-content: stretch;
+    width: 100%;
+  }
+  .mafia-target-actions button {
+    flex: 1 1 0;
   }
 }
