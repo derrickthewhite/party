@@ -1,0 +1,438 @@
+[
+  {
+    "id": "g61345-1-5-4-8",
+    "file": "RegionHead01_BrownDog.svg"
+  },
+  {
+    "id": "g64763",
+    "file": "RegionHead02_BlueAlien.svg"
+  },
+  {
+    "id": "g101884",
+    "file": "RegionHead03_GreyMask.svg"
+  },
+  {
+    "id": "g140360",
+    "file": "RegionHead04_GreenAlienA.svg"
+  },
+  {
+    "id": "g140468",
+    "file": "RegionHead05_GreenAlienB.svg"
+  },
+  {
+    "id": "g333698-6",
+    "file": "RegionHead06_BraidedHuman.svg"
+  },
+  {
+    "id": "g303141-7",
+    "file": "RegionHead07_IceElf.svg"
+  },
+  {
+    "id": "g440528",
+    "file": "RegionHead08_WhiteCat.svg"
+  },
+  {
+    "id": "g430526",
+    "file": "RegionHead09_OrangeCat.svg"
+  },
+  {
+    "id": "g430548",
+    "file": "RegionHead10_GreyCat.svg"
+  },
+  {
+    "id": "g64803",
+    "file": "RegionHead11_BlueHelmAlien.svg"
+  },
+  {
+    "id": "g101863",
+    "file": "RegionHead12_GreyFaceA.svg"
+  },
+  {
+    "id": "g101928",
+    "file": "RegionHead13_GreyFaceB.svg"
+  },
+  {
+    "id": "g101904",
+    "file": "RegionHead14_GreyFaceC.svg"
+  },
+  {
+    "id": "g151870",
+    "file": "RegionHead15_Tiger.svg"
+  },
+  {
+    "id": "g90047-8-5",
+    "file": "RegionHead16_CapHuman.svg"
+  },
+  {
+    "id": "g164329-5-6-7",
+    "file": "RegionHead17_Astronaut.svg"
+  },
+  {
+    "id": "g60142",
+    "file": "RegionHead18_PinkPilot.svg"
+  },
+  {
+    "id": "g158907",
+    "file": "RegionHead19_SpottedDogA.svg"
+  },
+  {
+    "id": "g158971",
+    "file": "RegionHead20_SpottedDogB.svg"
+  },
+  {
+    "id": "g178166-4",
+    "file": "RegionHead21_GreenBug.svg"
+  },
+  {
+    "id": "g178078-9-6",
+    "file": "RegionHead22_BlueBug.svg"
+  },
+  {
+    "id": "g178053-9-0",
+    "file": "RegionHead23_BlueBugSpotted.svg"
+  },
+  {
+    "id": "g65395",
+    "file": "RegionHead24_BrownSnake.svg"
+  },
+  {
+    "id": "g75550",
+    "file": "RegionHead25_OrangeSnake.svg"
+  },
+  {
+    "id": "g75516",
+    "file": "RegionHead26_BlackSnake.svg"
+  },
+  {
+    "id": "g75532",
+    "file": "RegionHead27_GreenSnake.svg"
+  },
+  {
+    "id": "g152440",
+    "file": "RegionHead28_GreySplitFace.svg"
+  },
+  {
+    "id": "g152420",
+    "file": "RegionHead29_HalfRedFace.svg"
+  },
+  {
+    "id": "g152459",
+    "file": "RegionHead30_BrownMask.svg"
+  },
+  {
+    "id": "g152384",
+    "file": "RegionHead31_GreyHalfMask.svg"
+  },
+  {
+    "id": "g18614",
+    "file": "RegionHead32_LilacCatA.svg"
+  },
+  {
+    "id": "g18560",
+    "file": "RegionHead33_LilacCatB.svg"
+  },
+  {
+    "id": "g123275",
+    "file": "RegionHead34_HornedGirlA.svg"
+  },
+  {
+    "id": "g220637",
+    "file": "RegionHead35_HornedGirlB.svg"
+  },
+  {
+    "id": "g157869",
+    "file": "RegionHead36_TealHelmAlien.svg"
+  },
+  {
+    "id": "g157790",
+    "file": "RegionHead37_NetHelmAlien.svg"
+  },
+  {
+    "id": "g182062",
+    "file": "RegionHead38_GreenAlienSmile.svg"
+  },
+  {
+    "id": "g182219",
+    "file": "RegionHead39_GreenAlienAngry.svg"
+  },
+  {
+    "id": "g200703-9",
+    "file": "RegionHead40_GoldFace.svg"
+  },
+  {
+    "id": "g251599",
+    "file": "RegionHead41_CurlyHuman.svg"
+  },
+  {
+    "id": "g248520",
+    "file": "RegionHead42_BlackHairHuman.svg"
+  },
+  {
+    "id": "g235986",
+    "file": "RegionHead43_Angel.svg"
+  },
+  {
+    "id": "g123316-9",
+    "file": "RegionHead44_HornedGirlC.svg"
+  },
+  {
+    "id": "g170734",
+    "file": "RegionHead45_GreenOgreHairA.svg"
+  },
+  {
+    "id": "g170773",
+    "file": "RegionHead46_GreenOgreCapA.svg"
+  },
+  {
+    "id": "g170814",
+    "file": "RegionHead47_GreenOgreCapB.svg"
+  },
+  {
+    "id": "g170895",
+    "file": "RegionHead48_GreenOgreCapC.svg"
+  },
+  {
+    "id": "g171160",
+    "file": "RegionHead49_GreenOgreHairB.svg"
+  },
+  {
+    "id": "g178109-4",
+    "file": "RegionHead50_BlueBugFullA.svg"
+  },
+  {
+    "id": "g178109",
+    "file": "RegionHead51_GreenBugFullA.svg"
+  },
+  {
+    "id": "g178141-7",
+    "file": "RegionHead52_BlueBugFullB.svg"
+  },
+  {
+    "id": "g178141",
+    "file": "RegionHead53_GreenBugFullB.svg"
+  },
+  {
+    "id": "g188023",
+    "file": "RegionHead54_GreenOgreHairC.svg"
+  },
+  {
+    "id": "g190209-4",
+    "file": "RegionHead55_GreenOgreHairD.svg"
+  },
+  {
+    "id": "g190209",
+    "file": "RegionHead56_GreenOgreHairE.svg"
+  },
+  {
+    "id": "g190836",
+    "file": "RegionHead57_WhiteLionA.svg"
+  },
+  {
+    "id": "g193641",
+    "file": "RegionHead58_BrownLionA.svg"
+  },
+  {
+    "id": "g193686",
+    "file": "RegionHead59_PaleLionA.svg"
+  },
+  {
+    "id": "g242235",
+    "file": "RegionHead60_WhiteLionB.svg"
+  },
+  {
+    "id": "g31806",
+    "file": "RegionHead61_SpikyHuman.svg"
+  },
+  {
+    "id": "g336398",
+    "file": "RegionHead62_BrownLionB.svg"
+  },
+  {
+    "id": "g396734",
+    "file": "RegionHead63_PaleLionB.svg"
+  },
+  {
+    "id": "g421077",
+    "file": "RegionHead64_BlackCat.svg"
+  },
+  {
+    "id": "g56303",
+    "file": "RegionHead65_GreenBugFullC.svg"
+  },
+  {
+    "id": "g61502",
+    "file": "RegionHead66_GreenBugSpottedFull.svg"
+  },
+  {
+    "id": "g61345-1",
+    "file": "RegionHead67_BrownDogB.svg"
+  },
+  {
+    "id": "g75753-1-7-7",
+    "file": "RegionHead68_HornedGirlD.svg"
+  },
+  {
+    "id": "g109751-9",
+    "file": "RegionHead69_BeardedHuman.svg"
+  },
+  {
+    "id": "g123275-5",
+    "file": "RegionHead70_HornedGirlE.svg"
+  },
+  {
+    "id": "g123296-1",
+    "file": "RegionHead71_HornedGirlF.svg"
+  },
+  {
+    "id": "g153047-5-2",
+    "file": "RegionHead72_PaleHumanA.svg"
+  },
+  {
+    "id": "g164329-5-2-3-9",
+    "file": "RegionHead73_BowlCutHumanA.svg"
+  },
+  {
+    "id": "g164329-5-6",
+    "file": "RegionHead74_BowlCutHumanB.svg"
+  },
+  {
+    "id": "g164329-7-1",
+    "file": "RegionHead75_BowlCutHumanC.svg"
+  },
+  {
+    "id": "g164329-8",
+    "file": "RegionHead76_BowlCutHumanD.svg"
+  },
+  {
+    "id": "g178757-2-4",
+    "file": "RegionHead77_BlondeBraidsHuman.svg"
+  },
+  {
+    "id": "g191139-5",
+    "file": "RegionHead78_BeanieHuman.svg"
+  },
+  {
+    "id": "g191624-6",
+    "file": "RegionHead79_RecedingHairHuman.svg"
+  },
+  {
+    "id": "g24346",
+    "file": "RegionHead80_DarkHumanA.svg"
+  },
+  {
+    "id": "g253971",
+    "file": "RegionHead81_GoateeHuman.svg"
+  },
+  {
+    "id": "g89304-8-2",
+    "file": "RegionHead82_DarkHumanB.svg"
+  },
+  {
+    "id": "g90047-8",
+    "file": "RegionHead83_BlondeHuman.svg"
+  },
+  {
+    "id": "g12086",
+    "file": "RegionHead84_TongueAlienWhite.svg"
+  },
+  {
+    "id": "g12276",
+    "file": "RegionHead85_TongueAlienGold.svg"
+  },
+  {
+    "id": "g123125",
+    "file": "RegionHead86_RedAstronautAlien.svg"
+  },
+  {
+    "id": "g15",
+    "file": "RegionHead87_TealHelmAlienB.svg"
+  },
+  {
+    "id": "g178053-9",
+    "file": "RegionHead88_BlueBugSpottedB.svg"
+  },
+  {
+    "id": "g178078-9",
+    "file": "RegionHead89_BlueBugPlainB.svg"
+  },
+  {
+    "id": "g178078",
+    "file": "RegionHead90_GreenBugPlainB.svg"
+  },
+  {
+    "id": "g178141-7-0",
+    "file": "RegionHead91_BlueBugFullC.svg"
+  },
+  {
+    "id": "g178166-6",
+    "file": "RegionHead92_BlueBugFullD.svg"
+  },
+  {
+    "id": "g178166",
+    "file": "RegionHead93_GreenBugFullD.svg"
+  },
+  {
+    "id": "g188023-3",
+    "file": "RegionHead94_GreenOgreHairF.svg"
+  },
+  {
+    "id": "g188766",
+    "file": "RegionHead95_GreenOgreFaceA.svg"
+  },
+  {
+    "id": "g200703",
+    "file": "RegionHead96_GoldFaceB.svg"
+  },
+  {
+    "id": "g200750",
+    "file": "RegionHead97_BronzeFaceA.svg"
+  },
+  {
+    "id": "g200797",
+    "file": "RegionHead98_WhiteFaceA.svg"
+  },
+  {
+    "id": "g303013",
+    "file": "RegionHead99_GreenElfA.svg"
+  },
+  {
+    "id": "g303141",
+    "file": "RegionHead100_IceElfB.svg"
+  },
+  {
+    "id": "g303269",
+    "file": "RegionHead101_AmberElfA.svg"
+  },
+  {
+    "id": "g332191",
+    "file": "RegionHead102_PaleElfA.svg"
+  },
+  {
+    "id": "g54776",
+    "file": "RegionHead103_TongueAlienBlack.svg"
+  },
+  {
+    "id": "g55542",
+    "file": "RegionHead104_GreenBugPlainC.svg"
+  },
+  {
+    "id": "g56303-1",
+    "file": "RegionHead105_GreenBugFullE.svg"
+  },
+  {
+    "id": "g56330-7",
+    "file": "RegionHead106_GreenBugSpottedB.svg"
+  },
+  {
+    "id": "g56330",
+    "file": "RegionHead107_TealHelmAlienC.svg"
+  },
+  {
+    "id": "g64925",
+    "file": "RegionHead108_GreenBugPlainD.svg"
+  },
+  {
+    "id": "g67417",
+    "file": "RegionHead109_GreenBugSpottedFullB.svg"
+  }
+]

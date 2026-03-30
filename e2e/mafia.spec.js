@@ -52,6 +52,14 @@ async function submitMafiaAction(page, title, targetUsername, actionName) {
   await button.click();
 }
 
+function mafiaTargetSuggestions(page, title, username) {
+  return mafiaPlayerRow(page, title, username).locator('[data-ref="suggestions"]');
+}
+
+function mafiaTargetVotes(page, title, username) {
+  return mafiaPlayerRow(page, title, username).locator('[data-ref="votes"]');
+}
+
 async function sessionRole(session, title) {
   const screen = await waitForMafiaPhase(session.page, title, 'Day Vote');
   const roleText = String((await screen.locator('[data-ref="roleText"]').textContent()) || '');
@@ -116,14 +124,16 @@ test('mafia suggestions are public by day and hidden from town at night', async 
     const dayVoteTarget = eliminatedTown.credentials.username;
 
     await submitMafiaAction(creator.page, title, daySuggestionTarget, 'Suggest');
-    await expect(mafiaPlayerRow(creator.page, title, creatorCredentials.username).locator('[data-ref="state"]')).toHaveText(`Suggests ${daySuggestionTarget}`);
+    await expect(mafiaTargetSuggestions(creator.page, title, daySuggestionTarget)).toHaveText(`Suggested by ${creatorCredentials.username}`);
 
-    await expect(mafiaPlayerRow(dayObserver.page, title, creatorCredentials.username).locator('[data-ref="state"]')).toHaveText(`Suggests ${daySuggestionTarget}`, { timeout: 15000 });
+    await expect(mafiaTargetSuggestions(dayObserver.page, title, daySuggestionTarget)).toHaveText(`Suggested by ${creatorCredentials.username}`, { timeout: 15000 });
 
     await submitMafiaAction(creator.page, title, dayVoteTarget, 'Vote');
-    await expect(mafiaPlayerRow(creator.page, title, creatorCredentials.username).locator('[data-ref="state"]')).toHaveText(`Suggests and votes ${dayVoteTarget}`);
+    await expect(mafiaTargetSuggestions(creator.page, title, daySuggestionTarget)).toHaveText(`Suggested by ${creatorCredentials.username}`);
+    await expect(mafiaTargetVotes(creator.page, title, dayVoteTarget)).toHaveText(`Voted by ${creatorCredentials.username}`);
 
-    await expect(mafiaPlayerRow(dayObserver.page, title, creatorCredentials.username).locator('[data-ref="state"]')).toHaveText(`Suggests and votes ${dayVoteTarget}`, { timeout: 15000 });
+    await expect(mafiaTargetSuggestions(dayObserver.page, title, daySuggestionTarget)).toHaveText(`Suggested by ${creatorCredentials.username}`, { timeout: 15000 });
+    await expect(mafiaTargetVotes(dayObserver.page, title, dayVoteTarget)).toHaveText(`Voted by ${creatorCredentials.username}`, { timeout: 15000 });
 
     const supportVoter = creatorSession.role === 'mafia' ? survivingTown : mafiaSession;
       const finalVoter = sessions.find((session) => {
@@ -155,9 +165,9 @@ test('mafia suggestions are public by day and hidden from town at night', async 
     });
 
     await submitMafiaAction(mafiaSession.page, title, nightTarget.credentials.username, 'Suggest');
-    await expect(mafiaPlayerRow(mafiaSession.page, title, mafiaSession.credentials.username).locator('[data-ref="state"]')).toHaveText(`Suggests ${nightTarget.credentials.username}`);
+    await expect(mafiaTargetSuggestions(mafiaSession.page, title, nightTarget.credentials.username)).toHaveText(`Suggested by ${mafiaSession.credentials.username}`);
 
-    await expect(mafiaPlayerRow(survivingTown.page, title, mafiaSession.credentials.username).locator('[data-ref="state"]')).toBeHidden({ timeout: 15000 });
+    await expect(mafiaTargetSuggestions(survivingTown.page, title, nightTarget.credentials.username)).toBeHidden({ timeout: 15000 });
   } finally {
     for (const session of sessions) {
       if (session.closed) {

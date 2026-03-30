@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/game_access.php';
+require_once __DIR__ . '/../lib/game_icons.php';
 
 function handle_messages_route(string $method, array $segments): void
 {
@@ -39,10 +40,13 @@ function messages_list(int $gameId): void
         $sinceId = (int)$_GET['since_id'];
     }
 
+    game_assign_missing_member_icons($gameId);
+
     $stmt = db()->prepare(
-        'SELECT m.id, m.body, m.created_at, u.id AS user_id, u.username '
+        'SELECT m.id, m.body, m.created_at, u.id AS user_id, u.username, ' . game_member_icon_select_sql('gm', 'icon_key') . ' '
         . 'FROM game_messages m '
         . 'JOIN users u ON u.id = m.user_id '
+        . 'LEFT JOIN game_members gm ON gm.game_id = m.game_id AND gm.user_id = m.user_id '
         . 'WHERE m.game_id = :game_id AND m.id > :since_id '
         . 'ORDER BY m.id ASC '
         . 'LIMIT 200'
@@ -62,6 +66,7 @@ function messages_list(int $gameId): void
             'user' => [
                 'id' => (int)$row['user_id'],
                 'username' => (string)$row['username'],
+                'icon_key' => game_normalize_icon_key($row['icon_key'] ?? null),
             ],
         ];
     }, $rows);
@@ -115,6 +120,8 @@ function messages_create(int $gameId): void
         'body' => $text,
     ]);
 
+    game_assign_missing_member_icons($gameId);
+
     $messageId = (int)db()->lastInsertId();
 
     success_response([
@@ -125,6 +132,7 @@ function messages_create(int $gameId): void
             'user' => [
                 'id' => $user['id'],
                 'username' => $user['username'],
+                'icon_key' => game_member_icon_key($gameId, (int)$user['id']),
             ],
         ],
     ], 201);

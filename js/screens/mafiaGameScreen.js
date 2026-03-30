@@ -1,5 +1,6 @@
 import { cloneTemplateNode, collectRefs, createNodeFromHtml, createTemplate } from './dom.js';
 import { createBaseGameScreen } from './gameScreen.js';
+import { playerIconLabel, setPlayerIconImage } from '../playerIcons.js';
 
 const MAFIA_PANEL_HTML = `
 	<div class="card mafia-panel">
@@ -14,6 +15,16 @@ const MAFIA_PANEL_HTML = `
 		<div class="mafia-summary" data-ref="latestSummary"></div>
 		<div class="mafia-ready-card" data-ref="readyCard">
 			<p data-ref="readyText"></p>
+			<div class="mafia-icon-row" data-ref="iconRow">
+				<div class="mafia-icon-chip">
+					<img class="player-icon mafia-icon-preview" data-ref="iconPreview" alt="">
+					<div>
+						<div class="mafia-icon-label" data-ref="iconLabel"></div>
+						<small class="mafia-target-meta" data-ref="iconHint"></small>
+					</div>
+				</div>
+				<button data-ref="changeIconBtn">Change Icon</button>
+			</div>
 			<div class="row mobile-stack">
 				<button class="primary" data-ref="readyBtn">I&apos;m Ready</button>
 			</div>
@@ -36,10 +47,14 @@ const MAFIA_PANEL_HTML = `
 
 const TARGET_ROW_TEMPLATE_HTML = `
 	<div class="mafia-target-row">
-		<div class="mafia-target-copy">
-			<div class="mafia-target-name" data-ref="name"></div>
-			<div class="mafia-target-state" data-ref="state"></div>
-			<small class="mafia-target-meta" data-ref="meta"></small>
+		<div class="mafia-target-identity">
+			<img class="player-icon mafia-target-icon" data-ref="icon" alt="">
+			<div class="mafia-target-copy">
+				<div class="mafia-target-name" data-ref="name"></div>
+				<div class="mafia-target-state" data-ref="suggestions"></div>
+				<div class="mafia-target-votes" data-ref="votes"></div>
+				<small class="mafia-target-meta" data-ref="meta"></small>
+			</div>
 		</div>
 		<div class="mafia-target-actions" data-ref="actions">
 			<button class="button-ready" data-ref="suggestBtn">Suggest</button>
@@ -69,6 +84,11 @@ export function createMafiaGameScreen(deps) {
 	const latestSummary = refs.latestSummary;
 	const readyCard = refs.readyCard;
 	const readyText = refs.readyText;
+	const iconRow = refs.iconRow;
+	const iconPreview = refs.iconPreview;
+	const iconLabel = refs.iconLabel;
+	const iconHint = refs.iconHint;
+	const changeIconBtn = refs.changeIconBtn;
 	const readyBtn = refs.readyBtn;
 	const voteCard = refs.voteCard;
 	const voteText = refs.voteText;
@@ -84,6 +104,7 @@ export function createMafiaGameScreen(deps) {
 	let lastGameId = null;
 	let refreshBusy = false;
 	let submitBusy = false;
+	let iconBusy = false;
 	let autoRefreshId = null;
 	let pendingAction = null;
 	let setStatusNode = function noop() {};
@@ -110,6 +131,7 @@ export function createMafiaGameScreen(deps) {
 		recentResults: [],
 		winnerSummary: null,
 		status: 'open',
+		iconCatalog: [],
 	};
 
 	const targetRowsByUserId = new Map();
@@ -202,27 +224,117 @@ export function createMafiaGameScreen(deps) {
 		return 'Use Suggest to float a target and Vote when you want your choice to count.';
 	}
 
-	function buildPlayerLiveStateText(player) {
-		const suggestionTargetUserId = player && player.display_suggestion_target_user_id != null
-			? Number(player.display_suggestion_target_user_id)
-			: null;
-		const voteTargetUserId = player && player.vote_target_user_id != null
-			? Number(player.vote_target_user_id)
-			: null;
+	function buildIncomingActionText(prefix, usernames) {
+		const items = Array.isArray(usernames) ? usernames.filter(Boolean) : [];
+		return items.length > 0 ? prefix + items.join(', ') : '';
+	}
 
-		if (suggestionTargetUserId != null && voteTargetUserId != null && suggestionTargetUserId === voteTargetUserId) {
-			return 'Suggests and votes ' + targetPlayerName(voteTargetUserId);
-		}
+	function canChangeIcon() {
+		return !!lastGameId
+			&& serverSnapshot.status === 'open'
+			&& Array.isArray(serverSnapshot.iconCatalog)
+			&& serverSnapshot.iconCatalog.length > 0
+			&& !iconBusy;
+	}
 
-		const bits = [];
-		if (suggestionTargetUserId != null) {
-			bits.push('Suggests ' + targetPlayerName(suggestionTargetUserId));
-		}
-		if (voteTargetUserId != null) {
-			bits.push('Votes ' + targetPlayerName(voteTargetUserId));
-		}
+	function showIconPickerModal(currentIconKey, iconCatalog) {
+		const availableIcons = Array.isArray(iconCatalog) ? iconCatalog.slice() : [];
+		const priorFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
-		return bits.join(' | ');
+		return new Promise(function resolveSelection(resolve) {
+			const overlay = document.createElement('div');
+			overlay.className = 'modal-overlay';
+
+			const dialog = document.createElement('div');
+			dialog.className = 'modal-card modal-card-wide mafia-icon-modal';
+			dialog.setAttribute('role', 'dialog');
+			dialog.setAttribute('aria-modal', 'true');
+			dialog.setAttribute('aria-label', 'Choose icon');
+
+			const title = document.createElement('h3');
+			title.textContent = 'Choose your icon';
+
+			const message = document.createElement('p');
+			message.className = 'modal-message';
+			message.textContent = 'Pick the icon that should represent you in chat and on the mafia player list.';
+
+			const grid = document.createElement('div');
+			grid.className = 'mafia-icon-grid';
+
+			const actions = document.createElement('div');
+			actions.className = 'modal-actions';
+
+			const cancelBtn = document.createElement('button');
+			cancelBtn.textContent = 'Cancel';
+
+			let closed = false;
+
+			function close(result) {
+				if (closed) {
+					return;
+				}
+
+				closed = true;
+				document.removeEventListener('keydown', onKeyDown);
+				overlay.remove();
+				if (priorFocus && priorFocus.isConnected && typeof priorFocus.focus === 'function') {
+					priorFocus.focus();
+				}
+				resolve(result);
+			}
+
+			function onKeyDown(event) {
+				if (event.key === 'Escape') {
+					close(null);
+				}
+			}
+
+			availableIcons.forEach(function eachIcon(iconKey) {
+				const option = document.createElement('button');
+				option.type = 'button';
+				option.className = 'mafia-icon-option';
+				option.classList.toggle('is-selected', String(iconKey) === String(currentIconKey || ''));
+
+				const icon = document.createElement('img');
+				icon.className = 'player-icon mafia-icon-option-image';
+				icon.setAttribute('aria-hidden', 'true');
+				setPlayerIconImage(icon, iconKey, 'Player');
+
+				const label = document.createElement('span');
+				label.textContent = playerIconLabel(iconKey);
+
+				option.appendChild(icon);
+				option.appendChild(label);
+				option.addEventListener('click', function onSelect() {
+					close(iconKey);
+				});
+				grid.appendChild(option);
+			});
+
+			overlay.addEventListener('click', function onOverlayClick(event) {
+				if (event.target === overlay) {
+					close(null);
+				}
+			});
+
+			cancelBtn.addEventListener('click', function onCancel() {
+				close(null);
+			});
+
+			actions.appendChild(cancelBtn);
+			dialog.appendChild(title);
+			dialog.appendChild(message);
+			dialog.appendChild(grid);
+			dialog.appendChild(actions);
+			overlay.appendChild(dialog);
+			document.body.appendChild(overlay);
+			document.addEventListener('keydown', onKeyDown);
+
+			const initialFocus = grid.querySelector('.mafia-icon-option.is-selected') || grid.querySelector('.mafia-icon-option');
+			if (initialFocus && typeof initialFocus.focus === 'function') {
+				initialFocus.focus();
+			}
+		});
 	}
 
 	async function fetchAndApplyGameDetail() {
@@ -289,7 +401,8 @@ export function createMafiaGameScreen(deps) {
 				bits.push(player.known_role === 'mafia' ? 'Mafia' : 'Town');
 			}
 
-			const liveStateText = buildPlayerLiveStateText(player);
+			const suggestionSummaryText = buildIncomingActionText('Suggested by ', player && player.incoming_suggestion_usernames);
+			const voteSummaryText = buildIncomingActionText('Voted by ', player && player.incoming_vote_usernames);
 			const isSelfSuggested = viewerSuggestionTargetUserId === userId;
 			const isSelfVoted = viewerVoteTargetUserId === userId;
 			const isPendingSuggestion = pendingAction && pendingAction.kind === 'suggest' && pendingAction.targetUserId === userId;
@@ -297,9 +410,12 @@ export function createMafiaGameScreen(deps) {
 			const canSuggest = canSendLiveAction(serverSnapshot.suggestionActionType, player) && !isSelfSuggested && !isPendingVote;
 			const canVote = canSendLiveAction(serverSnapshot.voteActionType, player) && !isSelfVoted && !isPendingSuggestion;
 
+			setPlayerIconImage(rowRefs.icon, player && player.icon_key ? player.icon_key : null, player && player.username ? player.username : 'Player');
 			rowRefs.name.textContent = String(player.username || 'Unknown');
-			rowRefs.state.textContent = liveStateText;
-			rowRefs.state.style.display = liveStateText ? '' : 'none';
+			rowRefs.suggestions.textContent = suggestionSummaryText;
+			rowRefs.suggestions.style.display = suggestionSummaryText ? '' : 'none';
+			rowRefs.votes.textContent = voteSummaryText;
+			rowRefs.votes.style.display = voteSummaryText ? '' : 'none';
 			rowRefs.meta.textContent = bits.join(' | ');
 			rowRefs.actions.style.display = player.is_self ? 'none' : '';
 			rowRefs.row.classList.toggle('is-suggested', viewerDisplaySuggestionTargetUserId === userId);
@@ -363,10 +479,19 @@ export function createMafiaGameScreen(deps) {
 	}
 
 	function reconcileUi() {
-		phaseTitle.textContent = String(serverSnapshot.phaseTitle || 'Mafia');
-		roleText.textContent = 'Your role: ' + (serverSnapshot.selfRole === 'mafia' ? 'Mafia' : 'Town');
-		phaseText.textContent = String(serverSnapshot.phaseInstructions || '');
-		if (serverSnapshot.phase === 'start') {
+		const player = selfPlayer();
+		const isLobbyOpen = serverSnapshot.status === 'open';
+
+		phaseTitle.textContent = isLobbyOpen ? 'Lobby' : String(serverSnapshot.phaseTitle || 'Mafia');
+		roleText.textContent = isLobbyOpen
+			? 'Game has not started yet. Pick an icon and use chat while the lobby is open.'
+			: 'Your role: ' + (serverSnapshot.selfRole === 'mafia' ? 'Mafia' : 'Town');
+		phaseText.textContent = isLobbyOpen
+			? 'The owner needs to start the game before roles are assigned and ready checks appear.'
+			: String(serverSnapshot.phaseInstructions || '');
+		if (isLobbyOpen) {
+			progressText.textContent = 'Players: ' + Number(serverSnapshot.players.length || 0);
+		} else if (serverSnapshot.phase === 'start') {
 			progressText.textContent = 'Ready: ' + Number(serverSnapshot.submittedCount || 0) + '/' + Number(serverSnapshot.requiredCount || 0);
 		} else {
 			progressText.textContent = 'Votes: ' + Number(serverSnapshot.submittedCount || 0) + '/' + Number(serverSnapshot.requiredCount || 0);
@@ -389,10 +514,19 @@ export function createMafiaGameScreen(deps) {
 
 		readyCard.style.display = serverSnapshot.phase === 'start' ? '' : 'none';
 		voteCard.style.display = isVotePhase() ? '' : 'none';
-		readyText.textContent = serverSnapshot.hasSubmitted
-			? 'Ready submitted. Waiting for the rest of the table.'
-			: 'Confirm that you have reviewed your role.';
-		readyBtn.disabled = !serverSnapshot.canSubmit || serverSnapshot.hasSubmitted || submitBusy;
+		readyText.textContent = isLobbyOpen
+			? 'Choose the icon you want to use in this game before the host starts the round.'
+			: (serverSnapshot.hasSubmitted
+				? 'Ready submitted. Waiting for the rest of the table.'
+				: 'Confirm that you have reviewed your role.');
+		iconRow.style.display = isLobbyOpen && player ? '' : 'none';
+		setPlayerIconImage(iconPreview, player && player.icon_key ? player.icon_key : null, player && player.username ? player.username : 'Player');
+		iconLabel.textContent = player && player.icon_key ? playerIconLabel(player.icon_key) : 'No icon assigned yet';
+		iconHint.textContent = 'Visible in chat and on every mafia player row.';
+		changeIconBtn.textContent = iconBusy ? 'Saving...' : 'Change Icon';
+		changeIconBtn.disabled = !canChangeIcon();
+		readyBtn.style.display = isLobbyOpen ? 'none' : '';
+		readyBtn.disabled = isLobbyOpen || !serverSnapshot.canSubmit || serverSnapshot.hasSubmitted || submitBusy;
 
 		reconcileTargets();
 		reconcileHistory();
@@ -421,8 +555,34 @@ export function createMafiaGameScreen(deps) {
 		serverSnapshot.recentResults = Array.isArray(mafiaState.recent_results) ? mafiaState.recent_results.slice() : [];
 		serverSnapshot.winnerSummary = mafiaState.winner_summary || null;
 		serverSnapshot.status = String((game && game.status) || 'open');
+		serverSnapshot.iconCatalog = Array.isArray(game && game.icon_catalog) ? game.icon_catalog.slice() : [];
 
 		reconcileUi();
+	}
+
+	async function updateIconSelection() {
+		const player = selfPlayer();
+		if (!player || !canChangeIcon()) {
+			return;
+		}
+
+		const selectedIconKey = await showIconPickerModal(player.icon_key || null, serverSnapshot.iconCatalog);
+		if (!selectedIconKey || String(selectedIconKey) === String(player.icon_key || '')) {
+			return;
+		}
+
+		iconBusy = true;
+		reconcileUi();
+		try {
+			await deps.api.setGameIcon(lastGameId, selectedIconKey);
+			await fetchAndApplyGameDetail();
+			setStatusNode('Icon updated.', 'ok');
+		} catch (err) {
+			setStatusNode(err.message || 'Unable to update icon.', 'error');
+		} finally {
+			iconBusy = false;
+			reconcileUi();
+		}
 	}
 
 	async function refreshMafiaState(options) {
@@ -558,6 +718,7 @@ export function createMafiaGameScreen(deps) {
 	});
 
 	readyBtn.addEventListener('click', submitReadyAction);
+	changeIconBtn.addEventListener('click', updateIconSelection);
 	withdrawVoteBtn.addEventListener('click', withdrawVote);
 
 	const screen = createBaseGameScreen(deps, {

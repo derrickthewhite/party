@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/game_access.php';
+require_once __DIR__ . '/game_icons.php';
 require_once __DIR__ . '/game_types.php';
 require_once __DIR__ . '/sql.php';
 
@@ -452,13 +453,43 @@ function mafia_role_for_user(array $roleMap, int $userId): string
 function mafia_alive_player_rows(int $gameId): array
 {
     $stmt = db()->prepare(
-        'SELECT gm.user_id, gm.role, u.username FROM game_members gm '
+        'SELECT gm.user_id, gm.role, u.username, ' . game_member_icon_select_sql('gm', 'icon_key') . ' FROM game_members gm '
         . 'JOIN users u ON u.id = gm.user_id '
         . 'WHERE gm.game_id = :game_id AND u.is_active = 1 '
         . 'ORDER BY u.username ASC'
     );
     $stmt->execute(['game_id' => $gameId]);
     return $stmt->fetchAll();
+}
+
+function mafia_live_choice_usernames_by_target(array $latestActions, array $usernameByUserId): array
+{
+    $usernamesByTargetUserId = [];
+
+    foreach ($latestActions as $userId => $action) {
+        if (!mafia_action_has_target($action)) {
+            continue;
+        }
+
+        $targetUserId = (int)$action['target_user_id'];
+        $username = isset($usernameByUserId[$userId]) ? (string)$usernameByUserId[$userId] : '';
+        if ($username === '') {
+            continue;
+        }
+
+        if (!isset($usernamesByTargetUserId[$targetUserId])) {
+            $usernamesByTargetUserId[$targetUserId] = [];
+        }
+
+        $usernamesByTargetUserId[$targetUserId][] = $username;
+    }
+
+    foreach ($usernamesByTargetUserId as &$usernames) {
+        sort($usernames, SORT_NATURAL | SORT_FLAG_CASE);
+    }
+    unset($usernames);
+
+    return $usernamesByTargetUserId;
 }
 
 function mafia_alive_player_ids(int $gameId): array
@@ -502,6 +533,18 @@ function mafia_build_player_payload(
     $players = [];
     $eligibleTargets = mafia_eligible_target_ids_for_user($gameId, $viewerUserId, $phase, $roleMap);
     $canViewLiveChoices = mafia_can_view_live_choices($gameStatus, $phase, $viewerRole, $viewerIsAlive);
+    $usernameByUserId = [];
+
+    foreach ($rows as $row) {
+        $usernameByUserId[(int)$row['user_id']] = (string)$row['username'];
+    }
+
+    $incomingSuggestionUsernamesByTargetUserId = $canViewLiveChoices
+        ? mafia_live_choice_usernames_by_target($latestSuggestions, $usernameByUserId)
+        : [];
+    $incomingVoteUsernamesByTargetUserId = $canViewLiveChoices
+        ? mafia_live_choice_usernames_by_target($latestVotes, $usernameByUserId)
+        : [];
 
     foreach ($rows as $row) {
         $userId = (int)$row['user_id'];
@@ -529,6 +572,7 @@ function mafia_build_player_payload(
         $players[] = [
             'user_id' => $userId,
             'username' => (string)$row['username'],
+            'icon_key' => game_normalize_icon_key($row['icon_key'] ?? null),
             'is_self' => $userId === $viewerUserId,
             'is_alive' => $isAlive,
             'is_eliminated' => !$isAlive,
@@ -536,6 +580,8 @@ function mafia_build_player_payload(
             'suggestion_target_user_id' => $suggestionTargetUserId,
             'display_suggestion_target_user_id' => $displaySuggestionTargetUserId,
             'vote_target_user_id' => $voteTargetUserId,
+            'incoming_suggestion_usernames' => $incomingSuggestionUsernamesByTargetUserId[$userId] ?? [],
+            'incoming_vote_usernames' => $incomingVoteUsernamesByTargetUserId[$userId] ?? [],
             'can_target_by_self' => in_array($userId, $eligibleTargets, true),
         ];
     }

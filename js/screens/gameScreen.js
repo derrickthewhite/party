@@ -1,5 +1,6 @@
 import { collectRefs, createNodeFromHtml, setStatus, showConfirmModal } from './dom.js';
 import { createGameParticipantsSidebarController } from './gameParticipantsSidebar.js';
+import { setPlayerIconImage } from '../playerIcons.js';
 
 export function createBaseGameScreen(deps, options) {
 	const config = options || {};
@@ -310,6 +311,8 @@ export function createBaseGameScreen(deps, options) {
 			participantsSidebarController.setGame(game);
 		}
 
+		refreshVisibleMessageIcons(game);
+
 		if (game.status === 'closed') {
 			modeInfo.textContent = 'Game has ended. Everything is read-only.';
 		} else if (memberRole === 'observer') {
@@ -342,18 +345,54 @@ export function createBaseGameScreen(deps, options) {
 		}
 	}
 
+	function memberByUserId(game) {
+		const map = new Map();
+		const members = Array.isArray(game && game.members) ? game.members : [];
+		members.forEach(function eachMember(member) {
+			const userId = Number(member && (member.user_id ?? member.id) ? (member.user_id ?? member.id) : 0);
+			map.set(userId, member || null);
+		});
+		return map;
+	}
+
+	function refreshVisibleMessageIcons(game) {
+		const membersByUserId = memberByUserId(game);
+		feed.querySelectorAll('.message-item[data-user-id]').forEach(function eachRow(node) {
+			const userId = Number(node.getAttribute('data-user-id') || 0);
+			const member = membersByUserId.get(userId) || null;
+			const iconNode = node.querySelector('.message-item-icon');
+			if (!iconNode) {
+				return;
+			}
+
+			setPlayerIconImage(iconNode, member && member.icon_key ? member.icon_key : null, member && member.username ? member.username : 'Player');
+		});
+	}
+
 	function appendMessages(messages) {
 		messages.forEach(function eachMessage(message) {
 			const line = document.createElement('div');
 			line.className = 'message-item';
+			line.setAttribute('data-user-id', String(message && message.user && message.user.id ? message.user.id : 0));
+
+			const header = document.createElement('div');
+			header.className = 'message-item-header';
+
+			const icon = document.createElement('img');
+			icon.className = 'player-icon message-item-icon';
+			icon.setAttribute('aria-hidden', 'true');
+			setPlayerIconImage(icon, message && message.user ? message.user.icon_key : null, message && message.user ? message.user.username : 'Player');
 
 			const meta = document.createElement('small');
 			meta.textContent = message.user.username + ' - ' + message.created_at;
 
 			const text = document.createElement('div');
+			text.className = 'message-item-body';
 			text.textContent = message.body;
 
-			line.appendChild(meta);
+			header.appendChild(icon);
+			header.appendChild(meta);
+			line.appendChild(header);
 			line.appendChild(text);
 			feed.appendChild(line);
 		});

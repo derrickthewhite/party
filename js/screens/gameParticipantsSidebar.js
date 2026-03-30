@@ -1,4 +1,5 @@
 import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate } from './dom.js';
+import { setPlayerIconImage } from '../playerIcons.js';
 
 const SIDEBAR_HTML = `
 	<aside class="participant-sidebar card">
@@ -18,7 +19,10 @@ const SIDEBAR_HTML = `
 
 const MEMBER_ROW_TEMPLATE_HTML = `
 	<div class="participant-sidebar-item">
-		<div data-ref="name"></div>
+		<div class="participant-sidebar-identity">
+			<img class="player-icon participant-sidebar-icon" data-ref="icon" alt="">
+			<div data-ref="name"></div>
+		</div>
 		<small data-ref="meta"></small>
 	</div>
 `;
@@ -74,6 +78,7 @@ export function createGameParticipantsSidebarController() {
 				roleBits.push('Observer');
 			}
 
+			setPlayerIconImage(rowRefs.icon, member && member.icon_key ? member.icon_key : null, displayName(member));
 			rowRefs.name.textContent = displayName(member);
 			rowRefs.meta.textContent = roleBits.join(' | ');
 			if (!rowRefs.meta.textContent) {

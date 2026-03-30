@@ -44,6 +44,7 @@ CREATE TABLE IF NOT EXISTS `game_members` (
   `game_id` BIGINT UNSIGNED NOT NULL,
   `user_id` BIGINT UNSIGNED NOT NULL,
   `role` ENUM('owner', 'player', 'observer') NOT NULL DEFAULT 'player',
+  `icon_key` VARCHAR(64) NULL DEFAULT NULL,
   `joined_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`game_id`, `user_id`),
   KEY `idx_game_members_user` (`user_id`),

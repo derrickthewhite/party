@@ -46,6 +46,9 @@ function createApiModule() {
 		joinGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/join', 'POST'),
 		observeGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/observe', 'POST'),
 		leaveGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/leave', 'POST'),
+		setGameIcon: (gameId, iconKey) => request('/games/' + encodeURIComponent(gameId) + '/icon', 'POST', {
+			icon_key: iconKey,
+		}),
 		startGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/start', 'POST'),
 		endGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/end', 'POST'),
 		deleteGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/delete', 'POST'),

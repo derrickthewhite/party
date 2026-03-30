@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../lib/auth.php';
 require_once __DIR__ . '/../lib/game_access.php';
 require_once __DIR__ . '/../lib/game_handlers.php';
+require_once __DIR__ . '/../lib/game_icons.php';
 require_once __DIR__ . '/../lib/game_types.php';
 
 function handle_games_route(string $method, array $segments): void
@@ -59,6 +60,13 @@ function handle_games_route(string $method, array $segments): void
             error_response('Method not allowed.', 405);
         }
         games_leave((int)$segments[1]);
+    }
+
+    if (count($segments) === 3 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'icon') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+        games_set_icon((int)$segments[1]);
     }
 
     if (count($segments) === 2 && $segments[0] === 'games' && ctype_digit($segments[1])) {
@@ -147,9 +155,13 @@ function games_members_by_game(array $gameIds): array
         return [];
     }
 
+    foreach ($gameIds as $gameId) {
+        game_assign_missing_member_icons((int)$gameId);
+    }
+
     $placeholders = implode(',', array_fill(0, count($gameIds), '?'));
     $stmt = db()->prepare(
-        'SELECT gm.game_id, gm.user_id, gm.role, u.username '
+        'SELECT gm.game_id, gm.user_id, gm.role, u.username, ' . game_member_icon_select_sql('gm', 'icon_key') . ' '
         . 'FROM game_members gm '
         . 'JOIN users u ON u.id = gm.user_id '
         . 'WHERE gm.game_id IN (' . $placeholders . ') '
@@ -169,6 +181,7 @@ function games_members_by_game(array $gameIds): array
             'id' => (int)$row['user_id'],
             'username' => (string)$row['username'],
             'role' => (string)$row['role'],
+            'icon_key' => game_normalize_icon_key($row['icon_key'] ?? null),
         ];
     }
 
@@ -210,6 +223,8 @@ function games_create(): void
             'user_id' => $user['id'],
             'role' => 'owner',
         ]);
+
+        game_assign_missing_member_icons($gameId);
 
         $stateStmt = $pdo->prepare('INSERT INTO game_state (game_id, phase, current_round) VALUES (:game_id, :phase, :round_number)');
         $stateStmt->execute([
@@ -263,6 +278,8 @@ function games_join(int $gameId): void
         'player_role' => 'player',
     ]);
 
+    game_assign_missing_member_icons($gameId);
+
     game_handler_after_join((string)$game['game_type'], $gameId, (int)$user['id']);
 
     success_response(['joined' => true, 'game_id' => $gameId, 'role' => 'player']);
@@ -288,6 +305,8 @@ function games_observe(int $gameId): void
         'user_id' => $user['id'],
         'role' => 'observer',
     ]);
+
+    game_assign_missing_member_icons($gameId);
 
     success_response(['joined' => true, 'game_id' => $gameId, 'role' => 'observer']);
 }
@@ -455,6 +474,38 @@ function games_leave(int $gameId): void
     ]);
 }
 
+function games_set_icon(int $gameId): void
+{
+    $user = require_user();
+
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    if (!user_is_game_member((int)$user['id'], $gameId)) {
+        error_response('Forbidden.', 403);
+    }
+
+    if ((string)$game['status'] !== 'open') {
+        error_response('Icons can only be changed before the game starts.', 409);
+    }
+
+    $body = json_input();
+    $iconKey = trim((string)($body['icon_key'] ?? ''));
+    if ($iconKey === '') {
+        error_response('An icon_key is required.', 422);
+    }
+
+    $normalizedIconKey = game_update_member_icon($gameId, (int)$user['id'], $iconKey);
+
+    success_response([
+        'updated' => true,
+        'game_id' => $gameId,
+        'icon_key' => $normalizedIconKey,
+    ]);
+}
+
 function games_detail(int $gameId): void
 {
     $user = require_user();
@@ -527,6 +578,7 @@ function games_detail(int $gameId): void
 				'observer_count' => $observerCount,
 				'player_count' => $playerCount,
 				'members' => $members,
+                'icon_catalog' => game_icon_catalog(),
                 'is_member' => $memberRole !== null,
                 'member_role' => $memberRole,
                 'permissions' => $permissions,

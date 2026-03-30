@@ -1,0 +1,2 @@
+ALTER TABLE `game_members`
+  ADD COLUMN `icon_key` VARCHAR(64) NULL DEFAULT NULL;
