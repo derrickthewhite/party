@@ -59,6 +59,18 @@ For `aliensByRegion.svg`, the reliable workflow was:
 
 The exported `aliensByRegion` icons were written to `assets/PlayerIcons/AliensByRegionHeads/`, and the exact source-group-to-file mapping was saved in `assets/PlayerIcons/AliensByRegionHeads/manifest.json`.
 
+For `AliensByRegionHeads`, keep the standalone filenames human-readable from the start:
+
+1. Strip the `RegionHeadNN_` prefix from the source-derived export name.
+2. Humanize CamelCase into spaced words.
+3. Keep the `.svg` extension and preserve any distinguishing suffix letters as separate trailing tokens.
+
+Examples:
+
+- `RegionHead01_BrownDog.svg` -> `Brown Dog.svg`
+- `RegionHead04_GreenAlienA.svg` -> `Green Alien A.svg`
+- `RegionHead109_GreenBugSpottedFullB.svg` -> `Green Bug Spotted Full B.svg`
+
 For `CrimsonNetwork.svg`, the reliable workflow was:
 
 1. Render a preview of the pre-split top-level groups and child groups.
@@ -94,6 +106,7 @@ Reliable check:
 - If the source was laid out beyond the visible page, inspect off-page top-level groups separately; in `aliensByRegion.svg`, that is where a substantial second batch of valid heads lived.
 - Do not rely on a minimum bounding-box cutoff to decide whether a group is worth reviewing; `aliensByRegion.svg` had additional valid right-edge human heads whose raw bounds were much smaller than the earlier creature groups.
 - If targeted passes still leave visible omissions, export every remaining unselected top-level group into a normalized review sheet; for `aliensByRegion.svg`, that full remainder pass exposed the tongue-out aliens and extra blue/green bug variants that were missed by earlier edge-focused scans.
+- When writing `AliensByRegionHeads` files, do not keep source-style numeric prefixes in the final asset names; keep the numeric association only in the manifest mapping.
 - If you render previews mid-run, do not reuse the same browser page for later source extraction without reloading the source SVG; this caused a false "missing id" failure during the CrimsonNetwork batch export.
 
 ## App integration reminder

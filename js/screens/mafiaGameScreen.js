@@ -1,6 +1,6 @@
 import { cloneTemplateNode, collectRefs, createNodeFromHtml, createTemplate } from './dom.js';
 import { createBaseGameScreen } from './gameScreen.js';
-import { playerIconLabel, setPlayerIconImage } from '../playerIcons.js';
+import { playerIconGroupKey, playerIconGroupLabel, playerIconLabel, setPlayerIconImage } from '../playerIcons.js';
 
 const MAFIA_PANEL_HTML = `
 	<div class="card mafia-panel">
@@ -239,6 +239,36 @@ export function createMafiaGameScreen(deps) {
 
 	function showIconPickerModal(currentIconKey, iconCatalog) {
 		const availableIcons = Array.isArray(iconCatalog) ? iconCatalog.slice() : [];
+		const normalizedCurrentIconKey = typeof currentIconKey === 'string' ? currentIconKey.trim() : '';
+		const iconGroupsByKey = new Map();
+		availableIcons.forEach(function eachIcon(iconKey) {
+			const groupKey = playerIconGroupKey(iconKey);
+			if (!iconGroupsByKey.has(groupKey)) {
+				iconGroupsByKey.set(groupKey, {
+					key: groupKey,
+					label: playerIconGroupLabel(groupKey),
+					icons: [],
+				});
+			}
+
+			iconGroupsByKey.get(groupKey).icons.push(iconKey);
+		});
+
+		const tabGroups = Array.from(iconGroupsByKey.values()).sort(function compareIconGroups(left, right) {
+			if (left.key === '' && right.key !== '') {
+				return -1;
+			}
+			if (left.key !== '' && right.key === '') {
+				return 1;
+			}
+
+			return left.label.localeCompare(right.label);
+		});
+		let activeGroupKey = tabGroups.find(function hasCurrentSelection(group) {
+			return group.icons.some(function isCurrentIcon(iconKey) {
+				return String(iconKey) === String(normalizedCurrentIconKey);
+			});
+		})?.key || (tabGroups[0] ? tabGroups[0].key : '');
 		const priorFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
 		return new Promise(function resolveSelection(resolve) {
@@ -258,8 +288,18 @@ export function createMafiaGameScreen(deps) {
 			message.className = 'modal-message';
 			message.textContent = 'Pick the icon that should represent you in chat and on the mafia player list.';
 
+			const tabList = document.createElement('div');
+			tabList.className = 'mafia-icon-tabs';
+			tabList.setAttribute('role', 'tablist');
+
+			const panel = document.createElement('div');
+			panel.className = 'mafia-icon-panel';
+			panel.setAttribute('role', 'tabpanel');
+			panel.setAttribute('aria-label', 'Available icons');
+
 			const grid = document.createElement('div');
 			grid.className = 'mafia-icon-grid';
+			panel.appendChild(grid);
 
 			const actions = document.createElement('div');
 			actions.className = 'modal-actions';
@@ -289,26 +329,120 @@ export function createMafiaGameScreen(deps) {
 				}
 			}
 
-			availableIcons.forEach(function eachIcon(iconKey) {
-				const option = document.createElement('button');
-				option.type = 'button';
-				option.className = 'mafia-icon-option';
-				option.classList.toggle('is-selected', String(iconKey) === String(currentIconKey || ''));
-
-				const icon = document.createElement('img');
-				icon.className = 'player-icon mafia-icon-option-image';
-				icon.setAttribute('aria-hidden', 'true');
-				setPlayerIconImage(icon, iconKey, 'Player');
-
-				const label = document.createElement('span');
-				label.textContent = playerIconLabel(iconKey);
-
-				option.appendChild(icon);
-				option.appendChild(label);
-				option.addEventListener('click', function onSelect() {
-					close(iconKey);
+			function iconOptionsForActiveGroup() {
+				const activeGroup = tabGroups.find(function matchesActiveGroup(group) {
+					return group.key === activeGroupKey;
 				});
-				grid.appendChild(option);
+
+				return activeGroup ? activeGroup.icons : [];
+			}
+
+			function focusActiveTabButton() {
+				const activeTabButton = tabList.querySelector('[data-group-key="' + CSS.escape(activeGroupKey) + '"]');
+				if (activeTabButton instanceof HTMLElement) {
+					activeTabButton.focus();
+				}
+			}
+
+			function focusSelectedOption() {
+				const selectedOption = grid.querySelector('.mafia-icon-option.is-selected') || grid.querySelector('.mafia-icon-option');
+				if (selectedOption instanceof HTMLElement) {
+					selectedOption.focus();
+				}
+			}
+
+			function renderActiveGroup() {
+				grid.replaceChildren();
+				Array.from(tabList.querySelectorAll('.mafia-icon-tab')).forEach(function syncTabState(tabButton) {
+					const isActive = tabButton.getAttribute('data-group-key') === activeGroupKey;
+					tabButton.classList.toggle('is-active', isActive);
+					tabButton.setAttribute('aria-selected', isActive ? 'true' : 'false');
+					tabButton.tabIndex = isActive ? 0 : -1;
+				});
+
+				iconOptionsForActiveGroup().forEach(function eachIcon(iconKey) {
+					const option = document.createElement('button');
+					option.type = 'button';
+					option.className = 'mafia-icon-option';
+					option.classList.toggle('is-selected', String(iconKey) === String(normalizedCurrentIconKey));
+
+					const icon = document.createElement('img');
+					icon.className = 'player-icon mafia-icon-option-image';
+					icon.setAttribute('aria-hidden', 'true');
+					setPlayerIconImage(icon, iconKey, 'Player');
+
+					const label = document.createElement('span');
+					label.textContent = playerIconLabel(iconKey);
+
+					option.appendChild(icon);
+					option.appendChild(label);
+					option.addEventListener('click', function onSelect() {
+						close(iconKey);
+					});
+					grid.appendChild(option);
+				});
+
+				panel.scrollTop = 0;
+			}
+
+			function setActiveGroup(nextGroupKey, focusTarget) {
+				if (!tabGroups.some(function hasGroup(group) {
+					return group.key === nextGroupKey;
+				})) {
+					return;
+				}
+
+				activeGroupKey = nextGroupKey;
+				renderActiveGroup();
+				if (focusTarget === 'tab') {
+					focusActiveTabButton();
+					return;
+				}
+
+				if (focusTarget === 'option') {
+					focusSelectedOption();
+				}
+			}
+
+			tabGroups.forEach(function eachGroup(group, index) {
+				const tabButton = document.createElement('button');
+				tabButton.type = 'button';
+				tabButton.className = 'mafia-icon-tab';
+				tabButton.setAttribute('role', 'tab');
+				tabButton.setAttribute('data-group-key', group.key);
+				tabButton.id = 'mafia-icon-tab-' + String(index + 1);
+				tabButton.textContent = group.label;
+				tabButton.addEventListener('click', function onTabClick() {
+					setActiveGroup(group.key, 'tab');
+				});
+				tabButton.addEventListener('keydown', function onTabKeyDown(event) {
+					if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') {
+						return;
+					}
+
+					event.preventDefault();
+					const currentIndex = tabGroups.findIndex(function matchesCurrent(candidate) {
+						return candidate.key === activeGroupKey;
+					});
+					if (currentIndex === -1) {
+						return;
+					}
+
+					if (event.key === 'Home') {
+						setActiveGroup(tabGroups[0].key, 'tab');
+						return;
+					}
+
+					if (event.key === 'End') {
+						setActiveGroup(tabGroups[tabGroups.length - 1].key, 'tab');
+						return;
+					}
+
+					const offset = event.key === 'ArrowLeft' ? -1 : 1;
+					const nextIndex = (currentIndex + offset + tabGroups.length) % tabGroups.length;
+					setActiveGroup(tabGroups[nextIndex].key, 'tab');
+				});
+				tabList.appendChild(tabButton);
 			});
 
 			overlay.addEventListener('click', function onOverlayClick(event) {
@@ -324,14 +458,17 @@ export function createMafiaGameScreen(deps) {
 			actions.appendChild(cancelBtn);
 			dialog.appendChild(title);
 			dialog.appendChild(message);
-			dialog.appendChild(grid);
+			dialog.appendChild(tabList);
+			dialog.appendChild(panel);
 			dialog.appendChild(actions);
 			overlay.appendChild(dialog);
 			document.body.appendChild(overlay);
 			document.addEventListener('keydown', onKeyDown);
 
+			renderActiveGroup();
+
 			const initialFocus = grid.querySelector('.mafia-icon-option.is-selected') || grid.querySelector('.mafia-icon-option');
-			if (initialFocus && typeof initialFocus.focus === 'function') {
+			if (initialFocus instanceof HTMLElement) {
 				initialFocus.focus();
 			}
 		});

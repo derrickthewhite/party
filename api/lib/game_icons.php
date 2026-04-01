@@ -6,14 +6,14 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/http.php';
 require_once __DIR__ . '/sql.php';
 
-function game_icon_catalog(): array
+function game_default_icon_catalog(): array
 {
-    static $catalog = null;
-    if (is_array($catalog)) {
-        return $catalog;
+    static $defaultCatalog = null;
+    if (is_array($defaultCatalog)) {
+        return $defaultCatalog;
     }
 
-    $catalog = [
+    $defaultCatalog = [
         'AmberHardHat.svg',
         'AquaAviators.svg',
         'BlackMask.svg',
@@ -48,6 +48,125 @@ function game_icon_catalog(): array
         'yellowSmile.svg',
     ];
 
+    return $defaultCatalog;
+}
+
+function game_icon_assets_dir(): string
+{
+    return dirname(__DIR__, 2) . DIRECTORY_SEPARATOR . 'assets' . DIRECTORY_SEPARATOR . 'PlayerIcons';
+}
+
+function game_icon_manifest_catalog(string $assetsDir, string $folderName): array
+{
+    $manifestPath = $assetsDir . DIRECTORY_SEPARATOR . $folderName . DIRECTORY_SEPARATOR . 'manifest.json';
+    if (!is_file($manifestPath) || !is_readable($manifestPath)) {
+        return [];
+    }
+
+    $manifest = json_decode((string)file_get_contents($manifestPath), true);
+    if (!is_array($manifest)) {
+        return [];
+    }
+
+    $catalog = [];
+    foreach ($manifest as $entry) {
+        if (!is_array($entry) || !isset($entry['file']) || !is_string($entry['file'])) {
+            continue;
+        }
+
+        $fileName = trim(str_replace('\\', '/', $entry['file']));
+        if ($fileName === '' || strpos($fileName, '/') !== false || !preg_match('/\.svg$/i', $fileName)) {
+            continue;
+        }
+
+        $absolutePath = $assetsDir . DIRECTORY_SEPARATOR . $folderName . DIRECTORY_SEPARATOR . $fileName;
+        if (!is_file($absolutePath)) {
+            continue;
+        }
+
+        $catalog[] = $folderName . '/' . $fileName;
+    }
+
+    return $catalog;
+}
+
+function game_icon_directory_catalog(string $assetsDir, string $folderName): array
+{
+    $folderPath = $assetsDir . DIRECTORY_SEPARATOR . $folderName;
+    if (!is_dir($folderPath)) {
+        return [];
+    }
+
+    $entries = scandir($folderPath);
+    if (!is_array($entries)) {
+        return [];
+    }
+
+    $catalog = [];
+    foreach ($entries as $entry) {
+        if (!is_string($entry) || $entry === '' || $entry[0] === '.') {
+            continue;
+        }
+
+        $absolutePath = $folderPath . DIRECTORY_SEPARATOR . $entry;
+        if (!is_file($absolutePath) || !preg_match('/\.svg$/i', $entry)) {
+            continue;
+        }
+
+        $catalog[] = $folderName . '/' . $entry;
+    }
+
+    natcasesort($catalog);
+    return array_values($catalog);
+}
+
+function game_icon_catalog(): array
+{
+    static $catalog = null;
+    if (is_array($catalog)) {
+        return $catalog;
+    }
+
+    $catalog = game_default_icon_catalog();
+    $assetsDir = game_icon_assets_dir();
+    if (!is_dir($assetsDir)) {
+        return $catalog;
+    }
+
+    $entries = scandir($assetsDir);
+    if (!is_array($entries)) {
+        return $catalog;
+    }
+
+    $folders = [];
+    foreach ($entries as $entry) {
+        if (!is_string($entry) || $entry === '' || $entry[0] === '.') {
+            continue;
+        }
+
+        $absolutePath = $assetsDir . DIRECTORY_SEPARATOR . $entry;
+        if (!is_dir($absolutePath)) {
+            continue;
+        }
+
+        $folders[] = $entry;
+    }
+
+    natcasesort($folders);
+
+    foreach ($folders as $folderName) {
+        $folderCatalog = game_icon_manifest_catalog($assetsDir, $folderName);
+        if (empty($folderCatalog)) {
+            $folderCatalog = game_icon_directory_catalog($assetsDir, $folderName);
+        }
+
+        foreach ($folderCatalog as $iconKey) {
+            if (!in_array($iconKey, $catalog, true)) {
+                $catalog[] = $iconKey;
+            }
+        }
+    }
+
     return $catalog;
 }
 
@@ -77,12 +196,26 @@ function game_normalize_icon_key($iconKey): ?string
         return null;
     }
 
-    $trimmed = trim($iconKey);
+    $trimmed = trim(str_replace('\\', '/', $iconKey));
     if ($trimmed === '') {
         return null;
     }
 
-    return in_array($trimmed, game_icon_catalog(), true) ? $trimmed : null;
+    $segments = array_values(array_filter(explode('/', $trimmed), static function ($segment) {
+        return $segment !== '';
+    }));
+    if (empty($segments)) {
+        return null;
+    }
+
+    foreach ($segments as $segment) {
+        if ($segment === '.' || $segment === '..') {
+            return null;
+        }
+    }
+
+    $normalized = implode('/', $segments);
+    return in_array($normalized, game_icon_catalog(), true) ? $normalized : null;
 }
 
 function game_assign_missing_member_icons(int $gameId): void
@@ -91,7 +224,7 @@ function game_assign_missing_member_icons(int $gameId): void
         return;
     }
 
-    $catalog = game_icon_catalog();
+    $catalog = game_default_icon_catalog();
     if (empty($catalog)) {
         return;
     }
