@@ -229,6 +229,38 @@ export function createMafiaGameScreen(deps) {
 		return items.length > 0 ? prefix + items.join(', ') : '';
 	}
 
+	function renderIncomingIcons(container, identifiers) {
+		// identifiers may be usernames or numeric user_ids
+		container.replaceChildren();
+		const items = Array.isArray(identifiers) ? identifiers.filter(Boolean) : [];
+		if (items.length === 0) {
+			container.style.display = 'none';
+			return;
+		}
+		container.style.display = '';
+		items.forEach(function eachId(id) {
+			let player = null;
+			if (typeof id === 'number' || String(Number(id)) === String(id)) {
+				player = serverSnapshot.players.find(function p(x) { return Number(x.user_id) === Number(id); }) || null;
+			} else {
+				player = serverSnapshot.players.find(function p(x) { return String(x.username || '') === String(id); }) || null;
+			}
+
+			if (player) {
+				const img = document.createElement('img');
+				img.className = 'player-icon mafia-target-meta-icon';
+				img.setAttribute('alt', String(player.username || ''));
+				setPlayerIconImage(img, player.icon_key || null, player.username || 'Player');
+				container.appendChild(img);
+			} else {
+				const span = document.createElement('span');
+				span.className = 'mafia-target-meta-text';
+				span.textContent = String(id);
+				container.appendChild(span);
+			}
+		});
+	}
+
 	function canChangeIcon() {
 		return !!lastGameId
 			&& serverSnapshot.status === 'open'
@@ -485,10 +517,11 @@ export function createMafiaGameScreen(deps) {
 
 			setPlayerIconImage(rowRefs.icon, player && player.icon_key ? player.icon_key : null, player && player.username ? player.username : 'Player');
 			rowRefs.name.textContent = String(player.username || 'Unknown');
-			rowRefs.suggestions.textContent = suggestionSummaryText;
-			rowRefs.suggestions.style.display = suggestionSummaryText ? '' : 'none';
-			rowRefs.votes.textContent = voteSummaryText;
-			rowRefs.votes.style.display = voteSummaryText ? '' : 'none';
+			// Render icon avatars for suggesters/voters when available; fall back to text
+			renderIncomingIcons(rowRefs.suggestions, player && (player.incoming_suggestion_user_ids || player.incoming_suggestion_usernames || []));
+			rowRefs.suggestions.title = suggestionSummaryText;
+			renderIncomingIcons(rowRefs.votes, player && (player.incoming_vote_user_ids || player.incoming_vote_usernames || []));
+			rowRefs.votes.title = voteSummaryText;
 			rowRefs.meta.textContent = bits.join(' | ');
 			rowRefs.actions.style.display = player.is_self ? 'none' : '';
 			rowRefs.row.classList.toggle('is-suggested', viewerDisplaySuggestionTargetUserId === userId);

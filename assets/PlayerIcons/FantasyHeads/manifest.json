@@ -1,0 +1,389 @@
+[
+  {
+    "index": 1,
+    "id": "g9303-7-0",
+    "name": "Spotted Boar",
+    "file": "Spotted Boar.svg",
+    "paintedPixels": 1415,
+    "width": 53.02142393101819,
+    "height": 39.20738791563312
+  },
+  {
+    "index": 2,
+    "id": "g3982",
+    "name": "Brown Dog",
+    "file": "Brown Dog.svg",
+    "paintedPixels": 1367,
+    "width": 60.91369787514028,
+    "height": 39.32354879075126
+  },
+  {
+    "index": 3,
+    "id": "g5022-63",
+    "name": "Black Hound",
+    "file": "Black Hound.svg",
+    "paintedPixels": 1224,
+    "width": 40.17710432723542,
+    "height": 23.909728989487377
+  },
+  {
+    "index": 4,
+    "id": "g7490-4",
+    "name": "Needle Mask",
+    "file": "Needle Mask.svg",
+    "paintedPixels": 805,
+    "width": 38.86076244315498,
+    "height": 55.27116277610443
+  },
+  {
+    "index": 5,
+    "id": "g17526-6",
+    "name": "Red Crest Soldier",
+    "file": "Red Crest Soldier.svg",
+    "paintedPixels": 1587,
+    "width": 16.916278683207096,
+    "height": 25.36876481108257
+  },
+  {
+    "index": 6,
+    "id": "g18034-3",
+    "name": "Black Horse",
+    "file": "Black Horse.svg",
+    "paintedPixels": 1127,
+    "width": 16.93255501325154,
+    "height": 33.86666842000355
+  },
+  {
+    "index": 7,
+    "id": "g18103-8",
+    "name": "Brown Horse",
+    "file": "Brown Horse.svg",
+    "paintedPixels": 1127,
+    "width": 16.932559050540398,
+    "height": 33.86667649458127
+  },
+  {
+    "index": 8,
+    "id": "g17077-6-6",
+    "name": "White Horse",
+    "file": "White Horse.svg",
+    "paintedPixels": 1127,
+    "width": 16.932555013251537,
+    "height": 33.86667649458127
+  },
+  {
+    "index": 9,
+    "id": "g8602",
+    "name": "Striped Serpent",
+    "file": "Striped Serpent.svg",
+    "paintedPixels": 811,
+    "width": 15.35935677452457,
+    "height": 6.127021874261743
+  },
+  {
+    "index": 10,
+    "id": "g1",
+    "name": "Bandana Skull",
+    "file": "Bandana Skull.svg",
+    "paintedPixels": 2035,
+    "width": 19.436865107488785,
+    "height": 23.710474653669827
+  },
+  {
+    "index": 11,
+    "id": "g11472-6-5",
+    "name": "Beaked Skull Mask",
+    "file": "Beaked Skull Mask.svg",
+    "paintedPixels": 1099,
+    "width": 32.864177297425016,
+    "height": 38.39385806092017
+  },
+  {
+    "index": 12,
+    "id": "g11750-3-0",
+    "name": "Pointed Hood Skull",
+    "file": "Pointed Hood Skull.svg",
+    "paintedPixels": 1333,
+    "width": 18.224984035406322,
+    "height": 29.997201582063553
+  },
+  {
+    "index": 13,
+    "id": "g9670-6-4",
+    "name": "Floppy Hood Skull",
+    "file": "Floppy Hood Skull.svg",
+    "paintedPixels": 1444,
+    "width": 13.70225963597035,
+    "height": 24.081426810181924
+  },
+  {
+    "index": 14,
+    "id": "g9451-9-9",
+    "name": "Wide Hat Skull",
+    "file": "Wide Hat Skull.svg",
+    "paintedPixels": 1829,
+    "width": 20.9472956162887,
+    "height": 20.529492741185337
+  },
+  {
+    "index": 15,
+    "id": "g9356-2-0",
+    "name": "Red Hood Skull",
+    "file": "Red Hood Skull.svg",
+    "paintedPixels": 2248,
+    "width": 16.896376867765156,
+    "height": 20.58750050754489
+  },
+  {
+    "index": 16,
+    "id": "g9485-0-6",
+    "name": "Black Cap Skull",
+    "file": "Black Cap Skull.svg",
+    "paintedPixels": 1445,
+    "width": 14.667325090804411,
+    "height": 23.197866142880358
+  },
+  {
+    "index": 17,
+    "id": "g10185-5",
+    "name": "Red Crest Skull",
+    "file": "Red Crest Skull.svg",
+    "paintedPixels": 1739,
+    "width": 16.916272627273813,
+    "height": 23.86020760431432
+  },
+  {
+    "index": 18,
+    "id": "g10082-1",
+    "name": "Red Hat Skull",
+    "file": "Red Hat Skull.svg",
+    "paintedPixels": 1829,
+    "width": 20.947295616288685,
+    "height": 20.5295169649185
+  },
+  {
+    "index": 19,
+    "id": "g10277-9",
+    "name": "Blonde Hood Skull",
+    "file": "Blonde Hood Skull.svg",
+    "paintedPixels": 2248,
+    "width": 16.896393016920626,
+    "height": 20.58659817348438
+  },
+  {
+    "index": 20,
+    "id": "g12574-6",
+    "name": "Panda",
+    "file": "Panda.svg",
+    "paintedPixels": 2447,
+    "width": 33.672365818974434,
+    "height": 28.719205867588016
+  },
+  {
+    "index": 21,
+    "id": "g12067-1",
+    "name": "Red Panda",
+    "file": "Red Panda.svg",
+    "paintedPixels": 1676,
+    "width": 21.166663725213354,
+    "height": 13.229162052622257
+  },
+  {
+    "index": 22,
+    "id": "g18061-6-2",
+    "name": "Wolf",
+    "file": "Wolf.svg",
+    "paintedPixels": 2011,
+    "width": 20.732237313223486,
+    "height": 22.85909723452633
+  },
+  {
+    "index": 23,
+    "id": "g18178-1-2",
+    "name": "Goblin",
+    "file": "Goblin.svg",
+    "paintedPixels": 2035,
+    "width": 19.525485616639358,
+    "height": 15.345848005994554
+  },
+  {
+    "index": 24,
+    "id": "g22919",
+    "name": "Red Bandana Skull",
+    "file": "Red Bandana Skull.svg",
+    "paintedPixels": 1840,
+    "width": 12.692428722241914,
+    "height": 16.45883165012995
+  },
+  {
+    "index": 25,
+    "id": "g22975",
+    "name": "Blue Tassel Skull",
+    "file": "Blue Tassel Skull.svg",
+    "paintedPixels": 1639,
+    "width": 19.914185694985832,
+    "height": 17.068995190320095
+  },
+  {
+    "index": 26,
+    "id": "g23027",
+    "name": "Long Bandana Skull",
+    "file": "Long Bandana Skull.svg",
+    "paintedPixels": 1990,
+    "width": 12.7549744012816,
+    "height": 16.45873475519724
+  },
+  {
+    "index": 27,
+    "id": "g2",
+    "name": "Black Tricorne Skull",
+    "file": "Black Tricorne Skull.svg",
+    "paintedPixels": 1507,
+    "width": 21.664560355392155,
+    "height": 18.747409214062117
+  },
+  {
+    "index": 28,
+    "id": "g19576-92-0-1-8-5",
+    "name": "Brown Mare",
+    "file": "Brown Mare.svg",
+    "paintedPixels": 1127,
+    "width": 13.058675418586105,
+    "height": 26.1185539492529
+  },
+  {
+    "index": 29,
+    "id": "g29450-7-8-5-4",
+    "name": "Grey Speckled Horse",
+    "file": "Grey Speckled Horse.svg",
+    "paintedPixels": 1127,
+    "width": 13.058683493163826,
+    "height": 26.118576154341632
+  },
+  {
+    "index": 30,
+    "id": "g28751-7-6-9-0",
+    "name": "Tan Horse",
+    "file": "Tan Horse.svg",
+    "paintedPixels": 1127,
+    "width": 13.05867541858612,
+    "height": 26.11857413569721
+  },
+  {
+    "index": 31,
+    "id": "g62048-6-6-4-3",
+    "name": "Tall Shako Soldier",
+    "file": "Tall Shako Soldier.svg",
+    "paintedPixels": 1474,
+    "width": 11.779638083584345,
+    "height": 22.44563444494892
+  },
+  {
+    "index": 32,
+    "id": "g7",
+    "name": "Crown Cap Soldier",
+    "file": "Crown Cap Soldier.svg",
+    "paintedPixels": 1489,
+    "width": 12.242868532955356,
+    "height": 22.639795740867886
+  },
+  {
+    "index": 33,
+    "id": "g3",
+    "name": "Red Tricorne Soldier",
+    "file": "Red Tricorne Soldier.svg",
+    "paintedPixels": 1598,
+    "width": 20.20098662111681,
+    "height": 17.07529739823264
+  },
+  {
+    "index": 34,
+    "id": "g102275-90-9",
+    "name": "Brown Lizard",
+    "file": "Brown Lizard.svg",
+    "paintedPixels": 1347,
+    "width": 30.494878179999404,
+    "height": 19.02354362302148
+  },
+  {
+    "index": 35,
+    "id": "g164943-0-0-8",
+    "name": "Blue Jay",
+    "file": "Blue Jay.svg",
+    "paintedPixels": 837,
+    "width": 33.605342786587535,
+    "height": 16.22329621796007
+  },
+  {
+    "index": 36,
+    "id": "g52636",
+    "name": "Green Reptile",
+    "file": "Green Reptile.svg",
+    "paintedPixels": 2180,
+    "width": 12.700002676145772,
+    "height": 11.112508397560816
+  },
+  {
+    "index": 37,
+    "id": "g5415-2-1-3",
+    "name": "Orange Beast",
+    "file": "Orange Beast.svg",
+    "paintedPixels": 1412,
+    "width": 47.77447450648182,
+    "height": 27.483262553892047
+  },
+  {
+    "index": 38,
+    "id": "g77284",
+    "name": "Unicorn",
+    "file": "Unicorn.svg",
+    "paintedPixels": 1482,
+    "width": 25.59977444243887,
+    "height": 24.968758305279948
+  },
+  {
+    "index": 39,
+    "id": "g77271",
+    "name": "Green Hood Archer",
+    "file": "Green Hood Archer.svg",
+    "paintedPixels": 1803,
+    "width": 21.361666795859904,
+    "height": 27.92605624704703
+  },
+  {
+    "index": 40,
+    "id": "g7160-2",
+    "name": "Plain Skull",
+    "file": "Plain Skull.svg",
+    "paintedPixels": 1803,
+    "width": 14.125165644194425,
+    "height": 20.41545548000829
+  },
+  {
+    "index": 41,
+    "id": "g4943-4",
+    "name": "Black Headwrap Man",
+    "file": "Black Headwrap Man.svg",
+    "paintedPixels": 2521,
+    "width": 16.514061761752913,
+    "height": 17.66568226029117
+  },
+  {
+    "index": 42,
+    "id": "g12529",
+    "name": "Black Cap Man",
+    "file": "Black Cap Man.svg",
+    "paintedPixels": 1644,
+    "width": 14.18213986460546,
+    "height": 20.862552923089424
+  },
+  {
+    "index": 43,
+    "id": "g8",
+    "name": "Dragon",
+    "file": "Dragon.svg",
+    "paintedPixels": 1598,
+    "width": 41.588459767378346,
+    "height": 36.46968215232253
+  }
+]

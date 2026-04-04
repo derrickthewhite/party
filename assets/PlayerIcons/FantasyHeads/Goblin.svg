@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="17.714333465525705 128.86492707964211 22.314840704730695 22.314840704730695"><defs>
+    <filter style="color-interpolation-filters:sRGB" x="-0.1940961" y="-0.046480109" width="1.3881922" height="1.0929602">
+      <feGaussianBlur stdDeviation="3.4637856"/>
+    </filter>
+  </defs><g transform="matrix(0.26458333,0,0,0.26458333,-769.9809,104.29282)">
+      <g transform="translate(2.1428571,-1.6071429)">
+        <path style="fill:#cad096;fill-opacity:1;stroke:#000000;stroke-width:2px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" d="m 3045.1525,125.02744 6,-10 c 6,12 2,20 -6,24"/>
+        <path style="fill:#cad096;fill-opacity:1;stroke:#000000;stroke-width:2px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" d="m 2989.1333,124.43124 -6,-10 c -6,12 -2,20 6,24"/>
+        <path d="m 3048.0622,137.64786 c 0,14 -24,28 -30,28 -6,0 -29.8014,-14.1926 -30,-28 0,-16.01626 0,-30 30,-30 30,0 30,13.98374 30,30 z" style="fill:#cad096;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:4;stroke-linecap:round;stroke-linejoin:bevel;stroke-miterlimit:4;stroke-dashoffset:0;stroke-opacity:1"/>
+        <g transform="rotate(10,3008.2042,132.13306)">
+          <path style="fill:none;stroke:#000000;stroke-width:2px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" d="m 3013.3911,132.3103 -1.9898,-2 h -5.9346 -2.0756"/>
+          <path style="fill:#ffffff;stroke:#000000;stroke-width:1;stroke-miterlimit:4;stroke-dashoffset:0;stroke-opacity:1" d="m 3011.0734,130.3907 c 0.2816,0.457 0.444,0.9952 0.444,1.5714 0,1.6568 -1.3432,3 -3,3 -1.6569,0 -3,-1.3432 -3,-3 0,-0.5918 0.1714,-1.1438 0.4673,-1.6086 z"/>
+          <circle style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.5;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" transform="matrix(2,0,0,2,1673.3911,-2003.4039)" cx="667.5" cy="1067.8622" r="0.5"/>
+        </g>
+        <g transform="rotate(-10,3027.5786,132.32365)">
+          <path style="fill:none;stroke:#000000;stroke-width:2px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" d="m 3022.5786,132.2478 2.2155,-2 h 7.7845"/>
+          <path style="fill:#ffffff;stroke:#000000;stroke-width:1;stroke-miterlimit:4;stroke-dashoffset:0;stroke-opacity:1" d="m 3030.2609,130.328 c 0.2816,0.457 0.444,0.9952 0.444,1.5714 0,1.6568 -1.3432,3 -3,3 -1.6569,0 -3,-1.3432 -3,-3 0,-0.5918 0.1714,-1.1438 0.4673,-1.6086 z"/>
+          <circle style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:#000000;stroke-width:0.5;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1" transform="matrix(2,0,0,2,1692.6417,-2003.4664)" cx="667.5" cy="1067.8622" r="0.5"/>
+        </g>
+        <path style="fill:none;stroke:#000000;stroke-width:2px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" d="m 3007.8571,148.96933 10,1 10,-1"/>
+        <path d="m 3014.0622,133.64786 2,8 h 4 l 2,-8" style="fill:none;stroke:#000000;stroke-width:2px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"/>
+      </g>
+      <path style="fill:#ffffff;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" d="m 3015,147.36218 -2,3 -1,-3"/>
+      <path style="fill:#ffffff;stroke:#000000;stroke-width:1px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1" d="m 3028,147.36218 -1,3 -2,-3"/>
+    </g></svg>
