@@ -299,6 +299,10 @@ button:disabled {
 }
 
 .mafia-target-copy {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
@@ -308,23 +312,55 @@ button:disabled {
 }
 
 .mafia-target-state {
-  margin-top: 4px;
-  color: var(--accent-2);
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border: 1px solid #d8b11e;
+  border-radius: 8px;
+  color: #8a6a00;
   font-size: 13px;
   font-weight: 700;
 }
 
 .mafia-target-votes {
-  margin-top: 4px;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 6px;
+  border: 1px solid var(--accent);
+  border-radius: 8px;
   color: var(--accent);
   font-size: 13px;
   font-weight: 700;
 }
 
 .mafia-target-meta {
-  display: block;
-  margin-top: 4px;
+  display: inline-block;
+  margin-top: 0;
   color: var(--muted);
+}
+
+.mafia-target-state::before,
+.mafia-target-votes::before {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.mafia-target-state::before {
+  content: 'Suggestions';
+}
+
+.mafia-target-votes::before {
+  content: 'Votes';
+}
+
+.mafia-target-meta-icon {
+  width: 24px;
+  height: 24px;
+  border-radius: 7px;
 }
 
 .mafia-target-actions {

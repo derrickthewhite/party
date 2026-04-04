@@ -251,6 +251,7 @@ export function createMafiaGameScreen(deps) {
 				img.className = 'player-icon mafia-target-meta-icon';
 				img.setAttribute('alt', String(player.username || ''));
 				setPlayerIconImage(img, player.icon_key || null, player.username || 'Player');
+				img.title = String(player.username || 'Player');
 				container.appendChild(img);
 			} else {
 				const span = document.createElement('span');
