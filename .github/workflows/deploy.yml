@@ -44,13 +44,32 @@ jobs:
           set -euxo pipefail
           echo "Starting lftp deploy to $FTP_HOST -> $FTP_TARGET"
           # Use plain FTP by default. If you prefer FTPS/SFTP, update settings accordingly.
-          lftp -c "set ssl:verify-certificate no; set ftp:ssl-force true; set ftp:ssl-protect-data true; open -u $FTP_USER,$FTP_PASS $FTP_HOST; \
-            mirror -R --parallel=2 --delete --verbose \
-              --exclude-glob server/** \
-              --exclude-glob e2e/** \
-              --exclude-glob sql/** \
-              --exclude-glob data/** \
-              --exclude-glob node_modules/** \
-              --exclude-glob playwright-report/** \
-              --exclude-glob test-results/** \
-              --exclude-glob api/config.local.php ./ $FTP_TARGET"
+          # Try FTPS first (secure), fall back to plain FTP if login fails.
+          echo "Attempting FTPS (secure) first..."
+          lftp -c "set ssl:verify-certificate no; set ftp:ssl-force true; set ftp:ssl-protect-data true; open -u $FTP_USER,$FTP_PASS $FTP_HOST; pwd; bye" >/tmp/ftptest 2>&1 || true
+          if grep -qi "530" /tmp/ftptest || grep -qi "Login failed" /tmp/ftptest; then
+            echo "FTPS login failed, trying plain FTP fallback..."
+            # Try plain FTP mirror (no SSL)
+            lftp -c "set ftp:ssl-force false; set ftp:ssl-protect-data false; open -u $FTP_USER,$FTP_PASS $FTP_HOST; \
+              mirror -R --parallel=2 --delete --verbose \
+                --exclude-glob server/** \
+                --exclude-glob e2e/** \
+                --exclude-glob sql/** \
+                --exclude-glob data/** \
+                --exclude-glob node_modules/** \
+                --exclude-glob playwright-report/** \
+                --exclude-glob test-results/** \
+                --exclude-glob api/config.local.php ./ $FTP_TARGET"
+          else
+            echo "FTPS login succeeded; running secure mirror..."
+            lftp -c "set ssl:verify-certificate no; set ftp:ssl-force true; set ftp:ssl-protect-data true; open -u $FTP_USER,$FTP_PASS $FTP_HOST; \
+              mirror -R --parallel=2 --delete --verbose \
+                --exclude-glob server/** \
+                --exclude-glob e2e/** \
+                --exclude-glob sql/** \
+                --exclude-glob data/** \
+                --exclude-glob node_modules/** \
+                --exclude-glob playwright-report/** \
+                --exclude-glob test-results/** \
+                --exclude-glob api/config.local.php ./ $FTP_TARGET"
+          fi
