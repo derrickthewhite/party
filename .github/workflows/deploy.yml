@@ -12,29 +12,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Deploy via FTP
-        uses: SamKirkland/FTP-Deploy-Action@v4
-        with:
-          server: ${{ secrets.FTP_HOST }}
-          username: ${{ secrets.FTP_USERNAME }}
-          password: ${{ secrets.FTP_PASSWORD }}
-          server-dir: ${{ secrets.FTP_TARGET }}
-          local-dir: ./
-          port: 21
-          protocol: ftp
-          include: |
-            index.html
-            styles.css
-            js/**
-            assets/**
-            PlayerIcons/**
-            api/**
-          exclude: |
-            api/config.local.php
-            server/**
-            e2e/**
-            sql/**
-            data/**
-            node_modules/**
-            playwright-report/**
-            test-results/**
+      - name: Install lftp
+        run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Deploy via lftp
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USERNAME }}
+          FTP_PASS: ${{ secrets.FTP_PASSWORD }}
+          FTP_TARGET: ${{ secrets.FTP_TARGET }}
+        run: |
+          set -euo pipefail
+          echo "Starting lftp deploy to $FTP_HOST -> $FTP_TARGET"
+          # Use plain FTP by default. If you prefer FTPS/SFTP, update settings accordingly.
+          lftp -c "open -u $FTP_USER,$FTP_PASS $FTP_HOST; \
+            mirror -R --parallel=2 --delete --verbose \
+              --exclude-glob server/** \
+              --exclude-glob e2e/** \
+              --exclude-glob sql/** \
+              --exclude-glob data/** \
+              --exclude-glob node_modules/** \
+              --exclude-glob playwright-report/** \
+              --exclude-glob test-results/** \
+              --exclude-glob api/config.local.php ./ $FTP_TARGET"
