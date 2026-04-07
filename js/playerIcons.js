@@ -89,7 +89,7 @@ const ICON_LABEL_OVERRIDES = Object.freeze({
 	'AliensByRegionHeads/Green Bug Plain C.svg': 'Keverling Green Plain C',
 	'AliensByRegionHeads/Green Bug Full E.svg': 'Keverling Green Full E',
 	'AliensByRegionHeads/Green Bug Spotted B.svg': 'Keverling Green Spotted B',
-	'AliensByRegionHeads/Green Bug Plain D.svg': 'Keleni',
+	'AliensByRegionHeads/Green Bug Plain D.svg': 'Keleni A',
 	'AliensByRegionHeads/Green Bug Spotted Full B.svg': 'Keverling Green Spotted Full B',
 });
 
