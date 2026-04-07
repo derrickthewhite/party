@@ -8,12 +8,31 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Install lftp
         run: sudo apt-get update && sudo apt-get install -y lftp
+
+      - name: Test FTP connection
+        env:
+          FTP_HOST: ${{ secrets.FTP_HOST }}
+          FTP_USER: ${{ secrets.FTP_USERNAME }}
+          FTP_PASS: ${{ secrets.FTP_PASSWORD }}
+          FTP_TARGET: ${{ secrets.FTP_TARGET }}
+        run: |
+          set -euxo pipefail
+          if [ -z "${FTP_HOST:-}" ] || [ -z "${FTP_USER:-}" ] || [ -z "${FTP_PASS:-}" ]; then
+            echo "Required FTP secrets are missing (FTP_HOST/FTP_USERNAME/FTP_PASSWORD)." >&2
+            exit 3
+          fi
+          echo "Testing connection to $FTP_HOST as $FTP_USER"
+          # Quick open/close to check credentials and reachability
+          lftp -c "open -u $FTP_USER,$FTP_PASS $FTP_HOST; pwd; bye" || (
+            echo "FTP connection test failed. Check host, username, password, and that Hostinger allows connections from GitHub Actions runners." >&2; exit 4)
 
       - name: Deploy via lftp
         env:
@@ -22,7 +41,7 @@ jobs:
           FTP_PASS: ${{ secrets.FTP_PASSWORD }}
           FTP_TARGET: ${{ secrets.FTP_TARGET }}
         run: |
-          set -euo pipefail
+          set -euxo pipefail
           echo "Starting lftp deploy to $FTP_HOST -> $FTP_TARGET"
           # Use plain FTP by default. If you prefer FTPS/SFTP, update settings accordingly.
           lftp -c "open -u $FTP_USER,$FTP_PASS $FTP_HOST; \
