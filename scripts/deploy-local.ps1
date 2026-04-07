@@ -38,7 +38,18 @@ $possible += @(
 
 $dll = $possible | Where-Object { Test-Path $_ } | Select-Object -First 1
 if (-not $dll) {
-    Fail "WinSCP .NET assembly not found. If WinSCP is installed, pass -WinSCPExePath 'C:\Program Files (x86)\WinSCP\WinSCP.exe' or download/copy WinSCPnet.dll into the WinSCP installation folder."
+    Write-Host "WinSCP .NET assembly not found in standard locations."
+    $reply = Read-Host "Enter full path to WinSCPnet.dll or press Enter to try locating via WinSCP.exe"
+    if ($reply) {
+        if (Test-Path $reply) { $dll = $reply } else { Fail "Provided path not found: $reply" }
+    } else {
+        $exeGuess = "C:\Program Files (x86)\WinSCP\WinSCP.exe"
+        if (Test-Path $exeGuess) { $dll = Join-Path (Split-Path $exeGuess -Parent) 'WinSCPnet.dll' }
+    }
+}
+
+if (-not $dll -or -not (Test-Path $dll)) {
+    Fail "WinSCP .NET assembly not found. If WinSCP is installed, either install to a standard location or run the script with -WinSCPExePath or -WinSCPDllPath pointing to your WinSCP installation."
 }
 
 [Reflection.Assembly]::LoadFrom($dll) | Out-Null
@@ -78,12 +89,31 @@ if ($FTPS) {
 $transferOptions = New-Object WinSCP.TransferOptions
 $transferOptions.TransferMode = [WinSCP.TransferMode]::Binary
 
-# FileMask: exclude dev/test folders and local config
-$excludes = @(
-    'server/*', 'e2e/*', 'sql/*', 'data/*', 'node_modules/*', 'playwright-report/*', 'test-results/*', 'api/config.local.php'
+# Deploy 'live' include list and excludes
+$includes = @(
+    'index.html',
+    'styles.css',
+    'js/*',
+    'assets/*',
+    'PlayerIcons/*',
+    'api/*'
 )
-$fileMask = ($excludes | ForEach-Object { "-" + $_ }) -join "; "
-$transferOptions.FileMask = $fileMask
+$excludes = @(
+    'api/config.local.php',
+    'server/*',
+    'e2e/*',
+    'sql/*',
+    'data/*',
+    'node_modules/*',
+    'playwright-report/*',
+    'test-results/*'
+)
+
+# Build WinSCP file mask: includes first, then excludes prefixed with -
+$maskParts = @()
+$maskParts += $includes
+$maskParts += ($excludes | ForEach-Object { "-" + $_ })
+$transferOptions.FileMask = ($maskParts -join "; ")
 
 $session = New-Object WinSCP.Session
 try {
