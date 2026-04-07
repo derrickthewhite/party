@@ -1,0 +1,40 @@
+name: Deploy to Hostinger (FTP)
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy via FTP
+        uses: SamKirkland/FTP-Deploy-Action@v4
+        with:
+          server: ${{ secrets.FTP_HOST }}
+          username: ${{ secrets.FTP_USERNAME }}
+          password: ${{ secrets.FTP_PASSWORD }}
+          server-dir: ${{ secrets.FTP_TARGET }}
+          local-dir: ./
+          port: 21
+          protocol: ftp
+          include: |
+            index.html
+            styles.css
+            js/**
+            assets/**
+            PlayerIcons/**
+            api/**
+          exclude: |
+            api/config.local.php
+            server/**
+            e2e/**
+            sql/**
+            data/**
+            node_modules/**
+            playwright-report/**
+            test-results/**
