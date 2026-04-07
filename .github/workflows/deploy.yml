@@ -44,7 +44,7 @@ jobs:
           set -euxo pipefail
           echo "Starting lftp deploy to $FTP_HOST -> $FTP_TARGET"
           # Use plain FTP by default. If you prefer FTPS/SFTP, update settings accordingly.
-          lftp -c "open -u $FTP_USER,$FTP_PASS $FTP_HOST; \
+          lftp -c "set ssl:verify-certificate no; set ftp:ssl-force true; set ftp:ssl-protect-data true; open -u $FTP_USER,$FTP_PASS $FTP_HOST; \
             mirror -R --parallel=2 --delete --verbose \
               --exclude-glob server/** \
               --exclude-glob e2e/** \
