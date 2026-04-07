@@ -6,3 +6,4 @@ runtime/php/windows/
 playwright-report/
 test-results/
 node_modules/
+scripts/deploy-local.ps1
