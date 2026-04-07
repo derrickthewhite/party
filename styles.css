@@ -104,6 +104,14 @@ button.secondary {
   border-color: var(--accent-2);
 }
 
+/* Make `.secondary` styling robust to moved elements (not tag-specific). */
+.secondary,
+button.secondary {
+  background: var(--accent-2);
+  color: #fff;
+  border-color: var(--accent-2);
+}
+
 button.link {
   border: none;
   background: transparent;
