@@ -12,6 +12,7 @@ const MAFIA_PANEL_HTML = `
 		<p class="top-user-label" data-ref="roleText"></p>
 		<p data-ref="phaseText"></p>
 		<p class="top-user-label" data-ref="progressText"></p>
+		<p class="top-user-label" data-ref="setupNote"></p>
 		<div class="mafia-summary" data-ref="latestSummary"></div>
 		<div class="mafia-ready-card" data-ref="readyCard">
 			<p data-ref="readyText"></p>
@@ -81,6 +82,7 @@ export function createMafiaGameScreen(deps) {
 	const roleText = refs.roleText;
 	const phaseText = refs.phaseText;
 	const progressText = refs.progressText;
+	const setupNote = refs.setupNote;
 	const latestSummary = refs.latestSummary;
 	const readyCard = refs.readyCard;
 	const readyText = refs.readyText;
@@ -132,6 +134,8 @@ export function createMafiaGameScreen(deps) {
 		winnerSummary: null,
 		status: 'open',
 		iconCatalog: [],
+		setupPlayerCount: 0,
+		setupMafiaCount: 0,
 	};
 
 	const targetRowsByUserId = new Map();
@@ -227,6 +231,19 @@ export function createMafiaGameScreen(deps) {
 	function buildIncomingActionText(prefix, usernames) {
 		const items = Array.isArray(usernames) ? usernames.filter(Boolean) : [];
 		return items.length > 0 ? prefix + items.join(', ') : '';
+	}
+
+	function buildSetupNoteText() {
+		const playerCount = Number(serverSnapshot.setupPlayerCount || 0);
+		const mafiaCount = Number(serverSnapshot.setupMafiaCount || 0);
+
+		if (playerCount <= 0 || mafiaCount <= 0) {
+			return '';
+		}
+
+		const mafiaLabel = mafiaCount === 1 ? 'mafia member' : 'mafia members';
+		const playerLabel = playerCount === 1 ? 'player' : 'players';
+		return 'With ' + playerCount + ' ' + playerLabel + ', the game will start with ' + mafiaCount + ' ' + mafiaLabel + '.';
 	}
 
 	function renderIncomingIcons(container, identifiers) {
@@ -603,6 +620,8 @@ export function createMafiaGameScreen(deps) {
 		} else {
 			progressText.textContent = 'Votes: ' + Number(serverSnapshot.submittedCount || 0) + '/' + Number(serverSnapshot.requiredCount || 0);
 		}
+		setupNote.textContent = isLobbyOpen ? buildSetupNoteText() : '';
+		setupNote.style.display = setupNote.textContent ? '' : 'none';
 
 		if (serverSnapshot.latestResult && serverSnapshot.latestResult.summary_text) {
 			latestSummary.textContent = String(serverSnapshot.latestResult.summary_text);
@@ -663,6 +682,8 @@ export function createMafiaGameScreen(deps) {
 		serverSnapshot.winnerSummary = mafiaState.winner_summary || null;
 		serverSnapshot.status = String((game && game.status) || 'open');
 		serverSnapshot.iconCatalog = Array.isArray(game && game.icon_catalog) ? game.icon_catalog.slice() : [];
+		serverSnapshot.setupPlayerCount = Number(mafiaState.setup_player_count || 0);
+		serverSnapshot.setupMafiaCount = Number(mafiaState.setup_mafia_count || 0);
 
 		reconcileUi();
 	}

@@ -119,14 +119,7 @@ function mafia_assign_roles_if_missing(int $gameId): void
         return;
     }
 
-    $membersStmt = db()->prepare(
-        'SELECT user_id FROM game_members WHERE game_id = :game_id AND role <> :observer_role ORDER BY user_id ASC'
-    );
-    $membersStmt->execute([
-        'game_id' => $gameId,
-        'observer_role' => 'observer',
-    ]);
-    $memberIds = array_map(static fn (array $row): int => (int)$row['user_id'], $membersStmt->fetchAll());
+    $memberIds = mafia_role_assignment_member_ids($gameId);
     if (empty($memberIds)) {
         return;
     }
@@ -144,7 +137,7 @@ function mafia_assign_roles_if_missing(int $gameId): void
         return strcmp($a['score'], $b['score']);
     });
 
-    $mafiaCount = max(1, (int)floor(count($memberIds) / 3));
+    $mafiaCount = mafia_preview_mafia_count(count($memberIds));
     $selected = array_slice($scored, 0, $mafiaCount);
 
     $insertStmt = db()->prepare(db_insert_ignore_sql(
@@ -159,6 +152,28 @@ function mafia_assign_roles_if_missing(int $gameId): void
             'is_hidden' => 1,
         ]);
     }
+}
+
+function mafia_role_assignment_member_ids(int $gameId): array
+{
+    $membersStmt = db()->prepare(
+        'SELECT user_id FROM game_members WHERE game_id = :game_id AND role <> :observer_role ORDER BY user_id ASC'
+    );
+    $membersStmt->execute([
+        'game_id' => $gameId,
+        'observer_role' => 'observer',
+    ]);
+
+    return array_map(static fn (array $row): int => (int)$row['user_id'], $membersStmt->fetchAll());
+}
+
+function mafia_preview_mafia_count(int $playerCount): int
+{
+    if ($playerCount <= 0) {
+        return 0;
+    }
+
+    return max(1, (int)floor($playerCount / 3));
 }
 
 function mafia_game_build_detail_payload(int $gameId, array $game, array $user): array
@@ -199,6 +214,8 @@ function mafia_game_build_detail_payload(int $gameId, array $game, array $user):
         $viewerIsAlive = in_array($viewerUserId, $alivePlayerIds, true);
 
         $stage = 'detail.players';
+        $setupPlayerCount = count(mafia_role_assignment_member_ids($gameId));
+        $setupMafiaCount = mafia_preview_mafia_count($setupPlayerCount);
         $voteActionType = mafia_vote_action_type_for_phase($phase);
         $suggestionActionType = mafia_suggestion_action_type_for_phase($phase);
         $progressActionType = mafia_progress_action_type_for_phase($phase);
@@ -260,6 +277,8 @@ function mafia_game_build_detail_payload(int $gameId, array $game, array $user):
                 'current_vote_target_user_id' => isset($currentVote['target_user_id']) ? $currentVote['target_user_id'] : null,
                 'submitted_count' => $submittedCount,
                 'required_count' => count($requiredVoterIds),
+                'setup_player_count' => $setupPlayerCount,
+                'setup_mafia_count' => $setupMafiaCount,
                 'players' => $players,
                 'latest_result' => $latestResult,
                 'recent_results' => $recentResults,
