@@ -75,10 +75,10 @@ export function createLandingScreen(deps) {
 			</p>
 			<div class="row game-item-bar">
 				<div class="row game-item-controls-left">
+					<button class="secondary" data-ref="open">Open</button>
 					<button data-ref="join">Join</button>
 					<button data-ref="leave">Leave</button>
 					<button data-ref="observe">Observe</button>
-					<button class="secondary" data-ref="open">Open</button>
 				</div>
 				<div class="row game-item-controls-right">
 					<button data-ref="start">Start</button>
