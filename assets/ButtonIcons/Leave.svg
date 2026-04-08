@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+  <!-- Door arch -->
+  <path d="M96 480V160c0-88 72-160 160-160s160 72 160 160v320H96z" />
+  <!-- Door half open (negative space) -->
+  <path d="M272 64v384c0 0 0-8 88-8V144c0-44-36-80-80-80h-8z" fill="#ffffff" />
+  <!-- Walking person silhouette (overlaid) -->
+  <path d="M200 320l32-8v-56c0-24 16-40 36-40s36 16 36 40v64l36 0 28 64-36 16-20-56-64 8-32-32z" />
+</svg>

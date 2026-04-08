@@ -4,7 +4,9 @@
   "version": "0.1.0",
   "description": "In-place Node host for the Party PHP app",
   "devDependencies": {
-    "@playwright/test": "^1.54.2"
+    "@playwright/test": "^1.54.2",
+    "potrace": "^2.0.0",
+    "svgo": "^3.0.0"
   },
   "scripts": {
     "start": "node server/index.js",
@@ -12,5 +14,7 @@
     "e2e:headed": "playwright test --headed",
     "e2e:debug": "playwright test --debug",
     "e2e:install": "playwright install chromium"
+    ,
+    "trace-icons": "node scripts/trace-icons.js"
   }
 }

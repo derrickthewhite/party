@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+  <!-- Bugle / horn simplified -->
+  <path d="M160 272c0 0 136-8 200-96 12-16 32-24 56-24h40v24c0 20-16 36-36 36H408c-72 0-176 88-248 120z" />
+  <path d="M80 272h96v32H80z" />
+  <circle cx="416" cy="96" r="24" />
+</svg>

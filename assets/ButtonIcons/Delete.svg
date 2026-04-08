@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+  <!-- Campfire logs -->
+  <path d="M120 400c40 24 96 24 136-8M392 400c-40 24-96 24-136-8" stroke="currentColor" stroke-width="28" stroke-linecap="round" stroke-linejoin="round" fill="none" />
+  <!-- Flames -->
+  <path d="M256 96c56 56 32 120 8 160-24 40 0 72 24 88 0 0-40-16-56-56-16-40 8-104 24-136 8-16 0-56 0-56z" />
+  <path d="M256 160c24 24 16 48 8 64-8 16 0 28 8 36 0 0-24-8-32-28-8-20 0-52 16-72z" fill="#ffffff" />
+</svg>

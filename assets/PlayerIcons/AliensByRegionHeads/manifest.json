@@ -1,59 +1,99 @@
 [
   {
-    "id": "snake-brown",
-    "file": "Snake (Brown).svg"
+    "id": "blue-bug-a",
+    "file": "Blue Bug A.svg"
   },
   {
-    "id": "human-z",
-    "file": "Human Z.svg"
+    "id": "blue-bug-c",
+    "file": "Blue Bug C.svg"
   },
   {
-    "id": "human-y",
-    "file": "Human Y.svg"
+    "id": "blue-bug-d",
+    "file": "Blue Bug D.svg"
   },
   {
-    "id": "human-x",
-    "file": "Human X.svg"
+    "id": "blue-bug-pattern",
+    "file": "Blue Bug pattern.svg"
   },
   {
-    "id": "human-r",
-    "file": "Human R.svg"
+    "id": "blue-bug",
+    "file": "Blue Bug.svg"
   },
   {
-    "id": "trader-a",
-    "file": "Trader A.svg"
+    "id": "cat-black",
+    "file": "Cat (Black).svg"
   },
   {
-    "id": "trader-b",
-    "file": "Trader B.svg"
-  },
-  {
-    "id": "trader-c",
-    "file": "Trader C.svg"
-  },
-  {
-    "id": "plains-nehudi-a",
-    "file": "Plains Nehudi A.svg"
-  },
-  {
-    "id": "trader-d",
-    "file": "Trader D.svg"
-  },
-  {
-    "id": "keleni-c",
-    "file": "Keleni C.svg"
-  },
-  {
-    "id": "green-bug-pattern",
-    "file": "Green Bug Pattern.svg"
-  },
-  {
-    "id": "green-bug-f",
-    "file": "Green Bug F.svg"
+    "id": "cat-ginger",
+    "file": "Cat (Ginger).svg"
   },
   {
     "id": "cat-grey",
     "file": "Cat (Grey).svg"
+  },
+  {
+    "id": "cat-tiger",
+    "file": "Cat (Tiger).svg"
+  },
+  {
+    "id": "cat-white",
+    "file": "Cat (White).svg"
+  },
+  {
+    "id": "desert-nehudi-a",
+    "file": "Desert Nehudi A.svg"
+  },
+  {
+    "id": "desert-nehudi-b",
+    "file": "Desert Nehudi B.svg"
+  },
+  {
+    "id": "desert-nehudi-d",
+    "file": "Desert Nehudi D.svg"
+  },
+  {
+    "id": "desert-nehudi-f",
+    "file": "Desert Nehudi F.svg"
+  },
+  {
+    "id": "desert-nehui-c",
+    "file": "Desert Nehui C.svg"
+  },
+  {
+    "id": "forest-nehudi-b",
+    "file": "Forest Nehudi B.svg"
+  },
+  {
+    "id": "forest-nehudi-c",
+    "file": "Forest Nehudi C.svg"
+  },
+  {
+    "id": "forest-nehudi-d",
+    "file": "Forest Nehudi D.svg"
+  },
+  {
+    "id": "forest-nehudi",
+    "file": "Forest Nehudi.svg"
+  },
+  {
+    "id": "forest-nehui-e",
+    "file": "Forest Nehui E.svg"
+  },
+  {
+    "id": "gaunt-a",
+    "file": "Gaunt A.svg"
+  },
+  {
+    "id": "gaunt-b",
+    "file": "Gaunt B.svg"
+  },
+  {
+    "id": "gaunt-c",
+    "file": "Gaunt C.svg"
+  },
+  {
+    "id": "gaunt-d",
+    "file": "Gaunt D.svg"
   },
   {
     "id": "green-bug-a",
@@ -72,36 +112,40 @@
     "file": "Green Bug D.svg"
   },
   {
-    "id": "gaunt-a",
-    "file": "Gaunt A.svg"
-  },
-  {
     "id": "green-bug-e",
     "file": "Green Bug E.svg"
   },
   {
-    "id": "gaunt-b",
-    "file": "Gaunt B.svg"
+    "id": "green-bug-f",
+    "file": "Green Bug F.svg"
   },
   {
-    "id": "gaunt-c",
-    "file": "Gaunt C.svg"
-  },
-  {
-    "id": "human-c",
-    "file": "Human C.svg"
+    "id": "green-bug-pattern",
+    "file": "Green Bug Pattern.svg"
   },
   {
     "id": "green-bug-spotted-b",
     "file": "Green Bug Spotted B.svg"
   },
   {
+    "id": "human-a",
+    "file": "Human A.svg"
+  },
+  {
+    "id": "human-b",
+    "file": "Human B.svg"
+  },
+  {
+    "id": "human-c",
+    "file": "Human C.svg"
+  },
+  {
     "id": "human-d",
     "file": "Human D.svg"
   },
   {
-    "id": "cat-black",
-    "file": "Cat (Black).svg"
+    "id": "human-e",
+    "file": "Human E.svg"
   },
   {
     "id": "human-f",
@@ -112,40 +156,12 @@
     "file": "Human G.svg"
   },
   {
-    "id": "forest-nehudi",
-    "file": "Forest Nehudi.svg"
-  },
-  {
-    "id": "snow-nehudi-a",
-    "file": "Snow Nehudi A.svg"
-  },
-  {
-    "id": "mogwai-a",
-    "file": "Mogwai A.svg"
-  },
-  {
-    "id": "forest-nehudi-b",
-    "file": "Forest Nehudi B.svg"
-  },
-  {
-    "id": "forest-nehudi-c",
-    "file": "Forest Nehudi C.svg"
-  },
-  {
-    "id": "mogwai-b",
-    "file": "Mogwai B.svg"
-  },
-  {
-    "id": "vithani-a",
-    "file": "Vithani A.svg"
-  },
-  {
     "id": "human-h",
     "file": "Human H.svg"
   },
   {
-    "id": "loroko-b",
-    "file": "Loroko B.svg"
+    "id": "human-i",
+    "file": "Human I.svg"
   },
   {
     "id": "human-j",
@@ -156,28 +172,64 @@
     "file": "Human K.svg"
   },
   {
-    "id": "forest-nehudi-d",
-    "file": "Forest Nehudi D.svg"
-  },
-  {
-    "id": "forest-nehui-e",
-    "file": "Forest Nehui E.svg"
-  },
-  {
-    "id": "snake-green",
-    "file": "Snake (Green).svg"
-  },
-  {
     "id": "human-l",
     "file": "Human L.svg"
   },
   {
-    "id": "loroko-c",
-    "file": "Loroko C.svg"
-  },
-  {
     "id": "human-m",
     "file": "Human M.svg"
+  },
+  {
+    "id": "human-n",
+    "file": "Human N.svg"
+  },
+  {
+    "id": "human-r",
+    "file": "Human R.svg"
+  },
+  {
+    "id": "human-x",
+    "file": "Human X.svg"
+  },
+  {
+    "id": "human-y",
+    "file": "Human Y.svg"
+  },
+  {
+    "id": "human-z",
+    "file": "Human Z.svg"
+  },
+  {
+    "id": "karkadann-b",
+    "file": "Karkadann B.svg"
+  },
+  {
+    "id": "karkadann-c",
+    "file": "Karkadann C.svg"
+  },
+  {
+    "id": "karkadann-d",
+    "file": "Karkadann D.svg"
+  },
+  {
+    "id": "karkadann",
+    "file": "Karkadann.svg"
+  },
+  {
+    "id": "keleni-c",
+    "file": "Keleni C.svg"
+  },
+  {
+    "id": "keleni-girl-b",
+    "file": "Keleni Girl B.svg"
+  },
+  {
+    "id": "keleni-girl",
+    "file": "Keleni Girl.svg"
+  },
+  {
+    "id": "krouta-a",
+    "file": "Krouta A.svg"
   },
   {
     "id": "krouta-b",
@@ -188,20 +240,40 @@
     "file": "Krouta C.svg"
   },
   {
-    "id": "karkadann-b",
-    "file": "Karkadann B.svg"
+    "id": "loroko-b",
+    "file": "Loroko B.svg"
   },
   {
-    "id": "gaunt-d",
-    "file": "Gaunt D.svg"
+    "id": "loroko-c",
+    "file": "Loroko C.svg"
   },
   {
-    "id": "karkadann-c",
-    "file": "Karkadann C.svg"
+    "id": "loroko",
+    "file": "Loroko.svg"
   },
   {
-    "id": "karkadann-d",
-    "file": "Karkadann D.svg"
+    "id": "mogwai-a",
+    "file": "Mogwai A.svg"
+  },
+  {
+    "id": "mogwai-b",
+    "file": "Mogwai B.svg"
+  },
+  {
+    "id": "plains-nehudi-a",
+    "file": "Plains Nehudi A.svg"
+  },
+  {
+    "id": "plains-nehudi-b",
+    "file": "Plains Nehudi B.svg"
+  },
+  {
+    "id": "plains-nehudi-c",
+    "file": "Plains Nehudi C.svg"
+  },
+  {
+    "id": "plains-nehudi-d",
+    "file": "Plains Nehudi D.svg"
   },
   {
     "id": "ranathim-a",
@@ -228,147 +300,75 @@
     "file": "Ranathim F.svg"
   },
   {
-    "id": "vithani-b",
-    "file": "Vithani B.svg"
+    "id": "snake-black",
+    "file": "Snake (Black).svg"
   },
   {
-    "id": "vithani-c",
-    "file": "Vithani C.svg"
+    "id": "snake-brown",
+    "file": "Snake (Brown).svg"
   },
   {
-    "id": "cat-tiger",
-    "file": "Cat (Tiger).svg"
-  },
-  {
-    "id": "human-n",
-    "file": "Human N.svg"
-  },
-  {
-    "id": "cat-white",
-    "file": "Cat (White).svg"
-  },
-  {
-    "id": "cat-ginger",
-    "file": "Cat (Ginger).svg"
+    "id": "snake-green",
+    "file": "Snake (Green).svg"
   },
   {
     "id": "snake-orange",
     "file": "Snake (Orange).svg"
   },
   {
-    "id": "plains-nehudi-b",
-    "file": "Plains Nehudi B.svg"
+    "id": "snow-nedui-c",
+    "file": "Snow Nedui C.svg"
   },
   {
-    "id": "plains-nehudi-c",
-    "file": "Plains Nehudi C.svg"
-  },
-  {
-    "id": "plains-nehudi-d",
-    "file": "Plains Nehudi D.svg"
-  },
-  {
-    "id": "temkor-red",
-    "file": "Temkor (Red).svg"
-  },
-  {
-    "id": "temkor-gold",
-    "file": "Temkor (Gold).svg"
-  },
-  {
-    "id": "temkor-white",
-    "file": "Temkor (White).svg"
+    "id": "snow-nehudi-a",
+    "file": "Snow Nehudi A.svg"
   },
   {
     "id": "snow-nehudi-b",
     "file": "Snow Nehudi B.svg"
   },
   {
-    "id": "snow-nedui-c",
-    "file": "Snow Nedui C.svg"
-  },
-  {
     "id": "snow-nehudi-d",
     "file": "Snow Nehudi D.svg"
   },
   {
-    "id": "human-a",
-    "file": "Human A.svg"
+    "id": "temkor-gold",
+    "file": "Temkor (Gold).svg"
   },
   {
-    "id": "human-b",
-    "file": "Human B.svg"
+    "id": "temkor-red",
+    "file": "Temkor (Red).svg"
   },
   {
-    "id": "krouta-a",
-    "file": "Krouta A.svg"
+    "id": "temkor-white",
+    "file": "Temkor (White).svg"
   },
   {
-    "id": "karkadann",
-    "file": "Karkadann.svg"
+    "id": "trader-a",
+    "file": "Trader A.svg"
   },
   {
-    "id": "human-e",
-    "file": "Human E.svg"
+    "id": "trader-b",
+    "file": "Trader B.svg"
   },
   {
-    "id": "desert-nehudi-f",
-    "file": "Desert Nehudi F.svg"
+    "id": "trader-c",
+    "file": "Trader C.svg"
   },
   {
-    "id": "human-i",
-    "file": "Human I.svg"
+    "id": "trader-d",
+    "file": "Trader D.svg"
   },
   {
-    "id": "loroko",
-    "file": "Loroko.svg"
+    "id": "vithani-a",
+    "file": "Vithani A.svg"
   },
   {
-    "id": "snake-black",
-    "file": "Snake (Black).svg"
+    "id": "vithani-b",
+    "file": "Vithani B.svg"
   },
   {
-    "id": "keleni-girl",
-    "file": "Keleni Girl.svg"
-  },
-  {
-    "id": "blue-bug-a",
-    "file": "Blue Bug A.svg"
-  },
-  {
-    "id": "blue-bug-c",
-    "file": "Blue Bug C.svg"
-  },
-  {
-    "id": "blue-bug-d",
-    "file": "Blue Bug D.svg"
-  },
-  {
-    "id": "blue-bug-pattern",
-    "file": "Blue Bug pattern.svg"
-  },
-  {
-    "id": "blue-bug",
-    "file": "Blue Bug.svg"
-  },
-  {
-    "id": "keleni-girl-b",
-    "file": "Keleni Girl B.svg"
-  },
-  {
-    "id": "desert-nehudi-b",
-    "file": "Desert Nehudi B.svg"
-  },
-  {
-    "id": "desert-nehui-c",
-    "file": "Desert Nehui C.svg"
-  },
-  {
-    "id": "desert-nehudi-d",
-    "file": "Desert Nehudi D.svg"
-  },
-  {
-    "id": "desert-nehudi-a",
-    "file": "Desert Nehudi A.svg"
+    "id": "vithani-c",
+    "file": "Vithani C.svg"
   }
 ]

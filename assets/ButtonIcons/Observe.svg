@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="currentColor" aria-hidden="true">
+  <!-- Eye outline -->
+  <path d="M256 112c88 0 168 56 224 144-56 88-136 144-224 144S88 344 32 256C88 168 168 112 256 112z" />
+  <!-- Pupil -->
+  <circle cx="256" cy="256" r="72" fill="currentColor" />
+  <!-- Simple lashes -->
+  <path d="M112 192l-16-40M160 152l-8-56M240 120l8-80M336 120l8-80M400 152l-8-56M448 192l16-40" stroke="currentColor" stroke-width="20" stroke-linecap="round" fill="none" />
+</svg>
