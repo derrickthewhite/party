@@ -124,6 +124,24 @@ button:disabled {
   cursor: not-allowed;
 }
 
+.game-action-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 42px;
+  min-height: 42px;
+  padding: 10px;
+  line-height: 1;
+}
+
+.game-action-button-icon {
+  width: 20px;
+  height: 20px;
+  display: block;
+  flex: 0 0 auto;
+  pointer-events: none;
+}
+
 .hidden {
   display: none !important;
 }

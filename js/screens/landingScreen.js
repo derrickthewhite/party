@@ -1,4 +1,17 @@
+import { buttonIconLabel, buttonIconUrl } from '../buttonIcons.js';
 import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate, setStatus, showConfirmModal } from './dom.js';
+
+function createGameActionButtonMarkup(actionName, refName, className) {
+	const label = buttonIconLabel(actionName);
+	const iconUrl = buttonIconUrl(actionName);
+	const buttonClassName = className ? className + ' game-action-button' : 'game-action-button';
+
+	return `
+		<button class="${buttonClassName}" data-ref="${refName}" title="${label}" aria-label="${label}">
+			<img class="game-action-button-icon" src="${iconUrl}" alt="" aria-hidden="true">
+		</button>
+	`;
+}
 
 export function createLandingScreen(deps) {
 	const api = deps.api;
@@ -75,15 +88,15 @@ export function createLandingScreen(deps) {
 			</p>
 			<div class="row game-item-bar">
 				<div class="row game-item-controls-left">
-					<button class="secondary" data-ref="open">Open</button>
-					<button data-ref="join">Join</button>
-					<button data-ref="leave">Leave</button>
-					<button data-ref="observe">Observe</button>
+					${createGameActionButtonMarkup('open', 'open', 'secondary')}
+					${createGameActionButtonMarkup('join', 'join', '')}
+					${createGameActionButtonMarkup('leave', 'leave', '')}
+					${createGameActionButtonMarkup('observe', 'observe', '')}
 				</div>
 				<div class="row game-item-controls-right">
-					<button data-ref="start">Start</button>
-					<button data-ref="end">End</button>
-					<button data-ref="remove">Delete</button>
+					${createGameActionButtonMarkup('start', 'start', '')}
+					${createGameActionButtonMarkup('end', 'end', '')}
+					${createGameActionButtonMarkup('remove', 'remove', '')}
 				</div>
 			</div>
 		</div>
