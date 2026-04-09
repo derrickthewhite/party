@@ -1,4 +1,5 @@
 import { collectRefs, createNodeFromHtml, setStatus, showConfirmModal } from './dom.js';
+import { createGameActionButtonMarkup } from './gameActionButtons.js';
 import { createGameParticipantsSidebarController } from './gameParticipantsSidebar.js';
 import { setPlayerIconImage } from '../playerIcons.js';
 
@@ -38,9 +39,9 @@ export function createBaseGameScreen(deps, options) {
 			<div class="column" data-ref="typePanel"></div>
 			<div class="status" data-ref="status"></div>
 			<div class="row mobile-stack" data-ref="adminControls">
-				<button data-ref="adminStart">Start</button>
-				<button data-ref="adminEnd">End</button>
-				<button data-ref="adminDelete">Delete</button>
+				${createGameActionButtonMarkup('start', 'adminStart', '')}
+				${createGameActionButtonMarkup('end', 'adminEnd', '')}
+				${createGameActionButtonMarkup('remove', 'adminDelete', '')}
 			</div>
 		</section>
 	`);

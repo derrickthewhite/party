@@ -1,17 +1,5 @@
-import { buttonIconLabel, buttonIconUrl } from '../buttonIcons.js';
 import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate, setStatus, showConfirmModal } from './dom.js';
-
-function createGameActionButtonMarkup(actionName, refName, className) {
-	const label = buttonIconLabel(actionName);
-	const iconUrl = buttonIconUrl(actionName);
-	const buttonClassName = className ? className + ' game-action-button' : 'game-action-button';
-
-	return `
-		<button class="${buttonClassName}" data-ref="${refName}" title="${label}" aria-label="${label}">
-			<img class="game-action-button-icon" src="${iconUrl}" alt="" aria-hidden="true">
-		</button>
-	`;
-}
+import { createGameActionButtonMarkup } from './gameActionButtons.js';
 
 export function createLandingScreen(deps) {
 	const api = deps.api;
