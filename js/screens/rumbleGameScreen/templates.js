@@ -1,9 +1,11 @@
+import { createGameActionButtonMarkup } from '../gameActionButtons.js';
+
 export const RUMBLE_PANEL_HTML = `
 	<div class="card">
 		<div class="row">
 			<h3 data-ref="phaseTitle">Rumble Bidding</h3>
 			<div data-ref="headerSpacer"></div>
-			<button data-ref="refreshBtn">Refresh</button>
+			${createGameActionButtonMarkup('refresh', 'refreshBtn', '')}
 		</div>
 		<p class="top-user-label" data-ref="progressText">Bidding submissions: 0/0</p>
 		<div data-ref="shipNameMount"></div>

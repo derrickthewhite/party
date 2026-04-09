@@ -1,5 +1,6 @@
 import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate } from './dom.js';
 import { createBaseGameScreen } from './gameScreen.js';
+import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
 
 export function createDiplomacyGameScreen(deps) {
 	const orderPanel = createNodeFromHtml(`
@@ -7,7 +8,7 @@ export function createDiplomacyGameScreen(deps) {
 			<div class="row">
 				<h3>Diplomacy Orders</h3>
 				<div data-ref="orderHeaderSpacer"></div>
-				<button data-ref="refreshOrdersBtn">Refresh</button>
+				${createGameActionButtonMarkup('refresh', 'refreshOrdersBtn', '')}
 			</div>
 			<div class="row mobile-stack">
 				<input type="text" placeholder="Enter your order text" data-ref="orderInput">
@@ -160,7 +161,7 @@ export function createDiplomacyGameScreen(deps) {
 		const config = options || {};
 		refreshGameBusy = true;
 		refreshOrdersBtn.disabled = true;
-		refreshOrdersBtn.textContent = 'Refreshing...';
+		setGameActionButtonLabel(refreshOrdersBtn, 'Refreshing...');
 		try {
 			const detail = await deps.api.gameDetail(lastGameId);
 			deps.state.patch({ activeGame: detail.game });
@@ -174,7 +175,7 @@ export function createDiplomacyGameScreen(deps) {
 		} finally {
 			refreshGameBusy = false;
 			refreshOrdersBtn.disabled = false;
-			refreshOrdersBtn.textContent = 'Refresh';
+			setGameActionButtonLabel(refreshOrdersBtn, 'Refresh');
 		}
 	}
 

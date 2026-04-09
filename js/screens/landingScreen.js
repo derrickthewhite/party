@@ -1,5 +1,5 @@
 import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate, setStatus, showConfirmModal } from './dom.js';
-import { createGameActionButtonMarkup } from './gameActionButtons.js';
+import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
 
 export function createLandingScreen(deps) {
 	const api = deps.api;
@@ -14,7 +14,7 @@ export function createLandingScreen(deps) {
 				<h2>Game Lobby</h2>
 				<div data-ref="headingSpacer"></div>
 				<button data-ref="adminUiToggle">Admin UI: On</button>
-				<button data-ref="refresh">Refresh</button>
+				${createGameActionButtonMarkup('refresh', 'refresh', '')}
 				<button class="link" data-ref="signout">Sign out</button>
 			</div>
 			<p class="top-user-label" data-ref="userLabel"></p>
@@ -34,14 +34,14 @@ export function createLandingScreen(deps) {
 							<option value="stub" data-ref="stubOption">Stub</option>
 						</select>
 					</div>
-					<button class="primary lobby-create-button" data-ref="createBtn">Create</button>
+					${createGameActionButtonMarkup('create-game', 'createBtn', 'primary lobby-create-button')}
 				</div>
 			</div>
 			<div class="status" data-ref="status"></div>
 			<div class="row" data-ref="listHeader">
 				<h3>Available games</h3>
 				<div data-ref="listHeaderSpacer"></div>
-				<button data-ref="listRefresh">Refresh</button>
+				${createGameActionButtonMarkup('refresh', 'listRefresh', '')}
 			</div>
 			<div class="list" data-ref="list">
 				<p data-ref="emptyListNode">No games yet. Create one to get started.</p>
@@ -100,6 +100,7 @@ export function createLandingScreen(deps) {
 	refs.listHeader.style.marginTop = '14px';
 	refs.listHeaderSpacer.style.flex = '1';
 	let headingRefreshBusy = false;
+	let createBusy = false;
 	refresh.addEventListener('click', async function onRefreshHeading() {
 		if (headingRefreshBusy) {
 			return;
@@ -107,7 +108,7 @@ export function createLandingScreen(deps) {
 
 		headingRefreshBusy = true;
 		refresh.disabled = true;
-		refresh.textContent = 'Refreshing...';
+		setGameActionButtonLabel(refresh, 'Refreshing...');
 		try {
 			await refreshGames();
 		} catch (err) {
@@ -115,7 +116,7 @@ export function createLandingScreen(deps) {
 		} finally {
 			headingRefreshBusy = false;
 			refresh.disabled = false;
-			refresh.textContent = 'Refresh';
+			setGameActionButtonLabel(refresh, 'Refresh');
 		}
 	});
 	signout.addEventListener('click', async function onSignout() {
@@ -173,6 +174,13 @@ export function createLandingScreen(deps) {
 	syncAdminUiToggle();
 	syncGameTypeOptions();
 	createBtn.addEventListener('click', async function onCreate() {
+		if (createBusy) {
+			return;
+		}
+
+		createBusy = true;
+		createBtn.disabled = true;
+		setGameActionButtonLabel(createBtn, 'Creating game...');
 		try {
 			setStatus(status, 'Creating game...', '');
 			await api.createGame(gameTitleInput.value.trim(), gameTypeSelect.value);
@@ -180,6 +188,10 @@ export function createLandingScreen(deps) {
 			setStatus(status, 'Game created.', 'ok');
 		} catch (err) {
 			setStatus(status, err.message, 'error');
+		} finally {
+			createBusy = false;
+			createBtn.disabled = false;
+			setGameActionButtonLabel(createBtn, 'Create game');
 		}
 	});
 	let listRefreshBusy = false;
@@ -190,7 +202,7 @@ export function createLandingScreen(deps) {
 
 		listRefreshBusy = true;
 		listRefresh.disabled = true;
-		listRefresh.textContent = 'Refreshing...';
+		setGameActionButtonLabel(listRefresh, 'Refreshing...');
 		try {
 			await refreshGames();
 		} catch (err) {
@@ -198,7 +210,7 @@ export function createLandingScreen(deps) {
 		} finally {
 			listRefreshBusy = false;
 			listRefresh.disabled = false;
-			listRefresh.textContent = 'Refresh';
+			setGameActionButtonLabel(listRefresh, 'Refresh');
 		}
 	});
 	const gameRowsById = new Map();

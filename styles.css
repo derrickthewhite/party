@@ -132,6 +132,7 @@ button:disabled {
   min-height: 48px;
   padding: 6px;
   line-height: 1;
+  border-radius: 12px;
 }
 
 .game-action-button-icon {
@@ -140,6 +141,29 @@ button:disabled {
   display: block;
   flex: 0 0 auto;
   pointer-events: none;
+}
+
+.game-action-button:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(47, 125, 140, 0.18);
+}
+
+.game-action-button.primary .game-action-button-icon,
+.game-action-button.secondary .game-action-button-icon,
+.game-action-button.button-ready .game-action-button-icon {
+  filter: brightness(0) invert(1);
+}
+
+.game-action-button.is-active {
+  box-shadow: 0 0 0 3px rgba(47, 125, 140, 0.18);
+}
+
+.game-action-button.primary.is-active {
+  box-shadow: 0 0 0 3px rgba(208, 74, 42, 0.2);
+}
+
+.game-action-button.is-busy .game-action-button-icon {
+  opacity: 0.8;
 }
 
 .hidden {
@@ -437,6 +461,8 @@ button:disabled {
 
 .lobby-create-button {
   margin-top: 3px;
+  min-width: 56px;
+  min-height: 56px;
 }
 
 .chat-composer-row {
@@ -451,7 +477,19 @@ button:disabled {
 
 .chat-composer-send {
   flex: 0 0 auto;
-  white-space: nowrap;
+  min-width: 56px;
+  min-height: 56px;
+}
+
+.mafia-icon-action-button,
+.mafia-vote-action-button,
+.mafia-target-action-button {
+  min-width: 52px;
+  min-height: 52px;
+}
+
+.mafia-target-action-button {
+  flex: 0 0 auto;
 }
 
 .modal-overlay {

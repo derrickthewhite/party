@@ -23,6 +23,10 @@ function lobbyGameRow(page, title, gameType) {
   return lobby.locator('.game-item').filter({ hasText: `${title} (${gameType})` }).first();
 }
 
+function actionButton(locator, refName) {
+  return locator.locator(`[data-ref="${refName}"]`);
+}
+
 function rumbleGameScreen(page, title) {
   return activeScreen(page, `${title} (Rumble)`);
 }
@@ -31,7 +35,7 @@ async function clickLobbyRefresh(page) {
   const lobby = activeScreen(page, 'Game Lobby');
   await waitForVisible(lobby, AUTH_TIMEOUT);
 
-  const refreshButtons = lobby.getByRole('button', { name: 'Refresh', exact: true });
+  const refreshButtons = lobby.locator('[data-ref="refresh"], [data-ref="listRefresh"]');
   const refreshCount = await refreshButtons.count();
   if (refreshCount === 0) {
     return lobby;
@@ -123,7 +127,7 @@ async function createGame(page, title, gameType) {
 
   await lobby.getByPlaceholder('Game Title').fill(title);
   await lobby.locator('select').selectOption(gameType);
-  await lobby.getByRole('button', { name: 'Create', exact: true }).click();
+  await actionButton(lobby, 'createBtn').click();
 
   const row = lobby.locator('.game-item').filter({ hasText: `${title} (${gameType})` });
   for (let attempt = 0; attempt < 8; attempt += 1) {
@@ -155,24 +159,24 @@ async function confirmModal(page, confirmLabel) {
 async function joinGameFromLobby(page, title, gameType) {
   const row = lobbyGameRow(page, title, gameType);
   await waitForVisible(row, DEFAULT_TIMEOUT);
-  await row.getByRole('button', { name: 'Join', exact: true }).click();
+  await actionButton(row, 'join').click();
   const updatedRow = lobbyGameRow(page, title, gameType);
   await waitForVisible(updatedRow, DEFAULT_TIMEOUT);
-  await expect(updatedRow.getByRole('button', { name: 'Open', exact: true })).toBeVisible({ timeout: DEFAULT_TIMEOUT });
+  await expect(actionButton(updatedRow, 'open')).toBeVisible({ timeout: DEFAULT_TIMEOUT });
   return updatedRow;
 }
 
 async function openGameFromLobby(page, title, gameType, headingName) {
   const row = lobbyGameRow(page, title, gameType);
   await waitForVisible(row, DEFAULT_TIMEOUT);
-  await row.getByRole('button', { name: 'Open', exact: true }).click();
+  await actionButton(row, 'open').click();
   await waitForVisible(activeScreen(page, headingName), AUTH_TIMEOUT);
 }
 
 async function startGameFromLobby(page, title, gameType) {
   const row = lobbyGameRow(page, title, gameType);
   await waitForVisible(row, DEFAULT_TIMEOUT);
-  await row.getByRole('button', { name: 'Start', exact: true }).click();
+  await actionButton(row, 'start').click();
   await confirmModal(page, 'Confirm');
   const updatedRow = lobbyGameRow(page, title, gameType);
   //await expect(updatedRow).toContainText('Status: in_progress', { timeout: DEFAULT_TIMEOUT });
@@ -197,15 +201,15 @@ async function clickRumbleRefresh(page, title) {
 
   const refreshBtn = screen.locator('[data-ref="refreshBtn"]');
   await waitForVisible(refreshBtn, DEFAULT_TIMEOUT);
-  const currentText = String((await refreshBtn.textContent()) || '').trim();
+  const currentLabel = String((await refreshBtn.getAttribute('aria-label')) || '').trim();
 
-  if (currentText === 'Refresh' && await refreshBtn.isEnabled()) {
+  if (currentLabel === 'Refresh' && await refreshBtn.isEnabled()) {
     await refreshBtn.click();
-    await expect(refreshBtn).toHaveText('Refreshing...', { timeout: DEFAULT_TIMEOUT });
+    await expect(refreshBtn).toHaveAttribute('aria-label', 'Refreshing...', { timeout: DEFAULT_TIMEOUT });
   }
 
   try {
-    await expect(refreshBtn).toHaveText('Refresh', { timeout: 5000 });
+    await expect(refreshBtn).toHaveAttribute('aria-label', 'Refresh', { timeout: 5000 });
   } catch (err) {
     // Some refresh paths overlap with the screen's own auto-refresh. In that case,
     // the caller still made an explicit refresh attempt and can continue checking state.

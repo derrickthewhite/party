@@ -3,8 +3,15 @@ const BUTTON_ICON_FILES = {
 	join: 'Join.svg',
 	leave: 'Leave.svg',
 	observe: 'Observe.svg',
+	'create-game': 'CreateGame.svg',
+	'send-message': 'SendMessage.svg',
+	'change-icon': 'ChangeIcon.svg',
+	suggest: 'Suggest.svg',
+	vote: 'Vote.svg',
+	'withdraw-vote': 'WithdrawVote.svg',
 	start: 'Start.svg',
 	end: 'End.svg',
+	refresh: 'Refresh.svg',
 	remove: 'Delete.svg',
 };
 
@@ -13,8 +20,15 @@ const BUTTON_ICON_LABELS = {
 	join: 'Join game',
 	leave: 'Leave game',
 	observe: 'Observe game',
+	'create-game': 'Create game',
+	'send-message': 'Send message',
+	'change-icon': 'Change icon',
+	suggest: 'Suggest target',
+	vote: 'Vote target',
+	'withdraw-vote': 'Withdraw vote',
 	start: 'Start game',
 	end: 'End game',
+	refresh: 'Refresh',
 	remove: 'Delete game',
 };
 

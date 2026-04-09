@@ -1,5 +1,6 @@
 import { cloneTemplateNode, collectRefs, createNodeFromHtml, createTemplate } from './dom.js';
 import { createBaseGameScreen } from './gameScreen.js';
+import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
 import { playerIconGroupKey, playerIconGroupLabel, playerIconLabel, setPlayerIconImage } from '../playerIcons.js';
 
 const MAFIA_PANEL_HTML = `
@@ -7,7 +8,7 @@ const MAFIA_PANEL_HTML = `
 		<div class="row">
 			<h3 data-ref="phaseTitle">Mafia</h3>
 			<div data-ref="headerSpacer"></div>
-			<button data-ref="refreshBtn">Refresh</button>
+			${createGameActionButtonMarkup('refresh', 'refreshBtn', '')}
 		</div>
 		<p class="top-user-label" data-ref="roleText"></p>
 		<p data-ref="phaseText"></p>
@@ -24,7 +25,7 @@ const MAFIA_PANEL_HTML = `
 						<small class="mafia-target-meta" data-ref="iconHint"></small>
 					</div>
 				</div>
-				<button data-ref="changeIconBtn">Change Icon</button>
+				${createGameActionButtonMarkup('change-icon', 'changeIconBtn', 'mafia-icon-action-button')}
 			</div>
 			<div class="row mobile-stack">
 				<button class="primary" data-ref="readyBtn">I&apos;m Ready</button>
@@ -33,7 +34,7 @@ const MAFIA_PANEL_HTML = `
 		<div class="mafia-vote-card" data-ref="voteCard">
 			<div class="row mobile-stack mafia-selection-row">
 				<p class="mafia-selection-text" data-ref="voteText"></p>
-				<button data-ref="withdrawVoteBtn">Withdraw Vote</button>
+				${createGameActionButtonMarkup('withdraw-vote', 'withdrawVoteBtn', 'mafia-vote-action-button')}
 			</div>
 			<div class="list mafia-target-list" data-ref="targetsList"></div>
 			<p class="top-user-label" data-ref="emptyTargets">No valid targets right now.</p>
@@ -58,8 +59,8 @@ const TARGET_ROW_TEMPLATE_HTML = `
 			</div>
 		</div>
 		<div class="mafia-target-actions" data-ref="actions">
-			<button class="button-ready" data-ref="suggestBtn">Suggest</button>
-			<button class="primary" data-ref="voteBtn">Vote</button>
+			${createGameActionButtonMarkup('suggest', 'suggestBtn', 'button-ready mafia-target-action-button')}
+			${createGameActionButtonMarkup('vote', 'voteBtn', 'primary mafia-target-action-button')}
 		</div>
 	</div>
 `;
@@ -544,8 +545,14 @@ export function createMafiaGameScreen(deps) {
 			rowRefs.actions.style.display = player.is_self ? 'none' : '';
 			rowRefs.row.classList.toggle('is-suggested', viewerDisplaySuggestionTargetUserId === userId);
 			rowRefs.row.classList.toggle('is-voted', isSelfVoted);
-			rowRefs.suggestBtn.textContent = isPendingSuggestion ? 'Suggesting...' : (isSelfSuggested ? 'Suggested' : 'Suggest');
-			rowRefs.voteBtn.textContent = isPendingVote ? 'Voting...' : (isSelfVoted ? 'Voted' : 'Vote');
+			rowRefs.suggestBtn.classList.toggle('is-active', isSelfSuggested || viewerDisplaySuggestionTargetUserId === userId);
+			rowRefs.voteBtn.classList.toggle('is-active', isSelfVoted);
+			rowRefs.suggestBtn.classList.toggle('is-busy', !!isPendingSuggestion);
+			rowRefs.voteBtn.classList.toggle('is-busy', !!isPendingVote);
+			rowRefs.suggestBtn.setAttribute('aria-pressed', isSelfSuggested || viewerDisplaySuggestionTargetUserId === userId ? 'true' : 'false');
+			rowRefs.voteBtn.setAttribute('aria-pressed', isSelfVoted ? 'true' : 'false');
+			setGameActionButtonLabel(rowRefs.suggestBtn, isPendingSuggestion ? 'Suggesting target...' : (isSelfSuggested ? 'Suggested target' : 'Suggest target'));
+			setGameActionButtonLabel(rowRefs.voteBtn, isPendingVote ? 'Voting for target...' : (isSelfVoted ? 'Voted for target' : 'Vote target'));
 			rowRefs.suggestBtn.disabled = !canSuggest;
 			rowRefs.voteBtn.disabled = !canVote;
 			targetsList.appendChild(rowRefs.row);
@@ -637,6 +644,8 @@ export function createMafiaGameScreen(deps) {
 		voteText.textContent = buildVoteSummaryText();
 		withdrawVoteBtn.style.display = canWithdrawVote() ? '' : 'none';
 		withdrawVoteBtn.disabled = !canWithdrawVote();
+		withdrawVoteBtn.classList.toggle('is-busy', !!(pendingAction && pendingAction.kind === 'withdraw'));
+		setGameActionButtonLabel(withdrawVoteBtn, pendingAction && pendingAction.kind === 'withdraw' ? 'Withdrawing vote...' : 'Withdraw vote');
 
 		readyCard.style.display = serverSnapshot.phase === 'start' ? '' : 'none';
 		voteCard.style.display = isVotePhase() ? '' : 'none';
@@ -649,7 +658,8 @@ export function createMafiaGameScreen(deps) {
 		setPlayerIconImage(iconPreview, player && player.icon_key ? player.icon_key : null, player && player.username ? player.username : 'Player');
 		iconLabel.textContent = player && player.icon_key ? playerIconLabel(player.icon_key) : 'No icon assigned yet';
 		iconHint.textContent = 'Visible in chat and on every mafia player row.';
-		changeIconBtn.textContent = iconBusy ? 'Saving...' : 'Change Icon';
+		changeIconBtn.classList.toggle('is-busy', iconBusy);
+		setGameActionButtonLabel(changeIconBtn, iconBusy ? 'Saving icon...' : 'Change icon');
 		changeIconBtn.disabled = !canChangeIcon();
 		readyBtn.style.display = isLobbyOpen ? 'none' : '';
 		readyBtn.disabled = isLobbyOpen || !serverSnapshot.canSubmit || serverSnapshot.hasSubmitted || submitBusy;
@@ -721,7 +731,7 @@ export function createMafiaGameScreen(deps) {
 		const config = options || {};
 		refreshBusy = true;
 		refreshBtn.disabled = true;
-		refreshBtn.textContent = 'Refreshing...';
+		setGameActionButtonLabel(refreshBtn, 'Refreshing...');
 		try {
 			await fetchAndApplyGameDetail();
 			if (!config.silent) {
@@ -732,7 +742,7 @@ export function createMafiaGameScreen(deps) {
 		} finally {
 			refreshBusy = false;
 			refreshBtn.disabled = false;
-			refreshBtn.textContent = 'Refresh';
+			setGameActionButtonLabel(refreshBtn, 'Refresh');
 		}
 	}
 

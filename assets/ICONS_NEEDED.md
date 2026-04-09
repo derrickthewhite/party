@@ -14,7 +14,7 @@ This document lists all icons needed to represent UI states and button choices f
 
 ## Landing / Lobby
 - Action: `admin-toggle-on` / `admin-toggle-off` — Admin UI on/off toggle.
-- Action: `refresh` — Refresh the lobby / game lists.
+- Action: `refresh` — Shared refresh action used for lobby, game lists, and in-game refresh buttons.
 - Action: `sign-out` — Sign out button.
 - Action: `create-game` — Create game button (primary).
 - Control: `select-game-type` — icon set for game types:
@@ -39,12 +39,12 @@ This document lists all icons needed to represent UI states and button choices f
   - `progress-phase` — phase/round indicator (small badge).
 
 ## Game Row / Controls (common)
+- Action: `send-message` — Shared send action used by the game chat composer.
 - Action states for buttons: `button-primary`, `button-secondary`, `button-disabled` (visual states).
 - Icon: `tooltip-indicator` — for hover title hints (optional).
 
 ## Mafia Screen (lobby & in-game)
 - Panel actions:
-  - `mafia-refresh` — Refresh mafia state.
   - `change-icon` — Open icon picker.
   - `ready` / `not-ready` — Ready button and state.
   - `withdraw-vote` — Withdraw vote action.
@@ -80,5 +80,46 @@ This document lists all icons needed to represent UI states and button choices f
 - Provide two visual sizes where needed: small (16px) for inline badges and micro-counts, medium (20–24px) for buttons, and large (40–64px) for player avatar previews.
 - Produce two visual variants for interactive icons: default and disabled/ghost.
 
+## Button Icon Style
+- General direction: monochrome SVG, bold solid glyph, single fill, no strokes, optimized to read cleanly at 16px.
+- Mood: medieval or storybook-adjacent without becoming ornate; strong silhouettes first, detail second.
+- Composition: centered icon mass, simple geometric structure, minimal interior cutouts, avoid thin appendages that disappear at small sizes.
+- Button usage: these icons are used in icon-only buttons, so the silhouette must carry the meaning without visible text.
+- File baseline: 24x24 viewBox is preferred for new prompts, but existing traced assets in this repository also use larger viewBox values when needed.
+
+## Stored Prompt Examples
+
+### Open
+Monochrome SVG, 24x24 viewBox, solid glyph of a old-style medival arched door with a left-pointing arrow overlay at center-right; simple geometric shapes, strong silhouette, optimized for 16px, single fill.
+
+### Observe
+Monochrome SVG, 24x24 viewBox, solid glyph of an eye, medieval feel; minimal pupil, strong silhouette, optimized for 16px, single fill.
+
+### Leave
+Monochrome SVG, 24x24 viewBox, solid glyph of a cloaked figure stepping through a medieval arched door with a large right-pointing arrow at the center left; simple readable shapes, optimized for 16px, single fill.
+
+### Start
+Monochrome SVG, 24x24 viewBox, solid glyph of a french hunting horn with the bell pointing right and the mouthpiece pointing left: bold centered silhouette, optimized for 16px, single fill.
+
+## Prompt Drafts For Better Icons
+
+### Create Game
+Monochrome SVG, 24x24 viewBox, solid glyph of a medieval arched hall or fortress door with a small heraldic plus badge integrated into the upper-right corner; simple geometric shapes, bold silhouette, optimized for 16px, single fill.
+
+### Send Message
+Monochrome SVG, 24x24 viewBox, solid glyph of a rolled parchment message with a right-pointing dispatch arrow, medieval courier feel; minimal folds, strong silhouette, optimized for 16px, single fill.
+
+### Change Icon
+Monochrome SVG, 24x24 viewBox, solid glyph of a round portrait medallion with a simple face silhouette and a small swap arrow motif wrapping one side; medieval badge feel, bold centered silhouette, optimized for 16px, single fill.
+
+### Suggest
+Monochrome SVG, 24x24 viewBox, solid glyph of a subtle proposing gesture such as a hand or token offering toward a target marker, less forceful than a vote icon; simple readable shapes, strong silhouette, optimized for 16px, single fill.
+
+### Vote
+Monochrome SVG, 24x24 viewBox, solid glyph of a medieval ballot box or urn receiving a marked token, decisive and official; bold centered silhouette, optimized for 16px, single fill.
+
+### Withdraw Vote
+Monochrome SVG, 24x24 viewBox, solid glyph of a medieval ballot token being pulled back out of a ballot box or urn with a clear backward motion cue; simple readable shapes, strong silhouette, optimized for 16px, single fill.
+
 ---
-Next step: generate creative prompts and examples for each icon (per-user request).
+Current implementation includes initial SVGs for `create-game`, `send-message`, `change-icon`, `suggest`, `vote`, and `withdraw-vote` under `assets/ButtonIcons/`.

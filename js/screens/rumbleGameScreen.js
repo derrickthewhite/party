@@ -15,6 +15,7 @@ import { createCombatPanelController } from './rumbleGameScreen/combatPanel.js';
 import { createVictoryScreenController } from './rumbleGameScreen/victoryScreen.js';
 import { createEventLogsController } from './rumbleGameScreen/eventLogs.js';
 import { showRumbleAbilityInfo } from './rumbleGameScreen/abilityInfoModal.js';
+import { setGameActionButtonLabel } from './gameActionButtons.js';
 import {
 	clearDraftDirty as clearRumbleDraftDirty,
 	getCheatEligiblePlayers as getCheatEligiblePlayersState,
@@ -484,7 +485,7 @@ export function createRumbleGameScreen(deps) {
 		const config = options || {};
 		refreshBusy = true;
 		refreshBtn.disabled = true;
-		refreshBtn.textContent = 'Refreshing...';
+		setGameActionButtonLabel(refreshBtn, 'Refreshing...');
 		try {
 			const detail = await deps.api.gameDetail(lastGameId);
 			deps.state.patch({ activeGame: detail.game });
@@ -497,7 +498,7 @@ export function createRumbleGameScreen(deps) {
 		} finally {
 			refreshBusy = false;
 			refreshBtn.disabled = false;
-			refreshBtn.textContent = 'Refresh';
+			setGameActionButtonLabel(refreshBtn, 'Refresh');
 		}
 	}
 

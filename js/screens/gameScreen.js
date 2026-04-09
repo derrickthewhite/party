@@ -1,5 +1,5 @@
 import { collectRefs, createNodeFromHtml, setStatus, showConfirmModal } from './dom.js';
-import { createGameActionButtonMarkup } from './gameActionButtons.js';
+import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
 import { createGameParticipantsSidebarController } from './gameParticipantsSidebar.js';
 import { setPlayerIconImage } from '../playerIcons.js';
 
@@ -26,7 +26,7 @@ export function createBaseGameScreen(deps, options) {
 					<div class="message-feed" data-ref="feed"></div>
 					<div class="row chat-composer-row" data-ref="composerRow">
 						<input type="text" placeholder="Type a message" class="chat-composer-input" data-ref="messageInput">
-						<button class="primary chat-composer-send" data-ref="sendButton">Send</button>
+						${createGameActionButtonMarkup('send-message', 'sendButton', 'primary chat-composer-send')}
 					</div>
 				</div>
 				<aside class="game-screen-sidebar" data-ref="sidebarPanel"></aside>
@@ -68,6 +68,7 @@ export function createBaseGameScreen(deps, options) {
 	const adminDelete = refs.adminDelete;
 	let mountedTypePanel = null;
 	let mountedSidebarPanel = null;
+	let sendBusy = false;
 	const participantsSidebarController = config.showParticipantsPanel ? createGameParticipantsSidebarController() : null;
 
 	refs.headingSpacer.style.flex = '1';
@@ -122,7 +123,7 @@ export function createBaseGameScreen(deps, options) {
 
 	sendButton.addEventListener('click', async function onSendClick() {
 		const activeGame = state.state.activeGame;
-		if (!activeGame) {
+		if (!activeGame || sendBusy || sendButton.disabled) {
 			return;
 		}
 
@@ -131,12 +132,21 @@ export function createBaseGameScreen(deps, options) {
 			return;
 		}
 
+		sendBusy = true;
+		sendButton.disabled = true;
+		setGameActionButtonLabel(sendButton, 'Sending message...');
 		try {
 			await api.sendMessage(activeGame.id, body);
 			messageInput.value = '';
 			messageInput.focus();
 		} catch (err) {
 			setStatus(status, err.message, 'error');
+		} finally {
+			sendBusy = false;
+			const currentGame = state.state.activeGame;
+			const canChat = !!(currentGame && currentGame.permissions && currentGame.permissions.can_chat);
+			sendButton.disabled = !canChat;
+			setGameActionButtonLabel(sendButton, 'Send message');
 		}
 	});
 
@@ -281,7 +291,8 @@ export function createBaseGameScreen(deps, options) {
 		const canLeave = !!perms.can_leave;
 
 		messageInput.disabled = chatLocked;
-		sendButton.disabled = chatLocked;
+		sendButton.disabled = chatLocked || sendBusy;
+		setGameActionButtonLabel(sendButton, sendBusy ? 'Sending message...' : 'Send message');
 		actionType.disabled = actionsLocked;
 		actionPayload.disabled = actionsLocked;
 		actionButton.disabled = actionsLocked;

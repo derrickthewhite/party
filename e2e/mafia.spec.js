@@ -46,7 +46,8 @@ async function readyPlayer(page, title) {
 async function submitMafiaAction(page, title, targetUsername, actionName) {
   const row = mafiaPlayerRow(page, title, targetUsername);
   await expect(row).toBeVisible({ timeout: 30000 });
-  const button = row.getByRole('button', { name: actionName, exact: true });
+  const actionRef = actionName === 'Suggest' ? 'suggestBtn' : 'voteBtn';
+  const button = row.locator(`[data-ref="${actionRef}"]`);
   await expect(button).toBeVisible({ timeout: 30000 });
   await expect(button).toBeEnabled({ timeout: 30000 });
   await button.click();
