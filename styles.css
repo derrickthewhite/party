@@ -81,6 +81,111 @@ input, select {
   background: #fff;
 }
 
+.icon-select {
+  position: relative;
+  width: 100%;
+}
+
+.icon-select-toggle {
+  width: 100%;
+  min-height: 43px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: #fff;
+  text-align: left;
+}
+
+.icon-select-toggle-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1 1 auto;
+}
+
+.icon-select-label,
+.icon-select-option-label {
+  min-width: 0;
+  color: var(--ink);
+}
+
+.icon-select-caret {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(45deg) translateY(-1px);
+  opacity: 0.7;
+}
+
+.icon-select.is-open .icon-select-caret {
+  transform: rotate(-135deg) translateY(-1px);
+}
+
+.icon-select-toggle:focus-visible,
+.icon-select-option:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(47, 125, 140, 0.18);
+}
+
+.icon-select-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: 1000;
+}
+
+.icon-select-options {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: 0 10px 24px rgba(43, 36, 21, 0.14);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.icon-select-option {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.icon-select-option:hover {
+  background: rgba(47, 125, 140, 0.08);
+}
+
+.icon-select-option.is-selected {
+  background: color-mix(in srgb, var(--accent-2) 12%, #fff);
+  border-color: color-mix(in srgb, var(--accent-2) 40%, var(--line));
+}
+
+.icon-select-icon {
+  width: 24px;
+  height: 24px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.icon-select-game-icon {
+  width: 24px;
+  height: 24px;
+}
+
 button {
   cursor: pointer;
   background: #fff;
@@ -450,11 +555,6 @@ button:disabled {
   flex-wrap: wrap;
 }
 
-.game-item-controls-left {
-  flex: 0 0 112px;
-  max-width: 112px;
-}
-
 .game-item-controls-right {
   justify-content: flex-end;
   margin-left: auto;
@@ -475,6 +575,23 @@ button:disabled {
   padding-left: 8px;
   border-left: 1px solid var(--line);
   flex: 0 0 auto;
+}
+
+/* Left-most block in the game item bar keeps the previous fixed width */
+.game-item-bar > .left-most-block {
+  flex: 0 0 112px;
+  max-width: 112px;
+}
+
+/* If the left-most block is the icons container, put the divider on its right edge
+   so the visual divider appears between the left block and the following block. */
+.game-item-bar > .left-most-block.game-info-icons-inline {
+  margin-left: 0;
+  padding-left: 0;
+  border-left: none;
+  margin-right: 8px;
+  padding-right: 8px;
+  border-right: 1px solid var(--line);
 }
 
 .game-state-icon {

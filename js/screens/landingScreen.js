@@ -1,6 +1,7 @@
 import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate, setStatus, showConfirmModal } from './dom.js';
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
 import { collectGameInfoIcons, setGameInfoIconNode, getMemberBadgeIcon } from '../gameStateIcons.js';
+import { enhanceSelectWithIcons } from '../components/iconSelect.js';
 import { LANDING_REFRESH_MS } from '../config.js';
 
 export function createLandingScreen(deps) {
@@ -77,18 +78,18 @@ export function createLandingScreen(deps) {
 				<span data-ref="progressSeparator"></span>
 				<span data-ref="progressInfo"></span>
 			</p>
-			<div class="row game-item-bar">
-				<div class="row game-item-controls-left">
-					${createGameActionButtonMarkup('open', 'open', 'secondary')}
-					${createGameActionButtonMarkup('join', 'join', '')}
-					${createGameActionButtonMarkup('leave', 'leave', '')}
-					${createGameActionButtonMarkup('observe', 'observe', '')}
-				</div>
-				<div class="game-info-icons game-info-icons-inline" data-ref="gameInfoIcons">
-					<img class="game-state-icon" data-ref="typeIcon" alt="" aria-hidden="true">
-					<img class="game-state-icon" data-ref="statusIcon" alt="" aria-hidden="true">
-					<img class="game-state-icon" data-ref="phaseIcon" alt="" aria-hidden="true">
-				</div>
+				<div class="row game-item-bar">
+					<div class="game-info-icons game-info-icons-inline left-most-block" data-ref="gameInfoIcons">
+						<img class="game-state-icon" data-ref="typeIcon" alt="" aria-hidden="true">
+						<img class="game-state-icon" data-ref="statusIcon" alt="" aria-hidden="true">
+						<img class="game-state-icon" data-ref="phaseIcon" alt="" aria-hidden="true">
+					</div>
+					<div class="row game-item-controls-left">
+						${createGameActionButtonMarkup('open', 'open', 'secondary')}
+						${createGameActionButtonMarkup('join', 'join', '')}
+						${createGameActionButtonMarkup('leave', 'leave', '')}
+						${createGameActionButtonMarkup('observe', 'observe', '')}
+					</div>
 				<div class="row game-item-controls-right">
 					${createGameActionButtonMarkup('start', 'start', '')}
 					${createGameActionButtonMarkup('end', 'end', '')}
@@ -142,6 +143,7 @@ export function createLandingScreen(deps) {
 	const gameTypeOptions = {
 		stub: refs.stubOption,
 	};
+	let gameTypeControl = null;
 
 	function hasAdminRights() {
 		return !!(state.state.user && state.state.user.is_admin);
@@ -167,6 +169,9 @@ export function createLandingScreen(deps) {
 		if (!stubEnabled && gameTypeSelect.value === 'stub') {
 			gameTypeSelect.value = 'chat';
 		}
+		if (gameTypeControl && typeof gameTypeControl.refresh === 'function') {
+			gameTypeControl.refresh();
+		}
 	}
 
 	adminUiToggle.addEventListener('click', function onToggleAdminUi() {
@@ -181,6 +186,23 @@ export function createLandingScreen(deps) {
 
 	syncAdminUiToggle();
 	syncGameTypeOptions();
+
+	// enhance the native select with an icon-capable custom dropdown
+	try {
+		gameTypeControl = enhanceSelectWithIcons(gameTypeSelect, function createIconFor(value) {
+		const fake = { game_type: value };
+		const icons = collectGameInfoIcons(fake, { hideInProgressWhenPhase: true }) || {};
+		const img = document.createElement('img');
+		img.className = 'game-state-icon';
+		img.alt = '';
+		img.setAttribute('aria-hidden', 'true');
+		img.classList.add('icon-select-game-icon');
+		setGameInfoIconNode(img, icons.typeIcon || null);
+		return img;
+	});
+} catch (err) {
+	// if enhancer missing or fails, keep using native select
+}
 	createBtn.addEventListener('click', async function onCreate() {
 		if (createBusy) {
 			return;
