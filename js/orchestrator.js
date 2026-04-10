@@ -11,6 +11,7 @@ import { createSignupScreen } from './screens/signupScreen.js';
 import { getInitialRoute, isSafeNext, isValidGameId } from './url-utils.js';
 import { createStubGameScreen } from './screens/stubGameScreen.js';
 import { createWelcomeScreen } from './screens/welcomeScreen.js';
+import { CHAT_REFRESH_MS } from './config.js';
 
 export function initializePartyApp() {
 	const app = document.getElementById('app');
@@ -46,7 +47,7 @@ export function initializePartyApp() {
 
 		chat.startPolling({
 			gameId,
-			intervalMs: 2500,
+			intervalMs: CHAT_REFRESH_MS,
 			getSinceId: function getSinceId() {
 				return state.getMessageCursor(gameId);
 			},

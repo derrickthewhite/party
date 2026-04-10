@@ -121,5 +121,104 @@ Monochrome SVG, 24x24 viewBox, solid glyph of a medieval ballot box or urn recei
 ### Withdraw Vote
 Monochrome SVG, 24x24 viewBox, solid glyph of a medieval ballot token being pulled back out of a ballot box or urn with a clear backward motion cue; simple readable shapes, strong silhouette, optimized for 16px, single fill.
 
+## Game State Icon Set (Implemented)
+
+The following simple filled-glyph SVGs are now implemented under `assets/GameStateIcons/`.
+
+### Game Type Icons
+- `TypeChat.svg`
+- `TypeMafia.svg`
+- `TypeDiplomacy.svg`
+- `TypeRumble.svg`
+- `TypeStub.svg`
+
+### Game Status Icons
+- `StatusOpen.svg`
+- `StatusInProgress.svg`
+- `StatusClosed.svg`
+
+### Current Phase Icons
+- `PhaseChatChat.svg`
+- `PhaseMafiaStart.svg`
+- `PhaseMafiaDay.svg`
+- `PhaseMafiaNight.svg`
+- `PhaseRumbleBidding.svg`
+- `PhaseRumbleBattle.svg`
+- `PhaseDiplomacyOrders.svg`
+
+### Future Placeholder Phase Icons
+- `PhaseMafiaTrial.svg`
+- `PhaseMafiaDusk.svg`
+- `PhaseRumbleResolve.svg`
+- `PhaseDiplomacyRetreat.svg`
+- `PhaseDiplomacyBuild.svg`
+- `PhaseChatArchive.svg`
+- `PhaseGenericSetup.svg`
+
+## Prompt Ideas For Replacements
+
+### Game Type: Chat
+Monochrome SVG, 24x24 viewBox, filled glyph of a speech bubble with three centered dots, clean silhouette with no thin lines, readable at 16px.
+
+### Game Type: Mafia
+Monochrome SVG, 24x24 viewBox, filled glyph of a fedora and mask profile badge, bold silhouette that suggests hidden identity, readable at 16px.
+
+### Game Type: Diplomacy
+Monochrome SVG, 24x24 viewBox, filled glyph of two crossed treaty banners or a handshake crest, centered mass and minimal cutouts, readable at 16px.
+
+### Game Type: Rumble
+Monochrome SVG, 24x24 viewBox, filled glyph of crossed swords and compact guard shapes, high-contrast silhouette, readable at 16px.
+
+### Game Type: Stub
+Monochrome SVG, 24x24 viewBox, filled glyph of a blueprint block with a notch or placeholder tile motif, simple geometric silhouette, readable at 16px.
+
+### Status: Open
+Monochrome SVG, 24x24 viewBox, filled glyph of an unlocked padlock with an open shackle tilt, strong silhouette and minimal details, readable at 16px.
+
+### Status: In Progress
+Monochrome SVG, 24x24 viewBox, filled glyph of an hourglass with bold top and bottom chambers, simple interior cutout, readable at 16px.
+
+### Status: Closed
+Monochrome SVG, 24x24 viewBox, filled glyph of a locked padlock with sturdy rectangular body and closed shackle, readable at 16px.
+
+### Phase: Mafia Start
+Monochrome SVG, 24x24 viewBox, filled glyph of a spotlight or reveal eye badge, compact centered silhouette signaling role reveal, readable at 16px.
+
+### Phase: Mafia Day
+Monochrome SVG, 24x24 viewBox, filled glyph of a bright sun medallion with thick rays, simple radial silhouette, readable at 16px.
+
+### Phase: Mafia Night
+Monochrome SVG, 24x24 viewBox, filled glyph of a crescent moon with one star cutout, bold silhouette, readable at 16px.
+
+### Phase: Rumble Bidding
+Monochrome SVG, 24x24 viewBox, filled glyph of stacked coins with a small upward marker, solid silhouette, readable at 16px.
+
+### Phase: Rumble Battle
+Monochrome SVG, 24x24 viewBox, filled glyph of crossed blades over a shield, concentrated center mass, readable at 16px.
+
+### Phase: Diplomacy Orders
+Monochrome SVG, 24x24 viewBox, filled glyph of a sealed scroll with directive lines, minimal folds, readable at 16px.
+
+### Future Placeholder: Mafia Trial
+Monochrome SVG, 24x24 viewBox, filled glyph of balance scales with broad pans and thick stem, bold and legible at 16px.
+
+### Future Placeholder: Mafia Dusk
+Monochrome SVG, 24x24 viewBox, filled glyph of a half-set sun crossing the horizon bar, clear silhouette, readable at 16px.
+
+### Future Placeholder: Rumble Resolve
+Monochrome SVG, 24x24 viewBox, filled glyph of a checkmark over burst badge, compact shape for resolution state, readable at 16px.
+
+### Future Placeholder: Diplomacy Retreat
+Monochrome SVG, 24x24 viewBox, filled glyph of a backward arrow over a shield outline block, strong silhouette, readable at 16px.
+
+### Future Placeholder: Diplomacy Build
+Monochrome SVG, 24x24 viewBox, filled glyph of a tower keep with integrated plus badge, blocky silhouette, readable at 16px.
+
+### Future Placeholder: Chat Archive
+Monochrome SVG, 24x24 viewBox, filled glyph of an archive box with lid and label notch, simple geometric form, readable at 16px.
+
+### Future Placeholder: Generic Setup
+Monochrome SVG, 24x24 viewBox, filled glyph of a gear with a center dot, wide teeth and minimal cutouts, readable at 16px.
+
 ---
 Current implementation includes initial SVGs for `create-game`, `send-message`, `change-icon`, `suggest`, `vote`, and `withdraw-vote` under `assets/ButtonIcons/`.

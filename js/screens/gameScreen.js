@@ -2,6 +2,7 @@ import { collectRefs, createNodeFromHtml, setStatus, showConfirmModal } from './
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
 import { createGameParticipantsSidebarController } from './gameParticipantsSidebar.js';
 import { setPlayerIconImage } from '../playerIcons.js';
+import { collectGameInfoIcons, setGameInfoIconNode } from '../gameStateIcons.js';
 
 export function createBaseGameScreen(deps, options) {
 	const config = options || {};
@@ -20,6 +21,11 @@ export function createBaseGameScreen(deps, options) {
 			</div>
 			<p class="top-user-label" data-ref="userLabel"></p>
 			<p data-ref="subtitle"></p>
+			<div class="row game-screen-info-icons" data-ref="gameInfoIcons">
+				<img class="game-state-icon" data-ref="typeIcon" alt="" aria-hidden="true">
+				<img class="game-state-icon" data-ref="statusIcon" alt="" aria-hidden="true">
+				<img class="game-state-icon" data-ref="phaseIcon" alt="" aria-hidden="true">
+			</div>
 			<p data-ref="modeInfo"></p>
 			<div class="chat-layout-shell${config.showParticipantsPanel ? ' chat-layout-shell-with-sidebar' : ''}" data-ref="shell">
 				<div class="chat-layout-main" data-ref="chatPanel">
@@ -49,6 +55,9 @@ export function createBaseGameScreen(deps, options) {
 	const title = refs.title;
 	const userLabel = refs.userLabel;
 	const subtitle = refs.subtitle;
+	const typeIcon = refs.typeIcon;
+	const statusIcon = refs.statusIcon;
+	const phaseIcon = refs.phaseIcon;
 	const modeInfo = refs.modeInfo;
 	const feed = refs.feed;
 	const composerRow = refs.composerRow;
@@ -75,6 +84,8 @@ export function createBaseGameScreen(deps, options) {
 	leave.style.display = 'none';
 	modeInfo.style.marginTop = '-6px';
 	modeInfo.style.opacity = '0.8';
+	refs.gameInfoIcons.style.marginTop = '-3px';
+	refs.gameInfoIcons.style.marginBottom = '2px';
 	composerRow.style.marginTop = '10px';
 	actionRow.style.marginTop = '8px';
 	typePanel.style.marginTop = '8px';
@@ -283,6 +294,16 @@ export function createBaseGameScreen(deps, options) {
 		subtitle.textContent = game
 			? 'Type: ' + game.game_type + ' | Owner: ' + game.owner_username + ' | Status: ' + game.status + ' | Phase: ' + game.phase + ' | Round: ' + game.current_round
 			: '';
+		const infoIcons = collectGameInfoIcons(game, { hideInProgressWhenPhase: true });
+		// Show the phase icon only when the game status is "in-progress"
+		const _statusKey = String(game.status || '').toLowerCase();
+		const _isInProgress = _statusKey === 'in-progress' || _statusKey === 'in_progress' || _statusKey === 'inprogress';
+		if (!_isInProgress) {
+			infoIcons.phaseIcon = null;
+		}
+		setGameInfoIconNode(typeIcon, infoIcons.typeIcon);
+		setGameInfoIconNode(statusIcon, infoIcons.statusIcon);
+		setGameInfoIconNode(phaseIcon, infoIcons.phaseIcon);
 
 		const perms = game && game.permissions ? game.permissions : {};
 		const memberRole = game && game.member_role ? game.member_role : 'none';

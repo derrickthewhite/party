@@ -83,30 +83,47 @@ function games_list(): void
 {
         $user = require_user();
 
-    $sql = <<<SQL
+        $sql = <<<'SQL'
 SELECT
-  g.id,
+    g.id,
     g.owner_user_id,
-  g.title,
-  g.game_type,
-  g.status,
-  g.created_at,
+    g.title,
+    g.game_type,
+    g.status,
+    g.created_at,
     gs.phase,
     gs.current_round,
-  u.username AS owner_username,
+    u.username AS owner_username,
     COUNT(DISTINCT gm.user_id) AS member_count,
     SUM(CASE WHEN gm.role = 'observer' THEN 1 ELSE 0 END) AS observer_count,
-    SUM(CASE WHEN gm.role <> 'observer' THEN 1 ELSE 0 END) AS player_count
+    SUM(CASE WHEN gm.role <> 'observer' THEN 1 ELSE 0 END) AS player_count,
+    gm_me.role AS my_role,
+    COALESCE(gs.updated_at, gs.started_at, gs.ended_at, g.updated_at, g.created_at) AS last_state_change,
+    CASE
+        WHEN gm_me.role IS NOT NULL AND gm_me.role <> 'observer' AND g.status = 'in_progress' THEN 1
+        WHEN gm_me.role IS NOT NULL AND gm_me.role = 'observer' AND g.status = 'in_progress' THEN 2
+        WHEN gm_me.role IS NOT NULL AND gm_me.role <> 'observer' AND g.status = 'open' THEN 3
+        WHEN gm_me.role IS NOT NULL AND gm_me.role = 'observer' AND g.status = 'open' THEN 4
+        WHEN gm_me.role IS NOT NULL AND gm_me.role <> 'observer' AND g.status = 'closed' THEN 5
+        WHEN gm_me.role IS NOT NULL AND gm_me.role = 'observer' AND g.status = 'closed' THEN 6
+        WHEN gm_me.role IS NULL AND g.status = 'open' THEN 7
+        WHEN gm_me.role IS NULL AND g.status = 'in_progress' THEN 8
+        WHEN gm_me.role IS NULL AND g.status = 'closed' THEN 9
+        ELSE 99
+    END AS category
 FROM games g
 JOIN users u ON u.id = g.owner_user_id
 LEFT JOIN game_state gs ON gs.game_id = g.id
 LEFT JOIN game_members gm ON gm.game_id = g.id
-GROUP BY g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, gs.phase, gs.current_round, u.username
-ORDER BY g.created_at DESC
+LEFT JOIN game_members gm_me ON gm_me.game_id = g.id AND gm_me.user_id = :user_id
+GROUP BY g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, gs.phase, gs.current_round, u.username, gm_me.role, COALESCE(gs.updated_at, gs.started_at, gs.ended_at, g.updated_at, g.created_at)
+ORDER BY category ASC, last_state_change DESC, LOWER(g.title) ASC
 LIMIT 100
 SQL;
 
-    $rows = db()->query($sql)->fetchAll();
+        $stmt = db()->prepare($sql);
+        $stmt->execute(['user_id' => $user['id']]);
+        $rows = $stmt->fetchAll();
 
     $gameIds = array_map(static fn (array $row): int => (int)$row['id'], $rows);
     $membersByGame = games_members_by_game($gameIds);

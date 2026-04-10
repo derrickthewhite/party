@@ -1,3 +1,5 @@
+import { CHAT_REFRESH_MS } from './config.js';
+
 export function createChatTransport(api) {
  	let timerId = null;
 
@@ -19,7 +21,7 @@ export function createChatTransport(api) {
 	function startPolling(options) {
 		stopPolling();
 
-		const intervalMs = options.intervalMs || 2500;
+        const intervalMs = options.intervalMs || CHAT_REFRESH_MS;
 
 		tick(options);
 		timerId = window.setInterval(function pollLoop() {

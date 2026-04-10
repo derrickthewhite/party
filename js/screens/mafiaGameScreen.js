@@ -2,6 +2,7 @@ import { cloneTemplateNode, collectRefs, createNodeFromHtml, createTemplate } fr
 import { createBaseGameScreen } from './gameScreen.js';
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
 import { playerIconGroupKey, playerIconGroupLabel, playerIconLabel, setPlayerIconImage } from '../playerIcons.js';
+import { MAFIA_REFRESH_MS } from '../config.js';
 
 const MAFIA_PANEL_HTML = `
 	<div class="card mafia-panel">
@@ -771,7 +772,7 @@ export function createMafiaGameScreen(deps) {
 			}
 
 			refreshMafiaState({ silent: true });
-		}, 4000);
+		}, MAFIA_REFRESH_MS);
 	}
 
 	async function submitReadyAction() {

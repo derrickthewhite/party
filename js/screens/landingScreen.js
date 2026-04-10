@@ -1,5 +1,7 @@
 import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate, setStatus, showConfirmModal } from './dom.js';
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
+import { collectGameInfoIcons, setGameInfoIconNode, getMemberBadgeIcon } from '../gameStateIcons.js';
+import { LANDING_REFRESH_MS } from '../config.js';
 
 export function createLandingScreen(deps) {
 	const api = deps.api;
@@ -62,6 +64,7 @@ export function createLandingScreen(deps) {
 	const emptyListNode = refs.emptyListNode;
 	const rowTemplate = createTemplate(`
 		<div class="game-item">
+			<img class="game-member-star" data-ref="memberStar" alt="Member" style="display:none;" aria-hidden="true">
 			<strong data-ref="name"></strong>
 			<p>
 				<span data-ref="ownerInfo"></span>
@@ -80,6 +83,11 @@ export function createLandingScreen(deps) {
 					${createGameActionButtonMarkup('join', 'join', '')}
 					${createGameActionButtonMarkup('leave', 'leave', '')}
 					${createGameActionButtonMarkup('observe', 'observe', '')}
+				</div>
+				<div class="game-info-icons game-info-icons-inline" data-ref="gameInfoIcons">
+					<img class="game-state-icon" data-ref="typeIcon" alt="" aria-hidden="true">
+					<img class="game-state-icon" data-ref="statusIcon" alt="" aria-hidden="true">
+					<img class="game-state-icon" data-ref="phaseIcon" alt="" aria-hidden="true">
 				</div>
 				<div class="row game-item-controls-right">
 					${createGameActionButtonMarkup('start', 'start', '')}
@@ -249,7 +257,7 @@ export function createLandingScreen(deps) {
 			} finally {
 				autoRefreshBusy = false;
 			}
-		}, 30000);
+		}, LANDING_REFRESH_MS);
 	}
 
 	state.subscribe(function onLandingStateChanged(current) {
@@ -440,6 +448,10 @@ export function createLandingScreen(deps) {
 				statusInfo: itemRefs.statusInfo,
 				progressSeparator: itemRefs.progressSeparator,
 				progressInfo: itemRefs.progressInfo,
+				typeIcon: itemRefs.typeIcon,
+				statusIcon: itemRefs.statusIcon,
+				phaseIcon: itemRefs.phaseIcon,
+				memberStar: itemRefs.memberStar,
 				join,
 				observe,
 				leave,
@@ -465,6 +477,22 @@ export function createLandingScreen(deps) {
 			refs.playersInfo.textContent = 'Players: ' + Number(game.player_count || 0);
 			refs.observersInfo.textContent = 'Observers: ' + Number(game.observer_count || 0);
 			refs.statusInfo.textContent = 'Status: ' + game.status;
+			const infoIcons = collectGameInfoIcons(game, { hideInProgressWhenPhase: true });
+			// Show the phase icon only when the game status is "in-progress"
+			const _statusKey = String(game.status || '').toLowerCase();
+			const _isInProgress = _statusKey === 'in-progress' || _statusKey === 'in_progress' || _statusKey === 'inprogress';
+			if (!_isInProgress) {
+				infoIcons.phaseIcon = null;
+			}
+			setGameInfoIconNode(refs.typeIcon, infoIcons.typeIcon);
+			setGameInfoIconNode(refs.statusIcon, infoIcons.statusIcon);
+			setGameInfoIconNode(refs.phaseIcon, infoIcons.phaseIcon);
+			// Member star: show if current user is a member of the game
+			if (refs.memberStar) {
+				const alreadyMember = !!game.is_member;
+				const badge = alreadyMember ? getMemberBadgeIcon() : null;
+				setGameInfoIconNode(refs.memberStar, badge);
+			}
 
 			const players = (game.members || []).filter(function eachMember(member) {
 				return String(member.role || '').toLowerCase() !== 'observer';
