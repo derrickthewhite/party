@@ -164,7 +164,7 @@ Monochrome SVG, 24x24 viewBox, filled glyph of a speech bubble with three center
 Monochrome SVG, 24x24 viewBox, filled glyph of a fedora and mask profile badge, bold silhouette that suggests hidden identity, readable at 16px.
 
 ### Game Type: Diplomacy
-Monochrome SVG, 24x24 viewBox, filled glyph of two crossed treaty banners or a handshake crest, centered mass and minimal cutouts, readable at 16px.
+Monochrome SVG, 24x24 viewBox — filled glyph of a old  parchment treaty with a wax seal in bottom right overlaid with a dagger in the center at an artistic angle; compact, high-contrast silhouette, betrayal, optimized for 16px.
 
 ### Game Type: Rumble
 Monochrome SVG, 24x24 viewBox, filled glyph of crossed swords and compact guard shapes, high-contrast silhouette, readable at 16px.
