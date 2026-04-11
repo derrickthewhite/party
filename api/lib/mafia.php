@@ -929,9 +929,10 @@ function mafia_build_final_standings(int $gameId, string $status): ?array
 
     $roleMap = mafia_role_map($gameId);
     $stmt = db()->prepare(
-        'SELECT gps.user_id, gps.final_rank, gps.eliminated_round, gps.elimination_order, gps.result_status, u.username '
+        'SELECT gps.user_id, gps.final_rank, gps.eliminated_round, gps.elimination_order, gps.result_status, u.username, gm.icon_key '
         . 'FROM game_player_standings gps '
         . 'JOIN users u ON u.id = gps.user_id '
+        . 'LEFT JOIN game_members gm ON gm.game_id = gps.game_id AND gm.user_id = gps.user_id '
         . 'WHERE gps.game_id = :game_id '
         . 'ORDER BY COALESCE(gps.final_rank, 9999) ASC, COALESCE(gps.elimination_order, 9999) ASC, u.username ASC'
     );
@@ -943,6 +944,7 @@ function mafia_build_final_standings(int $gameId, string $status): ?array
         $rows[] = [
             'user_id' => $userId,
             'username' => (string)$row['username'],
+            'icon_key' => isset($row['icon_key']) ? (string)$row['icon_key'] : null,
             'role' => mafia_role_for_user($roleMap, $userId),
             'final_rank' => isset($row['final_rank']) ? (int)$row['final_rank'] : null,
             'eliminated_round' => isset($row['eliminated_round']) ? ($row['eliminated_round'] === null ? null : (int)$row['eliminated_round']) : null,

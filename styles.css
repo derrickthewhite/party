@@ -378,6 +378,109 @@ button:disabled {
   background: color-mix(in srgb, var(--accent-2) 10%, #fff);
 }
 
+.mafia-victory-card {
+  margin: 2px 0;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1px solid rgba(185, 36, 36, 0.24);
+  background:
+    linear-gradient(145deg, rgba(185, 36, 36, 0.12), rgba(15, 18, 34, 0.04)),
+    rgba(255, 255, 255, 0.94);
+}
+
+.mafia-victory-eyebrow {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  opacity: 0.75;
+}
+
+.mafia-victory-title {
+  margin: 8px 0 4px 0;
+  font-size: 34px;
+  line-height: 1;
+}
+
+.mafia-victory-summary {
+  margin: 0 0 16px 0;
+  font-size: 15px;
+  opacity: 0.82;
+}
+
+.mafia-victory-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.mafia-victory-team {
+  border-radius: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.mafia-victory-team-town {
+  background: linear-gradient(180deg, rgba(86, 146, 255, 0.12), rgba(255, 255, 255, 0.88));
+}
+
+.mafia-victory-team-mafia {
+  background: linear-gradient(180deg, rgba(185, 36, 36, 0.12), rgba(255, 255, 255, 0.88));
+}
+
+.mafia-victory-team-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.mafia-victory-team-header h4 {
+  margin: 0;
+}
+
+.mafia-victory-team-count {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  opacity: 0.72;
+}
+
+.mafia-victory-team-list {
+  margin-top: 12px;
+}
+
+.mafia-victory-player-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 12px;
+  align-items: center;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid rgba(23, 31, 56, 0.1);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.mafia-victory-player-icon {
+  width: 42px;
+  height: 42px;
+}
+
+.mafia-victory-player-copy {
+  min-width: 0;
+}
+
+.mafia-victory-player-name {
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.mafia-victory-player-status {
+  display: block;
+  margin-top: 2px;
+  color: var(--muted);
+}
+
 .mafia-selection-row {
   justify-content: space-between;
   align-items: center;
@@ -418,6 +521,12 @@ button:disabled {
 
 .mafia-target-list {
   margin-top: 12px;
+}
+
+@media (max-width: 720px) {
+  .mafia-victory-columns {
+    grid-template-columns: minmax(0, 1fr);
+  }
 }
 
 .mafia-target-row {

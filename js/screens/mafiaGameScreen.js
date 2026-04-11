@@ -5,6 +5,7 @@ import { playerIconGroupKey, playerIconGroupLabel, playerIconLabel, setPlayerIco
 import { buttonIconUrl } from '../buttonIcons.js';
 import { ensureActionTypeIcon } from './gameActionButtons.js';
 import { MAFIA_REFRESH_MS } from '../config.js';
+import { createMafiaVictoryScreenController } from './mafiaGameScreen/victoryScreen.js';
 
 const MAFIA_PANEL_HTML = `
 	<div class="card mafia-panel">
@@ -18,6 +19,7 @@ const MAFIA_PANEL_HTML = `
 		<p class="top-user-label" data-ref="progressText"></p>
 		<p class="top-user-label" data-ref="setupNote"></p>
 		<div class="mafia-summary" data-ref="latestSummary"></div>
+		<div data-ref="victoryMount"></div>
 		<div class="mafia-ready-card" data-ref="readyCard">
 			<p data-ref="readyText"></p>
 			<div class="mafia-icon-row" data-ref="iconRow">
@@ -90,6 +92,7 @@ export function createMafiaGameScreen(deps) {
 	const progressText = refs.progressText;
 	const setupNote = refs.setupNote;
 	const latestSummary = refs.latestSummary;
+	const victoryMount = refs.victoryMount;
 	const readyCard = refs.readyCard;
 	const readyText = refs.readyText;
 	const iconRow = refs.iconRow;
@@ -138,6 +141,7 @@ export function createMafiaGameScreen(deps) {
 		latestResult: null,
 		recentResults: [],
 		winnerSummary: null,
+		finalStandings: null,
 		status: 'open',
 		iconCatalog: [],
 		setupPlayerCount: 0,
@@ -146,6 +150,8 @@ export function createMafiaGameScreen(deps) {
 
 	const targetRowsByUserId = new Map();
 	const resultRowsByKey = new Map();
+	const victoryScreenController = createMafiaVictoryScreenController({ serverSnapshot });
+	victoryMount.appendChild(victoryScreenController.root);
 
 	function targetPlayerById(userId) {
 		if (userId == null) {
@@ -630,6 +636,7 @@ export function createMafiaGameScreen(deps) {
 	function reconcileUi() {
 		const player = selfPlayer();
 		const isLobbyOpen = serverSnapshot.status === 'open';
+		const hasVictoryStandings = Array.isArray(serverSnapshot.finalStandings) && serverSnapshot.finalStandings.length > 0;
 
 		phaseTitle.textContent = isLobbyOpen ? 'Lobby' : String(serverSnapshot.phaseTitle || 'Mafia');
 		roleText.textContent = isLobbyOpen
@@ -648,7 +655,10 @@ export function createMafiaGameScreen(deps) {
 		setupNote.textContent = isLobbyOpen ? buildSetupNoteText() : '';
 		setupNote.style.display = setupNote.textContent ? '' : 'none';
 
-		if (serverSnapshot.latestResult && serverSnapshot.latestResult.summary_text) {
+		if (hasVictoryStandings) {
+			latestSummary.textContent = '';
+			latestSummary.style.display = 'none';
+		} else if (serverSnapshot.latestResult && serverSnapshot.latestResult.summary_text) {
 			latestSummary.textContent = String(serverSnapshot.latestResult.summary_text);
 			latestSummary.style.display = '';
 		} else if (serverSnapshot.winnerSummary) {
@@ -682,6 +692,7 @@ export function createMafiaGameScreen(deps) {
 		readyBtn.style.display = isLobbyOpen ? 'none' : '';
 		readyBtn.disabled = isLobbyOpen || !serverSnapshot.canSubmit || serverSnapshot.hasSubmitted || submitBusy;
 
+		victoryScreenController.reconcile();
 		reconcileTargets();
 		reconcileHistory();
 	}
@@ -708,6 +719,7 @@ export function createMafiaGameScreen(deps) {
 		serverSnapshot.latestResult = mafiaState.latest_result || null;
 		serverSnapshot.recentResults = Array.isArray(mafiaState.recent_results) ? mafiaState.recent_results.slice() : [];
 		serverSnapshot.winnerSummary = mafiaState.winner_summary || null;
+		serverSnapshot.finalStandings = Array.isArray(game && game.final_standings) ? game.final_standings.slice() : null;
 		serverSnapshot.status = String((game && game.status) || 'open');
 		serverSnapshot.iconCatalog = Array.isArray(game && game.icon_catalog) ? game.icon_catalog.slice() : [];
 		serverSnapshot.setupPlayerCount = Number(mafiaState.setup_player_count || 0);
