@@ -2,6 +2,8 @@ import { cloneTemplateNode, collectRefs, createNodeFromHtml, createTemplate } fr
 import { createBaseGameScreen } from './gameScreen.js';
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
 import { playerIconGroupKey, playerIconGroupLabel, playerIconLabel, setPlayerIconImage } from '../playerIcons.js';
+import { buttonIconUrl } from '../buttonIcons.js';
+import { ensureActionTypeIcon } from './gameActionButtons.js';
 import { MAFIA_REFRESH_MS } from '../config.js';
 
 const MAFIA_PANEL_HTML = `
@@ -53,10 +55,12 @@ const TARGET_ROW_TEMPLATE_HTML = `
 		<div class="mafia-target-identity">
 			<img class="player-icon mafia-target-icon" data-ref="icon" alt="">
 			<div class="mafia-target-copy">
-				<div class="mafia-target-name" data-ref="name"></div>
+				<div class="mafia-target-main">
+					<div class="mafia-target-name" data-ref="name"></div>
+					<small class="mafia-target-meta" data-ref="meta"></small>
+				</div>
 				<div class="mafia-target-state" data-ref="suggestions"></div>
 				<div class="mafia-target-votes" data-ref="votes"></div>
-				<small class="mafia-target-meta" data-ref="meta"></small>
 			</div>
 		</div>
 		<div class="mafia-target-actions" data-ref="actions">
@@ -526,22 +530,35 @@ export function createMafiaGameScreen(deps) {
 				bits.push(player.known_role === 'mafia' ? 'Mafia' : 'Town');
 			}
 
-			const suggestionSummaryText = buildIncomingActionText('Suggested by ', player && player.incoming_suggestion_usernames);
-			const voteSummaryText = buildIncomingActionText('Voted by ', player && player.incoming_vote_usernames);
 			const isSelfSuggested = viewerSuggestionTargetUserId === userId;
 			const isSelfVoted = viewerVoteTargetUserId === userId;
 			const isPendingSuggestion = pendingAction && pendingAction.kind === 'suggest' && pendingAction.targetUserId === userId;
 			const isPendingVote = pendingAction && pendingAction.kind === 'vote' && pendingAction.targetUserId === userId;
-			const canSuggest = canSendLiveAction(serverSnapshot.suggestionActionType, player) && !isSelfSuggested && !isPendingVote;
-			const canVote = canSendLiveAction(serverSnapshot.voteActionType, player) && !isSelfVoted && !isPendingSuggestion;
+			// Allow suggestions while a vote exists; allow voting even if a suggestion exists.
+			const canSuggest = canSendLiveAction(serverSnapshot.suggestionActionType, player) && !isSelfSuggested;
+			const canVote = canSendLiveAction(serverSnapshot.voteActionType, player) && !isSelfVoted;
 
 			setPlayerIconImage(rowRefs.icon, player && player.icon_key ? player.icon_key : null, player && player.username ? player.username : 'Player');
 			rowRefs.name.textContent = String(player.username || 'Unknown');
 			// Render icon avatars for suggesters/voters when available; fall back to text
-			renderIncomingIcons(rowRefs.suggestions, player && (player.incoming_suggestion_user_ids || player.incoming_suggestion_usernames || []));
-			rowRefs.suggestions.title = suggestionSummaryText;
-			renderIncomingIcons(rowRefs.votes, player && (player.incoming_vote_user_ids || player.incoming_vote_usernames || []));
-			rowRefs.votes.title = voteSummaryText;
+			const suggestionItems = player && (player.incoming_suggestion_user_ids || player.incoming_suggestion_usernames || []) || [];
+			renderIncomingIcons(rowRefs.suggestions, suggestionItems);
+			if (Array.isArray(suggestionItems) && suggestionItems.length > 0) {
+				try { ensureActionTypeIcon(rowRefs.suggestions, 'suggest', 'Suggestions'); } catch (e) { /* ignore */ }
+			} else {
+				// remove any leftover icon if present
+				const old = rowRefs.suggestions.querySelector('.mafia-action-type-icon');
+				if (old && old.remove) old.remove();
+			}
+
+			const voteItems = player && (player.incoming_vote_user_ids || player.incoming_vote_usernames || []) || [];
+			renderIncomingIcons(rowRefs.votes, voteItems);
+			if (Array.isArray(voteItems) && voteItems.length > 0) {
+				try { ensureActionTypeIcon(rowRefs.votes, 'vote', 'Votes'); } catch (e) { /* ignore */ }
+			} else {
+				const old2 = rowRefs.votes.querySelector('.mafia-action-type-icon');
+				if (old2 && old2.remove) old2.remove();
+			}
 			rowRefs.meta.textContent = bits.join(' | ');
 			rowRefs.actions.style.display = player.is_self ? 'none' : '';
 			rowRefs.row.classList.toggle('is-suggested', viewerDisplaySuggestionTargetUserId === userId);
@@ -815,6 +832,17 @@ export function createMafiaGameScreen(deps) {
 			await deps.api.sendAction(lastGameId, actionType, {
 				target_user_id: Number(targetUserId),
 			});
+			// If the action was a vote, attempt to clear any existing suggestion for this player.
+			if (kind === 'vote' && serverSnapshot.suggestionActionType) {
+				try {
+					await deps.api.sendAction(lastGameId, serverSnapshot.suggestionActionType, {
+						//target_user_id: Number(targetUserId),
+						clear: true,
+					});
+				} catch (e) {
+					// ignore clear error; we'll re-fetch below
+				}
+			}
 			await fetchAndApplyGameDetail();
 			setStatusNode(kind === 'suggest' ? 'Suggestion updated.' : 'Vote updated.', 'ok');
 		} catch (err) {
@@ -838,9 +866,10 @@ export function createMafiaGameScreen(deps) {
 		};
 		reconcileUi();
 		try {
-			await deps.api.sendAction(lastGameId, serverSnapshot.voteActionType, {
-				clear: true,
-			});
+				await deps.api.sendAction(lastGameId, serverSnapshot.voteActionType, {
+					//target_user_id: Number(serverSnapshot.currentVoteTargetUserId || 0),
+					clear: true,
+				});
 			await fetchAndApplyGameDetail();
 			setStatusNode('Vote withdrawn.', 'ok');
 		} catch (err) {

@@ -20,3 +20,28 @@ export function setGameActionButtonLabel(button, label) {
 	button.title = label;
 	button.setAttribute('aria-label', label);
 }
+
+// Ensure an icon for a given action exists inside a container.
+// Inserts or updates an <img> with class `mafia-action-type-icon` and sets title/aria.
+export function ensureActionTypeIcon(container, actionName, titleText) {
+	if (!container || typeof actionName !== 'string') return;
+	try {
+		const iconUrl = buttonIconUrl && buttonIconUrl(actionName);
+		if (!iconUrl) return;
+		// Do not force container display here; caller controls visibility.
+		let img = container.querySelector('.mafia-action-type-icon');
+		if (!img) {
+			img = document.createElement('img');
+			img.className = 'mafia-action-type-icon';
+			img.setAttribute('alt', '');
+			container.insertBefore(img, container.firstChild);
+		}
+		img.src = iconUrl;
+		if (typeof titleText === 'string' && titleText) {
+			img.title = titleText;
+			img.setAttribute('aria-label', titleText);
+		}
+	} catch (e) {
+		// silent
+	}
+}

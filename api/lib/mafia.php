@@ -339,7 +339,9 @@ function mafia_validate_action_create(int $gameId, int $userId, string $actionTy
         }
 
         $isVoteAction = $actionType === mafia_vote_action_type_for_phase($phase);
+        $isSuggestionAction = $actionType === mafia_suggestion_action_type_for_phase($phase);
         $isClearingVote = $isVoteAction && !empty($payload['clear']);
+        $isClearingSuggestion = $isSuggestionAction && !empty($payload['clear']);
 
         $stage = 'action.validate_target';
         $stage = 'action.check_duplicate';
@@ -348,6 +350,17 @@ function mafia_validate_action_create(int $gameId, int $userId, string $actionTy
         if ($isClearingVote) {
             if (!mafia_action_has_target($latestAction)) {
                 error_response('You do not have a vote to withdraw.', 409, [
+                    'phase' => $phase,
+                    'round_number' => $roundNumber,
+                ]);
+            }
+
+            return;
+        }
+
+        if ($isClearingSuggestion) {
+            if (!mafia_action_has_target($latestAction)) {
+                error_response('You do not have a suggestion to withdraw.', 409, [
                     'phase' => $phase,
                     'round_number' => $roundNumber,
                 ]);

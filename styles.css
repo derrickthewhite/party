@@ -429,6 +429,8 @@ button:disabled {
   border-radius: 10px;
   padding: 10px 12px;
   background: #fff;
+  --mafia-target-icon-size: 52px;
+  --mafia-target-secondary-icon-size: calc(var(--mafia-target-icon-size) * 0.8);
 }
 
 .mafia-target-identity {
@@ -439,8 +441,8 @@ button:disabled {
 }
 
 .mafia-target-icon {
-  width: 42px;
-  height: 42px;
+  width: var(--mafia-target-icon-size);
+  height: var(--mafia-target-icon-size);
 }
 
 .mafia-target-row.is-suggested {
@@ -459,6 +461,13 @@ button:disabled {
   align-items: center;
   gap: 8px;
   min-width: 0;
+}
+
+.mafia-target-main {
+  display: inline-flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 4px;
 }
 
 .mafia-target-name {
@@ -491,31 +500,34 @@ button:disabled {
 }
 
 .mafia-target-meta {
-  display: inline-block;
-  margin-top: 0;
+  display: block;
+  margin-top: 4px;
   color: var(--muted);
 }
 
-.mafia-target-state::before,
-.mafia-target-votes::before {
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.04em;
-  text-transform: uppercase;
+/* Small icon that denotes the action type (suggest / vote) shown in the box */
+.mafia-action-type-icon {
+  width: var(--mafia-target-secondary-icon-size);
+  height: var(--mafia-target-secondary-icon-size);
+  display: inline-block;
+  flex: 0 0 auto;
+  margin-right: 6px;
+  object-fit: contain;
 }
 
-.mafia-target-state::before {
-  content: 'Suggestions';
+/* Suggest button vivid color override (bright but not red) */
+.game-action-button[data-action-icon="suggest"] {
+  background: #ffb703;
+  border-color: #e49b00;
 }
-
-.mafia-target-votes::before {
-  content: 'Votes';
+.game-action-button[data-action-icon="suggest"] .game-action-button-icon {
+  filter: none;
 }
 
 .mafia-target-meta-icon {
-  width: 24px;
-  height: 24px;
-  border-radius: 7px;
+  width: var(--mafia-target-secondary-icon-size);
+  height: var(--mafia-target-secondary-icon-size);
+  border-radius: 10px;
 }
 
 .mafia-target-actions {
