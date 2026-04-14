@@ -1,7 +1,7 @@
 import { cloneTemplateNode, collectRefs, createNodeFromHtml, createTemplate } from './dom.js';
 import { createBaseGameScreen } from './gameScreen.js';
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
-import { playerIconGroupKey, playerIconGroupLabel, playerIconLabel, setPlayerIconImage } from '../playerIcons.js';
+import { playerIconGroupKey, playerIconGroupLabel, playerIconLabel, setPlayerIconImage, normalizePlayerIconKey, isPlayerIconAnimal, isPlayerIconHuman } from '../playerIcons.js';
 import { buttonIconUrl } from '../buttonIcons.js';
 import { ensureActionTypeIcon } from './gameActionButtons.js';
 import { collectGameInfoIcons, setGameInfoIconNode } from '../gameStateIcons.js';
