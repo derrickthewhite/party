@@ -49,6 +49,7 @@ function createApiModule() {
 		setGameIcon: (gameId, iconKey) => request('/games/' + encodeURIComponent(gameId) + '/icon', 'POST', {
 			icon_key: iconKey,
 		}),
+		setGameSettings: (gameId, settings) => request('/games/' + encodeURIComponent(gameId) + '/settings', 'POST', settings),
 		startGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/start', 'POST'),
 		endGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/end', 'POST'),
 		deleteGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/delete', 'POST'),

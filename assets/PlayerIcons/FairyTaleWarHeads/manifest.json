@@ -1,149 +1,24 @@
 [
-  {
-    "id": "g4943-4-6",
-    "name": "HeadbandWarrior",
-    "file": "HeadbandWarrior.svg",
-    "paintedPixels": 2521
-  },
-  {
-    "id": "g116677",
-    "name": "CrownedKing",
-    "file": "CrownedKing.svg",
-    "paintedPixels": 2263
-  },
-  {
-    "id": "g77318",
-    "name": "GreatHelm",
-    "file": "GreatHelm.svg",
-    "paintedPixels": 2014
-  },
-  {
-    "id": "g77301",
-    "file": "FairyHead04_g77301.svg",
-    "paintedPixels": 1283
-  },
-  {
-    "id": "g77301-0",
-    "name": "SunPriestess",
-    "file": "SunPriestess.svg",
-    "paintedPixels": 1645
-  },
-  {
-    "id": "g77249",
-    "name": "WhiteHairedNoble",
-    "file": "WhiteHairedNoble.svg",
-    "paintedPixels": 2387
-  },
-  {
-    "id": "g77271",
-    "file": "FairyHead07_g77271.svg",
-    "paintedPixels": 1803
-  },
-  {
-    "id": "g120616",
-    "name": "HeadbandPage",
-    "file": "HeadbandPage.svg",
-    "paintedPixels": 2659
-  },
-  {
-    "id": "g134078",
-    "name": "YoungKing",
-    "file": "YoungKing.svg",
-    "paintedPixels": 2179
-  },
-  {
-    "id": "g134063",
-    "name": "MustachedKing",
-    "file": "MustachedKing.svg",
-    "paintedPixels": 2243
-  },
-  {
-    "id": "g134093",
-    "name": "SternKing",
-    "file": "SternKing.svg",
-    "paintedPixels": 2227
-  },
-  {
-    "id": "g134529",
-    "name": "BeardedKing",
-    "file": "BeardedKing.svg",
-    "paintedPixels": 2007
-  },
-  {
-    "id": "g126440",
-    "name": "StripedCapPage",
-    "file": "StripedCapPage.svg",
-    "paintedPixels": 2381
-  },
-  {
-    "id": "g117503",
-    "name": "GreenDragon",
-    "file": "GreenDragon.svg",
-    "paintedPixels": 1297
-  },
-  {
-    "id": "g117691",
-    "name": "BarredHelm",
-    "file": "BarredHelm.svg",
-    "paintedPixels": 2270
-  },
-  {
-    "id": "g118679",
-    "name": "TVisorHelm",
-    "file": "TVisorHelm.svg",
-    "paintedPixels": 2634
-  },
-  {
-    "id": "g118675",
-    "name": "TuskOgre",
-    "file": "TuskOgre.svg",
-    "paintedPixels": 2603
-  },
-  {
-    "id": "g118928",
-    "name": "GreyHoodWoman",
-    "file": "GreyHoodWoman.svg",
-    "paintedPixels": 2243
-  },
-  {
-    "id": "g119803",
-    "name": "Witch",
-    "file": "Witch.svg",
-    "paintedPixels": 1392
-  },
-  {
-    "id": "g125432",
-    "name": "BoarHead",
-    "file": "BoarHead.svg",
-    "paintedPixels": 2040
-  },
-  {
-    "id": "g131726",
-    "name": "NasalHelm",
-    "file": "NasalHelm.svg",
-    "paintedPixels": 2085
-  },
-  {
-    "id": "g134545",
-    "file": "FairyHead22_g134545.svg",
-    "paintedPixels": 1474
-  },
-  {
-    "id": "g133427",
-    "name": "ClosedKnightHelm",
-    "file": "ClosedKnightHelm.svg",
-    "paintedPixels": 1752
-  },
-  {
-    "id": "g133632",
-    "name": "MailCapWarrior",
-    "file": "MailCapWarrior.svg",
-    "paintedPixels": 1800
-  },
-  {
-    "id": "g7125",
-    "name": "BlackCat",
-    "file": "BlackCat.svg",
-    "paintedPixels": 2391
-  }
+  { "file": "BarredHelm.svg" },
+  { "file": "BeardedKing.svg" },
+  { "file": "BlackCat.svg" },
+  { "file": "BoarHead.svg" },
+  { "file": "ClosedKnightHelm.svg" },
+  { "file": "CrownedKing.svg" },
+  { "file": "GreatHelm.svg" },
+  { "file": "GreenDragon.svg" },
+  { "file": "GreyHoodWoman.svg" },
+  { "file": "HeadbandPage.svg" },
+  { "file": "HeadbandWarrior.svg" },
+  { "file": "MailCapWarrior.svg" },
+  { "file": "MustachedKing.svg" },
+  { "file": "NasalHelm.svg" },
+  { "file": "SternKing.svg" },
+  { "file": "StripedCapPage.svg" },
+  { "file": "SunPriestess.svg" },
+  { "file": "TuskOgre.svg" },
+  { "file": "TVisorHelm.svg" },
+  { "file": "WhiteHairedNoble.svg" },
+  { "file": "Witch.svg" },
+  { "file": "YoungKing.svg" }
 ]

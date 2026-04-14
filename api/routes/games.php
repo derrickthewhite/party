@@ -69,6 +69,13 @@ function handle_games_route(string $method, array $segments): void
         games_set_icon((int)$segments[1]);
     }
 
+    if (count($segments) === 3 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'settings') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+        games_update_settings((int)$segments[1]);
+    }
+
     if (count($segments) === 2 && $segments[0] === 'games' && ctype_digit($segments[1])) {
         if ($method !== 'GET') {
             error_response('Method not allowed.', 405);
@@ -523,6 +530,55 @@ function games_set_icon(int $gameId): void
     ]);
 }
 
+function games_update_settings(int $gameId): void
+{
+    $user = require_user();
+
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+
+    $isOwner = (int)$game['owner_user_id'] === (int)$user['id'];
+    $isAdmin = (int)($user['is_admin'] ?? 0) === 1;
+    if (!$isOwner && !$isAdmin) {
+        error_response('Only the game owner or an admin can change game settings.', 403);
+    }
+
+    if ((string)$game['status'] !== 'open') {
+        error_response('Game settings can only be changed while the game is open.', 409);
+    }
+
+    $body = json_input();
+    $mode = isset($body['mafia_setup_mode']) ? trim((string)$body['mafia_setup_mode']) : 'auto';
+    $countRaw = $body['mafia_setup_mafia_count'] ?? null;
+
+    if ($mode !== 'auto' && $mode !== 'custom') {
+        error_response('Invalid mafia_setup_mode.', 422);
+    }
+
+    $count = null;
+    if ($mode === 'custom') {
+        if (!is_int($countRaw) && !ctype_digit((string)$countRaw)) {
+            error_response('A valid mafia_setup_mafia_count is required for custom mode.', 422);
+        }
+        $count = (int)$countRaw;
+        if ($count < 1) {
+            error_response('mafia_setup_mafia_count must be at least 1.', 422);
+        }
+    }
+
+    $stmt = db()->prepare('UPDATE games SET mafia_setup_mode = :mode, mafia_setup_mafia_count = :count WHERE id = :id');
+    $stmt->execute([
+        'mode' => $mode,
+        'count' => $count,
+        'id' => $gameId,
+    ]);
+
+    // Return the refreshed full game detail so the client can update UI.
+    games_detail($gameId);
+}
+
 function games_detail(int $gameId): void
 {
     $user = require_user();
@@ -531,7 +587,7 @@ function games_detail(int $gameId): void
     try {
         $stmt = db()->prepare(
             'SELECT g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, u.username AS owner_username, '
-            . 'gs.phase, gs.current_round '
+            . 'gs.phase, gs.current_round, g.mafia_setup_mode, g.mafia_setup_mafia_count '
             . 'FROM games g '
             . 'JOIN users u ON u.id = g.owner_user_id '
             . 'LEFT JOIN game_state gs ON gs.game_id = g.id '
@@ -553,7 +609,7 @@ function games_detail(int $gameId): void
         $stage = 'games_detail.refresh_game';
         $refreshStmt = db()->prepare(
             'SELECT g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, u.username AS owner_username, '
-            . 'gs.phase, gs.current_round '
+            . 'gs.phase, gs.current_round, g.mafia_setup_mode, g.mafia_setup_mafia_count '
             . 'FROM games g '
             . 'JOIN users u ON u.id = g.owner_user_id '
             . 'LEFT JOIN game_state gs ON gs.game_id = g.id '

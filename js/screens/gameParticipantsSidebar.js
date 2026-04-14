@@ -21,9 +21,11 @@ const MEMBER_ROW_TEMPLATE_HTML = `
 	<div class="participant-sidebar-item">
 		<div class="participant-sidebar-identity">
 			<img class="player-icon participant-sidebar-icon" data-ref="icon" alt="">
-			<div data-ref="name"></div>
+			<div class="participant-sidebar-name-meta">
+				<div data-ref="name"></div>
+				<small data-ref="meta"></small>
+			</div>
 		</div>
-		<small data-ref="meta"></small>
 	</div>
 `;
 

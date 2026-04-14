@@ -137,7 +137,17 @@ function mafia_assign_roles_if_missing(int $gameId): void
         return strcmp($a['score'], $b['score']);
     });
 
+    // Prefer persisted custom mafia count when configured on the game record.
     $mafiaCount = mafia_preview_mafia_count(count($memberIds));
+    $cfgStmt = db()->prepare('SELECT mafia_setup_mode, mafia_setup_mafia_count FROM games WHERE id = :id LIMIT 1');
+    $cfgStmt->execute(['id' => $gameId]);
+    $cfgRow = $cfgStmt->fetch();
+    if ($cfgRow && isset($cfgRow['mafia_setup_mode']) && (string)$cfgRow['mafia_setup_mode'] === 'custom') {
+        $cfgCount = $cfgRow['mafia_setup_mafia_count'] !== null ? (int)$cfgRow['mafia_setup_mafia_count'] : null;
+        if ($cfgCount !== null && $cfgCount >= 0) {
+            $mafiaCount = max(0, $cfgCount);
+        }
+    }
     $selected = array_slice($scored, 0, $mafiaCount);
 
     $insertStmt = db()->prepare(db_insert_ignore_sql(
@@ -215,7 +225,14 @@ function mafia_game_build_detail_payload(int $gameId, array $game, array $user):
 
         $stage = 'detail.players';
         $setupPlayerCount = count(mafia_role_assignment_member_ids($gameId));
+        // If the game record has a persisted custom mafia count prefer it.
         $setupMafiaCount = mafia_preview_mafia_count($setupPlayerCount);
+        if (isset($game['mafia_setup_mode']) && (string)$game['mafia_setup_mode'] === 'custom') {
+            $cfgCount = isset($game['mafia_setup_mafia_count']) ? $game['mafia_setup_mafia_count'] : null;
+            if ($cfgCount !== null && $cfgCount !== '') {
+                $setupMafiaCount = max(0, (int)$cfgCount);
+            }
+        }
         $voteActionType = mafia_vote_action_type_for_phase($phase);
         $suggestionActionType = mafia_suggestion_action_type_for_phase($phase);
         $progressActionType = mafia_progress_action_type_for_phase($phase);
@@ -245,6 +262,23 @@ function mafia_game_build_detail_payload(int $gameId, array $game, array $user):
         $submittedCount = $phase === 'start'
             ? mafia_submitted_count_for_required_voters($latestProgressActions, $requiredVoterIds)
             : mafia_active_vote_count_for_required_voters($latestProgressActions, $requiredVoterIds);
+        // Build a list of submitted usernames for client tooltips and UI hints.
+        $usernameByUserId = [];
+        foreach ($players as $p) {
+            if (isset($p['user_id']) && isset($p['username'])) {
+                $usernameByUserId[(int)$p['user_id']] = (string)$p['username'];
+            }
+        }
+        $submittedUsernames = [];
+        foreach ($requiredVoterIds as $uid) {
+            if (mafia_progress_action_is_complete_for_user($phase, (int)$uid, $latestProgressActions)) {
+                $name = isset($usernameByUserId[(int)$uid]) ? $usernameByUserId[(int)$uid] : '';
+                if ($name !== '') {
+                    $submittedUsernames[] = $name;
+                }
+            }
+        }
+        sort($submittedUsernames, SORT_NATURAL | SORT_FLAG_CASE);
         $currentVote = isset($latestVotes[$viewerUserId]) ? $latestVotes[$viewerUserId] : null;
         $currentSuggestion = isset($latestSuggestions[$viewerUserId]) ? $latestSuggestions[$viewerUserId] : null;
         $currentDisplaySuggestionTargetUserId = mafia_displayed_suggestion_target_user_id($currentSuggestion, $currentVote);
@@ -277,8 +311,11 @@ function mafia_game_build_detail_payload(int $gameId, array $game, array $user):
                 'current_vote_target_user_id' => isset($currentVote['target_user_id']) ? $currentVote['target_user_id'] : null,
                 'submitted_count' => $submittedCount,
                 'required_count' => count($requiredVoterIds),
+                'submitted_usernames' => $submittedUsernames,
                 'setup_player_count' => $setupPlayerCount,
                 'setup_mafia_count' => $setupMafiaCount,
+                'mafia_setup_mode' => isset($game['mafia_setup_mode']) ? (string)$game['mafia_setup_mode'] : 'auto',
+                'mafia_setup_mafia_count' => isset($game['mafia_setup_mafia_count']) ? ($game['mafia_setup_mafia_count'] !== null ? (int)$game['mafia_setup_mafia_count'] : null) : null,
                 'players' => $players,
                 'latest_result' => $latestResult,
                 'recent_results' => $recentResults,

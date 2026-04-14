@@ -31,6 +31,8 @@ CREATE TABLE IF NOT EXISTS `games` (
   `title` VARCHAR(100) NOT NULL,
   `game_type` VARCHAR(60) NOT NULL DEFAULT 'chat',
   `status` ENUM('open', 'in_progress', 'closed') NOT NULL DEFAULT 'open',
+  `mafia_setup_mode` ENUM('auto','custom') NOT NULL DEFAULT 'auto',
+  `mafia_setup_mafia_count` INT NULL DEFAULT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

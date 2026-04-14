@@ -373,6 +373,29 @@ button:disabled {
   padding: 12px;
 }
 
+/* Inline radio + label helper for mafia setup control */
+.mafia-setup-control {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.mafia-setup-control .radio-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 8px;
+}
+.mafia-setup-control input[type="radio"] {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  padding: 0;
+}
+.mafia-setup-control input[type="number"] {
+  width: 80px;
+}
+
 .mafia-summary {
   color: var(--ink);
   background: color-mix(in srgb, var(--accent-2) 10%, #fff);
@@ -479,6 +502,14 @@ button:disabled {
   display: block;
   margin-top: 2px;
   color: var(--muted);
+}
+
+.mafia-player-icon {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+  display: block;
+  margin-top: -8px;
 }
 
 .mafia-selection-row {
@@ -715,6 +746,14 @@ button:disabled {
   border-right: 1px solid var(--line);
 }
 
+.mafia-game-state-icon {
+  width: 64px;
+  height: 64px;
+  display: inline-block;
+  object-fit: contain;
+  flex: 0 0 auto;
+}
+
 .game-state-icon {
   width: 48px;
   height: 48px;
@@ -868,7 +907,7 @@ button:disabled {
 }
 
 .participant-sidebar-item {
-  padding: 10px 12px;
+  padding: 2px 12px;
   border: 1px solid var(--line);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.72);
