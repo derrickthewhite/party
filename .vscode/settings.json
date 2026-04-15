@@ -1,0 +1,7 @@
+{
+    "php.validate.executablePath": "${workspaceFolder}\\runtime\\php\\windows\\php.exe",
+    "terminal.integrated.env.windows": {
+        "PARTY_PHP_BIN": "${workspaceFolder}\\runtime\\php\\windows\\php.exe",
+        "PATH": "${workspaceFolder}\\runtime\\php\\windows;${env:PATH}"
+    }
+}
