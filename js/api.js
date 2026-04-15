@@ -79,10 +79,10 @@ function createApiModule() {
 			user_id: userId,
 			ability_ids: Array.isArray(abilityIds) ? abilityIds : [],
 		}),
-		setRumbleHealth: (gameId, userId, health) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-admin-set-health', 'POST', {
+		setRumbleHealth: (gameId, userId, health, startingHealth = null) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-admin-set-health', 'POST', Object.assign({
 			user_id: userId,
 			health: health,
-		}),
+		}, startingHealth !== null ? { starting_health: startingHealth } : {})),
 		endRumbleBidding: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/rumble-bids/end', 'POST'),
 		endRumbleTurn: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/actions/reveal', 'POST'),
 	};

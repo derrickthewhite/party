@@ -21,9 +21,11 @@ const ADMIN_CHEAT_PANEL_HTML = `
 			</div>
 			<div class="row mobile-stack" style="align-items: center; margin: 0 0 8px 0; gap: 8px;">
 				<label for="rumble-admin-cheat-health" style="min-width: 100px;">Set health</label>
-				<input id="rumble-admin-cheat-health" data-ref="adminCheatHealthInput" type="number" min="0" step="1" inputmode="numeric" style="width: 140px;">
+				<input id="rumble-admin-cheat-health" data-ref="adminCheatHealthInput" type="number" min="0" step="1" inputmode="numeric" style="width: 100px;">
+				<label for="rumble-admin-cheat-starting" style="min-width: 120px; margin-left: 4px;">Starting health</label>
+				<input id="rumble-admin-cheat-starting" data-ref="adminCheatStartingInput" type="number" min="0" step="1" inputmode="numeric" style="width: 100px;">
 				<button data-ref="adminCheatSetHealthBtn">Set Health</button>
-				<small data-ref="adminCheatHealthHint" style="opacity: 0.8;">Any non-negative integer.</small>
+				<small data-ref="adminCheatHealthHint" style="opacity: 0.8;">Enter current and optional starting health.</small>
 			</div>
 			<div class="row mobile-stack" style="align-items: center; margin: 0 0 8px 0; gap: 8px;">
 				<button data-ref="adminCheatGrantBtn">Grant Selected</button>
@@ -63,7 +65,9 @@ export function createAdminCheatController(context) {
 
 	function syncHealthDraftFromTarget(targetPlayer) {
 		context.localDraft.adminCheatHealthValue = targetPlayer ? String(Math.max(0, Number(targetPlayer.health || 0))) : '';
+		context.localDraft.adminCheatStartingValue = targetPlayer && typeof targetPlayer.starting_health !== 'undefined' ? String(Math.max(0, Number(targetPlayer.starting_health || 0))) : '';
 		context.localDraft.adminCheatHealthDirty = false;
+		context.localDraft.adminCheatStartingDirty = false;
 	}
 
 	function clearDraft() {
@@ -116,6 +120,12 @@ export function createAdminCheatController(context) {
 	refs.adminCheatHealthInput.addEventListener('input', function onAdminCheatHealthInput() {
 		context.localDraft.adminCheatHealthValue = String(refs.adminCheatHealthInput.value || '').trim();
 		context.localDraft.adminCheatHealthDirty = true;
+		context.reconcileUi();
+	});
+
+	refs.adminCheatStartingInput.addEventListener('input', function onAdminCheatStartingInput() {
+		context.localDraft.adminCheatStartingValue = String(refs.adminCheatStartingInput.value || '').trim();
+		context.localDraft.adminCheatStartingDirty = true;
 		context.reconcileUi();
 	});
 
@@ -234,6 +244,17 @@ export function createAdminCheatController(context) {
 
 		const targetPlayer = context.getCheatTargetPlayer();
 		const parsedHealth = context.getParsedCheatHealth();
+		context.getParsedCheatStartingHealth = function getParsedCheatStartingHealth() {
+			const raw = context.localDraft.adminCheatStartingValue;
+			if (raw === null || typeof raw === 'undefined' || String(raw).trim() === '') {
+				return null;
+			}
+			if (!/^-?\d+$/.test(String(raw).trim())) {
+				return null;
+			}
+			return Math.max(0, parseInt(String(raw).trim(), 10));
+		};
+		const parsedStarting = context.getParsedCheatStartingHealth();
 		if (!targetPlayer) {
 			context.setStatusNode('Choose a target player first.', 'error');
 			return;
@@ -243,12 +264,15 @@ export function createAdminCheatController(context) {
 			return;
 		}
 
-		const confirmed = await showConfirmModal({
-			title: 'Confirm Health Change',
-			message: 'Set ' + getTargetLabel(targetPlayer) + ' to ' + parsedHealth + ' health?',
-			cancelLabel: 'Cancel',
-			confirmLabel: 'Set Health',
-		});
+			const confirmMessage = parsedStarting === null
+				? ('Set ' + getTargetLabel(targetPlayer) + ' to ' + parsedHealth + ' health?')
+				: ('Set ' + getTargetLabel(targetPlayer) + ' to ' + parsedHealth + ' current health and ' + parsedStarting + ' starting health?');
+			const confirmed = await showConfirmModal({
+				title: 'Confirm Health Change',
+				message: confirmMessage,
+				cancelLabel: 'Cancel',
+				confirmLabel: 'Set Health',
+			});
 		if (!confirmed) {
 			return;
 		}
@@ -256,11 +280,14 @@ export function createAdminCheatController(context) {
 		context.setAdminCheatBusy(true);
 		context.reconcileUi();
 		try {
-			const result = await context.api.setRumbleHealth(context.getLastGameId(), targetPlayer.user_id, parsedHealth);
+			const result = await context.api.setRumbleHealth(context.getLastGameId(), targetPlayer.user_id, parsedHealth, parsedStarting);
 			context.localDraft.adminCheatHealthValue = String(result.health);
+			if (typeof result.starting_health !== 'undefined') {
+				context.localDraft.adminCheatStartingValue = String(result.starting_health);
+			}
 			context.localDraft.adminCheatHealthDirty = false;
 			await context.refreshRumbleState({ silent: true });
-			context.setStatusNode('Set ' + String(result.target_username || targetPlayer.username || targetPlayer.ship_name || ('User ' + targetPlayer.user_id)) + ' to ' + result.health + ' health.', 'ok');
+			context.setStatusNode('Set ' + String(result.target_username || targetPlayer.username || targetPlayer.ship_name || ('User ' + targetPlayer.user_id)) + ' to ' + result.health + ' health.' + (typeof result.starting_health !== 'undefined' ? (' Starting: ' + result.starting_health) : ''), 'ok');
 		} catch (err) {
 			context.setStatusNode(err.message || 'Unable to set health.', 'error');
 		} finally {
@@ -318,6 +345,13 @@ export function createAdminCheatController(context) {
 			const nextHealthValue = String(Math.max(0, Number(selectedTarget.health || 0)));
 			if (context.localDraft.adminCheatHealthValue !== nextHealthValue) {
 				context.localDraft.adminCheatHealthValue = nextHealthValue;
+			}
+		}
+
+		if (selectedTarget && !context.localDraft.adminCheatStartingDirty) {
+			const nextStartingValue = String(Math.max(0, Number(selectedTarget.starting_health || 0)));
+			if (context.localDraft.adminCheatStartingValue !== nextStartingValue) {
+				context.localDraft.adminCheatStartingValue = nextStartingValue;
 			}
 		}
 
@@ -383,6 +417,12 @@ export function createAdminCheatController(context) {
 		refs.adminCheatHealthHint.textContent = selectedTarget
 			? ('Current: ' + Math.max(0, Number(selectedTarget.health || 0)))
 			: 'Any non-negative integer.';
+
+		refs.adminCheatStartingInput.value = String(context.localDraft.adminCheatStartingValue || '');
+		refs.adminCheatStartingInput.disabled = context.isAdminCheatBusy() || !selectedTarget;
+		refs.adminCheatHealthHint.textContent = selectedTarget
+			? ('Current: ' + Math.max(0, Number(selectedTarget.health || 0)) + (typeof selectedTarget.starting_health !== 'undefined' ? (' — Starting: ' + Math.max(0, Number(selectedTarget.starting_health || 0))) : ''))
+			: 'Enter optional starting health.';
 		refs.adminCheatSelectionHint.textContent = selectedAbilityIds.length > 0
 			? (selectedAbilityIds.length + ' selected ability ' + (selectedAbilityIds.length === 1 ? 'type' : 'types'))
 			: 'Selected abilities are applied to the chosen player.';

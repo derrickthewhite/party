@@ -932,11 +932,12 @@ function rumble_admin_grant_abilities(int $gameId, int $actorUserId, int $target
     $db->beginTransaction();
     try {
         $upsertStmt = $db->prepare(db_upsert_sql(
-            'INSERT INTO rumble_player_state (game_id, user_id, current_health, owned_abilities_json) '
-            . 'VALUES (:game_id, :user_id, 100, :owned_abilities_json)',
+            'INSERT INTO rumble_player_state (game_id, user_id, current_health, starting_health, owned_abilities_json) '
+            . 'VALUES (:game_id, :user_id, 100, 100, :owned_abilities_json)',
             ['game_id', 'user_id'],
             [
                 'owned_abilities_json' => db_insert_value_sql('owned_abilities_json'),
+                'starting_health' => 'starting_health',
             ]
         ));
         $upsertStmt->execute([
@@ -1030,11 +1031,12 @@ function rumble_admin_revoke_abilities(int $gameId, int $actorUserId, int $targe
     $db->beginTransaction();
     try {
         $upsertStmt = $db->prepare(db_upsert_sql(
-            'INSERT INTO rumble_player_state (game_id, user_id, current_health, owned_abilities_json) '
-            . 'VALUES (:game_id, :user_id, 100, :owned_abilities_json)',
+            'INSERT INTO rumble_player_state (game_id, user_id, current_health, starting_health, owned_abilities_json) '
+            . 'VALUES (:game_id, :user_id, 100, 100, :owned_abilities_json)',
             ['game_id', 'user_id'],
             [
                 'owned_abilities_json' => db_insert_value_sql('owned_abilities_json'),
+                'starting_health' => 'starting_health',
             ]
         ));
         $upsertStmt->execute([
@@ -1068,7 +1070,7 @@ function rumble_admin_revoke_abilities(int $gameId, int $actorUserId, int $targe
     ];
 }
 
-function rumble_admin_set_health(int $gameId, int $actorUserId, int $targetUserId, int $health): array
+function rumble_admin_set_health(int $gameId, int $actorUserId, int $targetUserId, int $health, ?int $startingHealth = null): array
 {
     $db = db();
 
@@ -1100,17 +1102,19 @@ function rumble_admin_set_health(int $gameId, int $actorUserId, int $targetUserI
     $db->beginTransaction();
     try {
         $upsertStmt = $db->prepare(db_upsert_sql(
-            'INSERT INTO rumble_player_state (game_id, user_id, current_health) '
-            . 'VALUES (:game_id, :user_id, :current_health)',
+            'INSERT INTO rumble_player_state (game_id, user_id, current_health, starting_health) '
+            . 'VALUES (:game_id, :user_id, :current_health, :starting_health)',
             ['game_id', 'user_id'],
             [
                 'current_health' => db_insert_value_sql('current_health'),
+                'starting_health' => db_insert_value_sql('starting_health'),
             ]
         ));
         $upsertStmt->execute([
             'game_id' => $gameId,
             'user_id' => $targetUserId,
             'current_health' => $health,
+            'starting_health' => $startingHealth !== null ? $startingHealth : $health,
         ]);
 
         rumble_admin_log_action($gameId, $actorUserId, 'admin_set_health', [
@@ -1128,10 +1132,12 @@ function rumble_admin_set_health(int $gameId, int $actorUserId, int $targetUserI
         throw $err;
     }
 
+    $startingUsed = $startingHealth !== null ? $startingHealth : $health;
     return [
         'target_user_id' => $targetUserId,
         'target_username' => (string)$member['username'],
         'health' => $health,
+        'starting_health' => $startingUsed,
     ];
 }
 
@@ -1569,10 +1575,11 @@ function rumble_round_effect_human_text(array $effectRow, array $nameByUser = []
 function rumble_game_on_join(int $gameId, int $userId): void
 {
     $stateStmt = db()->prepare(db_upsert_sql(
-        'INSERT INTO rumble_player_state (game_id, user_id, current_health) VALUES (:game_id, :user_id, 100)',
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health, starting_health) VALUES (:game_id, :user_id, 100, 100)',
         ['game_id', 'user_id'],
         [
             'current_health' => 'current_health',
+            'starting_health' => 'starting_health',
         ]
     ));
     $stateStmt->execute([
@@ -1968,7 +1975,7 @@ function rumble_game_build_detail_payload(int $gameId, array $game, array $user)
     $submittedCount = (int)$submittedStmt->fetchColumn();
 
     $playersStmt = db()->prepare(
-        'SELECT gm.user_id, u.username, COALESCE(rps.current_health, 100) AS current_health, gm.role, rps.ship_name, rps.owned_abilities_json '
+        'SELECT gm.user_id, u.username, COALESCE(rps.current_health, 100) AS current_health, COALESCE(rps.starting_health, 100) AS starting_health, gm.role, rps.ship_name, rps.owned_abilities_json '
         . 'FROM game_members gm '
         . 'JOIN users u ON u.id = gm.user_id '
         . 'LEFT JOIN rumble_player_state rps ON rps.game_id = gm.game_id AND rps.user_id = gm.user_id '
@@ -1989,6 +1996,7 @@ function rumble_game_build_detail_payload(int $gameId, array $game, array $user)
         $playerRows[] = [
             'user_id' => (int)$row['user_id'],
             'current_health' => max(0, (int)$row['current_health']),
+            'starting_health' => max(0, (int)($row['starting_health'] ?? 100)),
             'owned_ability_ids' => $ownedAbilityIds,
         ];
 
@@ -1999,6 +2007,7 @@ function rumble_game_build_detail_payload(int $gameId, array $game, array $user)
                 ? trim((string)$row['ship_name'])
                 : (string)$row['username'],
             'health' => max(0, (int)$row['current_health']),
+            'starting_health' => max(0, (int)($row['starting_health'] ?? 100)),
             'is_self' => (int)$row['user_id'] === (int)$user['id'],
             'is_defeated' => (int)$row['current_health'] <= 0,
             'member_role' => (string)$row['role'],
@@ -2224,13 +2233,14 @@ function rumble_game_build_detail_payload(int $gameId, array $game, array $user)
 function rumble_initialize_player_state(int $gameId): void
 {
     $stmt = db()->prepare(db_upsert_sql(
-        'INSERT INTO rumble_player_state (game_id, user_id, current_health, owned_abilities_json) '
-        . 'SELECT gm.game_id, gm.user_id, 100, :owned_abilities_json FROM game_members gm '
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health, starting_health, owned_abilities_json) '
+        . 'SELECT gm.game_id, gm.user_id, 100, 100, :owned_abilities_json FROM game_members gm '
         . 'JOIN users u ON u.id = gm.user_id '
         . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1',
         ['game_id', 'user_id'],
         [
             'current_health' => 'current_health',
+            'starting_health' => 'starting_health',
         ]
     ));
     $stmt->execute([
@@ -2355,10 +2365,11 @@ function rumble_action_upsert_order(int $gameId): void
     }
 
     $ensureStmt = db()->prepare(db_upsert_sql(
-        'INSERT INTO rumble_player_state (game_id, user_id, current_health) VALUES (:game_id, :user_id, 100)',
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health, starting_health) VALUES (:game_id, :user_id, 100, 100)',
         ['game_id', 'user_id'],
         [
             'current_health' => 'current_health',
+            'starting_health' => 'starting_health',
         ]
     ));
     $ensureStmt->execute([
@@ -2598,10 +2609,11 @@ function rumble_action_upsert_bids(int $gameId): void
     }
 
     $ensureStmt = db()->prepare(db_upsert_sql(
-        'INSERT INTO rumble_player_state (game_id, user_id, current_health) VALUES (:game_id, :user_id, 100)',
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health, starting_health) VALUES (:game_id, :user_id, 100, 100)',
         ['game_id', 'user_id'],
         [
             'current_health' => 'current_health',
+            'starting_health' => 'starting_health',
         ]
     ));
     $ensureStmt->execute([
@@ -2738,11 +2750,12 @@ function rumble_action_upsert_ship_name(int $gameId): void
     $saveValue = $shipName === '' ? null : $shipName;
 
     $stmt = db()->prepare(db_upsert_sql(
-        'INSERT INTO rumble_player_state (game_id, user_id, current_health, ship_name, owned_abilities_json) '
-        . 'VALUES (:game_id, :user_id, 100, :ship_name, :owned_abilities_json)',
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health, starting_health, ship_name, owned_abilities_json) '
+        . 'VALUES (:game_id, :user_id, 100, 100, :ship_name, :owned_abilities_json)',
         ['game_id', 'user_id'],
         [
             'ship_name' => ':ship_name_update',
+            'starting_health' => 'starting_health',
         ]
     ));
     $stmt->execute([
@@ -2929,13 +2942,14 @@ function rumble_action_resolve_bidding_and_enter_battle(int $gameId, int $roundN
     $pdo = db();
 
     $ensureStmt = $pdo->prepare(db_upsert_sql(
-        'INSERT INTO rumble_player_state (game_id, user_id, current_health) '
-        . 'SELECT gm.game_id, gm.user_id, 100 FROM game_members gm '
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health, starting_health) '
+        . 'SELECT gm.game_id, gm.user_id, 100, 100 FROM game_members gm '
         . 'JOIN users u ON u.id = gm.user_id '
         . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1',
         ['game_id', 'user_id'],
         [
             'current_health' => 'current_health',
+            'starting_health' => 'starting_health',
         ]
     ));
     $ensureStmt->execute([
@@ -3202,13 +3216,14 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
     $pdo = db();
 
     $ensureStmt = $pdo->prepare(db_upsert_sql(
-        'INSERT INTO rumble_player_state (game_id, user_id, current_health) '
-        . 'SELECT gm.game_id, gm.user_id, 100 FROM game_members gm '
+        'INSERT INTO rumble_player_state (game_id, user_id, current_health, starting_health) '
+        . 'SELECT gm.game_id, gm.user_id, 100, 100 FROM game_members gm '
         . 'JOIN users u ON u.id = gm.user_id '
         . 'WHERE gm.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1',
         ['game_id', 'user_id'],
         [
             'current_health' => 'current_health',
+            'starting_health' => 'starting_health',
         ]
     ));
     $ensureStmt->execute([
@@ -3217,7 +3232,7 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
     ]);
 
     $playersStmt = $pdo->prepare(
-        'SELECT rps.user_id, rps.current_health, rps.owned_abilities_json FROM rumble_player_state rps '
+        'SELECT rps.user_id, rps.current_health, rps.starting_health, rps.owned_abilities_json FROM rumble_player_state rps '
         . 'JOIN game_members gm ON gm.game_id = rps.game_id AND gm.user_id = rps.user_id '
         . 'JOIN users u ON u.id = gm.user_id '
         . 'WHERE rps.game_id = :game_id AND gm.role <> :observer_role AND u.is_active = 1'
@@ -3255,50 +3270,91 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
         $ownedAbilityIds = rumble_parse_owned_abilities(isset($row['owned_abilities_json']) ? (string)$row['owned_abilities_json'] : null);
         $abilitySet = array_fill_keys($ownedAbilityIds, true);
 
-        if (isset($abilitySet['automated_repair_systems'])) {
-            $health = min(100, $health + 5);
-            $preRoundEffectRows[] = [
-                'game_id' => $gameId,
-                'round_number' => $roundNumber,
-                'owner_user_id' => $userId,
-                'target_user_id' => null,
-                'ability_instance_id' => null,
-                'effect_key' => 'step2:passive_round_start_heal',
-                'trigger_timing' => 'resolve',
-                'payload' => ['source_ability_id' => 'automated_repair_systems', 'amount' => 5],
-                'is_resolved' => 1,
-                'resolved_at' => gmdate('Y-m-d H:i:s'),
-            ];
-        }
-        if (isset($abilitySet['replicators'])) {
-            $health += 5;
-            $preRoundEffectRows[] = [
-                'game_id' => $gameId,
-                'round_number' => $roundNumber,
-                'owner_user_id' => $userId,
-                'target_user_id' => null,
-                'ability_instance_id' => null,
-                'effect_key' => 'step2:passive_round_start_heal',
-                'trigger_timing' => 'resolve',
-                'payload' => ['source_ability_id' => 'replicators', 'amount' => 5],
-                'is_resolved' => 1,
-                'resolved_at' => gmdate('Y-m-d H:i:s'),
-            ];
-        }
-        if (isset($abilitySet['mcguffin_generator']) && $roundNumber === 3) {
-            $health += 50;
-            $preRoundEffectRows[] = [
-                'game_id' => $gameId,
-                'round_number' => $roundNumber,
-                'owner_user_id' => $userId,
-                'target_user_id' => null,
-                'ability_instance_id' => null,
-                'effect_key' => 'step2:passive_round_start_heal',
-                'trigger_timing' => 'resolve',
-                'payload' => ['source_ability_id' => 'mcguffin_generator', 'amount' => 50],
-                'is_resolved' => 1,
-                'resolved_at' => gmdate('Y-m-d H:i:s'),
-            ];
+        // Apply passive round-start healing for each unique owned ability using DB-driven params/contracts.
+        foreach (array_keys($abilitySet) as $ownedAbilityId) {
+            $ability = rumble_ability_by_id($ownedAbilityId);
+            if ($ability === null) {
+                continue;
+            }
+
+            $params = rumble_ability_template_params($ability);
+            $configuredHeal = null;
+            $capToStarting = null;
+
+            // Preferred: explicit template param for heal amount and cap.
+            if (array_key_exists('heal_amount', $params)) {
+                $configuredHeal = max(0, (int)$params['heal_amount']);
+                $capToStarting = array_key_exists('cap_to_starting', $params) ? (bool)$params['cap_to_starting'] : null;
+            }
+
+            // Fallback: inspect runtime contract conditions for round-start heal outcomes.
+            if ($configuredHeal === null) {
+                $contract = rumble_ability_runtime_contract($ability);
+                foreach ((array)($contract['conditions'] ?? []) as $condition) {
+                    if ((string)($condition['evaluation_timing'] ?? '') !== 'round_start') {
+                        continue;
+                    }
+                    $roundRule = is_array($condition['round_rule'] ?? null) ? (array)$condition['round_rule'] : [];
+                    $matchesRound = true;
+                    if ((string)($roundRule['kind'] ?? '') === 'exact_round') {
+                        $matchesRound = ((int)($roundRule['round_number'] ?? 0) === $roundNumber);
+                    }
+                    if (!$matchesRound) {
+                        continue;
+                    }
+                    foreach ((array)($condition['outcomes'] ?? []) as $outcome) {
+                        if (!is_array($outcome)) {
+                            continue;
+                        }
+                        if ((string)($outcome['kind'] ?? '') === 'heal_constant') {
+                            $formula = is_array($outcome['formula'] ?? null) ? (array)$outcome['formula'] : [];
+                            $value = max(0, (int)($formula['value'] ?? 0));
+                            if ($value > 0) {
+                                $configuredHeal = $value;
+                                // conditions usually imply no cap unless templated params specify one
+                                $capToStarting = $capToStarting ?? false;
+                                break 2;
+                            }
+                        }
+                    }
+                }
+            }
+
+            if ($configuredHeal === null || $configuredHeal <= 0) {
+                continue;
+            }
+
+            $applied = 0;
+            if ($capToStarting === null) {
+                // default behavior: cap passive healing to starting health only when explicitly requested
+                $capToStarting = false;
+            }
+
+            if ($capToStarting) {
+                $startingHealth = max(0, (int)($row['starting_health'] ?? 100));
+                if ($health < $startingHealth) {
+                    $applied = min($configuredHeal, $startingHealth - $health);
+                    $health += $applied;
+                }
+            } else {
+                $applied = $configuredHeal;
+                $health += $applied;
+            }
+
+            if ($applied > 0) {
+                $preRoundEffectRows[] = [
+                    'game_id' => $gameId,
+                    'round_number' => $roundNumber,
+                    'owner_user_id' => $userId,
+                    'target_user_id' => null,
+                    'ability_instance_id' => null,
+                    'effect_key' => 'step2:passive_round_start_heal',
+                    'trigger_timing' => 'resolve',
+                    'payload' => ['source_ability_id' => $ownedAbilityId, 'amount' => $applied],
+                    'is_resolved' => 1,
+                    'resolved_at' => gmdate('Y-m-d H:i:s'),
+                ];
+            }
         }
 
         $healthByUser[$userId] = $health;
@@ -3319,7 +3375,15 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
                 rumble_apply_runtime_state_to_targeting_maps($state, $userId, null, $untargetableByUser, $cannotAttackByUser, $blockedAttackTargetsByUser);
             }
         }
-        $armorReductionByUser[$userId] = isset($abilitySet['heavy_armor']) ? 10 : (isset($abilitySet['armor']) ? 5 : 0);
+        $armorReduction = 0;
+        foreach ($ownedAbilityIds as $ownedAbilityId) {
+            $ownedAbility = rumble_ability_by_id($ownedAbilityId);
+            if ($ownedAbility === null) {
+                continue;
+            }
+            $armorReduction += (int)floor(rumble_ability_modifier_sum($ownedAbility, 'incoming_attack_damage', 'reduce_each_instance', 'incoming_attack'));
+        }
+        $armorReductionByUser[$userId] = max(0, (int)$armorReduction);
         $nimbleDodgeByUser[$userId] = false;
         $focusedDefenseByUser[$userId] = [];
         $reflectiveShieldByUser[$userId] = isset($abilitySet['reflective_shield']);

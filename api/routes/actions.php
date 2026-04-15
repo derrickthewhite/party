@@ -448,14 +448,34 @@ function rumble_admin_set_health_route(int $gameId): void
         error_response('Health must be a non-negative integer.', 422);
     }
 
-    $result = rumble_admin_set_health($gameId, (int)$user['id'], (int)$targetRaw, (int)$healthRaw);
+    $startingRaw = array_key_exists('starting_health', $body) ? $body['starting_health'] : null;
+    if ($startingRaw !== null && !is_int($startingRaw) && !ctype_digit((string)$startingRaw)) {
+        error_response('starting_health must be a non-negative integer when provided.', 422);
+    }
 
-    success_response([
-        'updated' => true,
-        'target_user_id' => $result['target_user_id'],
-        'target_username' => $result['target_username'],
-        'health' => $result['health'],
-    ]);
+    try {
+        $startingHealth = $startingRaw !== null ? (int)$startingRaw : null;
+        $result = rumble_admin_set_health($gameId, (int)$user['id'], (int)$targetRaw, (int)$healthRaw, $startingHealth);
+
+        $resp = [
+            'updated' => true,
+            'target_user_id' => $result['target_user_id'],
+            'target_username' => $result['target_username'],
+            'health' => $result['health'],
+        ];
+        if (array_key_exists('starting_health', $result)) {
+            $resp['starting_health'] = $result['starting_health'];
+        }
+        success_response($resp);
+    } catch (Throwable $ex) {
+        error_response('Admin set health failed at rumble_admin_set_health: ' . $ex->getMessage(), 500, [
+            'exception_class' => get_class($ex),
+            'exception_message' => $ex->getMessage(),
+            'exception_file' => $ex->getFile(),
+            'exception_line' => $ex->getLine(),
+            'trace' => explode("\n", $ex->getTraceAsString()),
+        ]);
+    }
 }
 
 function rumble_upsert_order(int $gameId): void

@@ -159,6 +159,7 @@ CREATE TABLE IF NOT EXISTS `rumble_player_state` (
   `game_id` BIGINT UNSIGNED NOT NULL,
   `user_id` BIGINT UNSIGNED NOT NULL,
   `current_health` INT UNSIGNED NOT NULL DEFAULT 100,
+  `starting_health` INT UNSIGNED NOT NULL DEFAULT 100,
   `ship_name` VARCHAR(60) NULL,
   `owned_abilities_json` JSON NULL,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -693,8 +694,8 @@ VALUES
       ))
     ))
   ), 1),
-  ('automated_repair_systems', 'Automated Repair Systems', 'round_start_effect', 'round_start_effect', JSON_ARRAY('healing', 'passive'), 'Passive. Gain 5 Health each round, up to your starting maximum Health.', JSON_OBJECT(), 1),
-  ('replicators', 'Replicators', 'round_start_effect', 'round_start_effect', JSON_ARRAY('healing', 'passive'), 'Passive. Gain 5 Health each round.', JSON_OBJECT(), 1),
+  ('automated_repair_systems', 'Automated Repair Systems', 'round_start_effect', 'round_start_effect', JSON_ARRAY('healing', 'passive'), 'Passive. Gain 5 Health each round, up to your starting maximum Health.', JSON_OBJECT('heal_amount', 5, 'cap_to_starting', true), 1),
+  ('replicators', 'Replicators', 'round_start_effect', 'round_start_effect', JSON_ARRAY('healing', 'passive'), 'Passive. Gain 5 Health each round.', JSON_OBJECT('heal_amount', 5, 'cap_to_starting', false), 1),
   ('mining_rig', 'Mining Rig', 'activated_utility', 'activated_spend_with_target_policy', JSON_ARRAY('healing', 'resource_conversion'), 'Spend 3X Energy. Gain X Health.', JSON_OBJECT(
     'target_policy', 'none',
     'cost_mode', 'variable',
