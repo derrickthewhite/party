@@ -16,7 +16,7 @@ Tested
 Backup Generator
 triggered
 Triggered. If reduced to 0 Health, lose this ability and set Health to 30.
-Not tested yet.
+Tested.
 
 Cloaking Field
 activated
@@ -26,12 +26,12 @@ Not tested yet.
 Courier Mission
 condition
 Win condition. If you are alive at end of round 10, you win.
-Not tested yet.
+Tested.
 
 Death Ray
 passive
 Passive. If you make exactly one attack this round, increase that attack by 50%.
-Not tested yet.
+Tested.
 
 Efficient Targeting
 activated

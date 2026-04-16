@@ -24,19 +24,18 @@ Notes:
 - Local host mode disables the API HTTPS requirement for the spawned PHP process by setting `PARTY_AUTH_ENFORCE_HTTPS=0`.
 - Repo-local writable paths are `data/party.sqlite` and `data/sessions/`.
 
-### Local E2E tests
+### Local backend API tests
 
-The repo includes a Playwright end-to-end harness for the live local server.
+The repo includes a Jest-based API integration harness for the live local server.
 
 1. Install Node.js and npm if they are not already available.
 2. Run `npm install`.
-3. Run `npm run e2e:install` once to install the Playwright Chromium browser.
-4. Run `npm run e2e`.
+3. Run `npm run test:api`.
 
 Notes:
-- The E2E suite starts and stops the local Node + PHP host automatically.
-- Test runs use a disposable SQLite database and session directory under `.tmp/e2e/`.
-- For interactive debugging, use `npm run e2e:headed` or `npm run e2e:debug`.
+- The API suite starts and stops the local Node + PHP host automatically.
+- Test runs use a disposable SQLite database and session directory under `.tmp/api-tests/`.
+- Tests hit the PHP API directly without launching browser sessions.
 
 ## API Overview
 

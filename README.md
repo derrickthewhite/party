@@ -22,7 +22,18 @@ Highlights:
 2. For local run, place a portable PHP at `runtime/php/windows/php.exe` or set `PARTY_PHP_BIN`.
 3. Run `npm start` and open `http://127.0.0.1:8080`.
 
-For full local host setup, Playwright E2E, deployment, and DB credential workflows, see `TECHNICAL.md`.
+## Backend API Tests
+
+Run `npm run test:api` to execute direct backend integration tests against the real local PHP API without launching a browser.
+
+The API test harness:
+
+- boots the normal local server stack from `server/index.js`
+- creates a disposable SQLite database under `.tmp/api-tests/current`
+- isolates PHP session files under `.tmp/api-tests/current/sessions`
+- exercises the HTTP API directly for auth and core game flows
+
+For full local host setup, backend API testing, deployment, and DB credential workflows, see `TECHNICAL.md`.
 
 ## Routing and Auth UX
 

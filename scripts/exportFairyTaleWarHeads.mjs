@@ -1,7 +1,7 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { chromium } from '@playwright/test';
+import puppeteer from 'puppeteer';
 
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const workspaceRoot = path.resolve(scriptDir, '..');
@@ -142,9 +142,11 @@ function renderReviewHtml(candidates) {
 `;
 }
 
-const browser = await chromium.launch();
-const sourcePage = await browser.newPage({ viewport: { width: 1800, height: 1400 }, deviceScaleFactor: 2 });
-const validationPage = await browser.newPage({ viewport: { width: 64, height: 64 }, deviceScaleFactor: 1 });
+const browser = await puppeteer.launch({ headless: true });
+const sourcePage = await browser.newPage();
+await sourcePage.setViewport({ width: 1800, height: 1400, deviceScaleFactor: 2 });
+const validationPage = await browser.newPage();
+await validationPage.setViewport({ width: 64, height: 64, deviceScaleFactor: 1 });
 
 await fs.mkdir(reviewDir, { recursive: true });
 await fs.mkdir(outputDir, { recursive: true });
