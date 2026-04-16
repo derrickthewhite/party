@@ -70,6 +70,55 @@ export function getAttackTotal(effectiveAttacks) {
 	return Math.max(0, total);
 }
 
+export function getAttackEnergySpent(effectiveAttacks, selfOwnedAbilities, activationMap) {
+	const totalAttack = getAttackTotal(effectiveAttacks);
+	if (totalAttack <= 0) {
+		return 0;
+	}
+
+	const positiveAttackSpends = [];
+	const source = effectiveAttacks && typeof effectiveAttacks === 'object' ? effectiveAttacks : {};
+	Object.keys(source).forEach(function eachAttack(targetId) {
+		const amount = Math.max(0, Math.floor(Number(source[targetId] || 0)));
+		if (amount > 0) {
+			positiveAttackSpends.push(amount);
+		}
+	});
+	if (positiveAttackSpends.length < 2) {
+		return totalAttack;
+	}
+
+	const abilities = Array.isArray(selfOwnedAbilities) ? selfOwnedAbilities : [];
+	const activations = activationMap && typeof activationMap === 'object' ? activationMap : {};
+	const secondLargestAttackIsFree = abilities.some(function eachAbility(ability) {
+		if (!isActivatedAbility(ability)) {
+			return false;
+		}
+
+		const params = ability && typeof ability.template_params === 'object' && ability.template_params
+			? ability.template_params
+			: {};
+		const effectFormula = params && typeof params.effect_formula === 'object' && params.effect_formula
+			? params.effect_formula
+			: {};
+		if (String(effectFormula.kind || '') !== 'second_largest_attack_free') {
+			return false;
+		}
+
+		const draftKey = getOwnedAbilityDraftKey(ability);
+		const activation = activations[draftKey] || { is_enabled: false };
+		return activation.is_enabled !== false;
+	});
+	if (!secondLargestAttackIsFree) {
+		return totalAttack;
+	}
+
+	positiveAttackSpends.sort(function sortDescending(a, b) {
+		return b - a;
+	});
+	return Math.max(0, totalAttack - positiveAttackSpends[1]);
+}
+
 export function getBidTotal(effectiveBids) {
 	let total = 0;
 	const source = effectiveBids && typeof effectiveBids === 'object' ? effectiveBids : {};
@@ -239,7 +288,7 @@ export function getOrderValidation(options) {
 		activationMap: effectiveActivations,
 		selfOwnedAbilities,
 	});
-	const attackEnergySpent = Math.max(0, getAttackTotal(effectiveAttacks));
+	const attackEnergySpent = Math.max(0, getAttackEnergySpent(effectiveAttacks, selfOwnedAbilities, effectiveActivations));
 	const abilityEnergySpent = Math.max(0, Number(activationSummary.ability_energy_spent || 0));
 	const totalEnergySpent = attackEnergySpent + abilityEnergySpent;
 	const ownedAbilityIds = selfOwnedAbilities.map(function eachAbility(ability) {

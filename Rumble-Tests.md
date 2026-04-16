@@ -16,12 +16,12 @@ Tested
 Backup Generator
 triggered
 Triggered. If reduced to 0 Health, lose this ability and set Health to 30.
-Tested.
+API coverage: verified by dedicated backend integration tests on 2026-04-16, including stacked double-restore behavior.
 
 Cloaking Field
 activated
 Spend 20 Energy and Burn 5. You cannot be attacked next round.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16, including burn, blocked attacks, and expiry.
 
 Courier Mission
 condition
@@ -31,32 +31,32 @@ Tested.
 Death Ray
 passive
 Passive. If you make exactly one attack this round, increase that attack by 50%.
-Tested.
+API coverage: verified by dedicated backend integration tests on 2026-04-16 for both single-attack amplification and multi-attack non-amplification.
 
 Efficient Targeting
 activated
 Spend 10 Energy. Your second-largest attack this round costs 0 Energy.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16 for valid discounted multi-target splits and invalid over-budget splits.
 
 Energy Absorption
 passive
 Spend 10 Energy. At the start of next round, gain Energy equal to half the damage your Defense blocked this round.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16 for zero blocked damage, defense-blocked damage, and armor-adjusted blocking.
 
 Escape Pods
 triggered
 Triggered. If reduced to 0 Health, lose this ability and set Health to 20.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Focused Defense
 activated
 Choose one opponent. Halve attacks from that opponent this round.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Hailing Frequencies
 activated
 Choose one opponent. Next round, neither of you may attack the other. Not valid if only two players remain.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16, including two-player invalidation.
 
 Heavy Armor
 passive
@@ -66,67 +66,67 @@ Tested
 Heavy Guns
 passive
 Passive. Each of your attacks deals +10 damage.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Heavy Meson Beam
 activated
 Spend 20 Energy. Deal 10 unblockable damage to one opponent.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Holoship
 passive
 Passive. You cannot be targeted by attacks. At end of round, lose 5 Health.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Hyperdrive
 activated
 Burn 5 to enter or leave Hyperspace. In Hyperspace, you cannot attack or be attacked.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16, including activation, persistence, and toggle-off.
 
 Ion Beam
 activated
 Spend 10 Energy. Deal 20 defense-only damage to one opponent.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Loitering Munitions
 activated
 Spend X Energy. At the start of next round, deal X damage to one opponent.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 McGuffin Generator
 condition
 Triggered. At the start of round 3, gain 50 Health.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Meson Beam
 activated
 Spend 10 Energy. Deal 5 unblockable damage to one opponent.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Mine Layer
 activated
 Spend X Energy. This round, each player who attacks you takes floor(X/2) damage.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Mining Rig
 activated
 Spend 3X Energy. Gain X Health.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Nimble Dodge
 activated
 Spend 10 Energy. Negate the largest attack against you this round. Not valid if only two players remain.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16, including two-player invalidation.
 
 Phase Bomb
 activated
 Spend X Energy. Deal floor(X/2) damage to all other opponents.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Reflective Shield
 triggered
 Passive. Whenever you take attack damage, the attacker takes half that damage.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Replicators
 passive
@@ -136,24 +136,24 @@ Tested.
 Scheming
 activated
 Burn 10. Choose one opponent. If that opponent attacks you this round, you ignore their largest attack and they take that much damage.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Shield Boosters
 passive
 Passive. Gain +20 Defense at the start of each round.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Shield Capacitors
 activated
 Spend 10 Energy. Gain +20 Defense this round.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Torpedo Bays
 activated
 Spend X Energy. Next round, add X bonus damage to one attack.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.
 
 Turbo Generator
 passive
 Passive. Your per-round Energy is Health + 10.
-Not tested yet.
+API coverage: verified by dedicated backend integration tests on 2026-04-16.

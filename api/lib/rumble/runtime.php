@@ -124,6 +124,35 @@ function rumble_ability_state_grants(array $ability, string $timing = 'always'):
 	return $states;
 }
 
+function rumble_ability_limits(array $ability): array
+{
+	$contract = rumble_ability_runtime_contract($ability);
+	$limits = [];
+	foreach ((array)($contract['limits'] ?? []) as $limit) {
+		if (is_array($limit)) {
+			$limits[] = $limit;
+		}
+	}
+	return $limits;
+}
+
+function rumble_validate_ability_activation_limits(array $ability, array $context): ?string
+{
+	foreach (rumble_ability_limits($ability) as $limit) {
+		$kind = trim((string)($limit['kind'] ?? ''));
+		if ($kind === 'min_alive_players') {
+			$minimum = max(0, (int)($limit['value'] ?? 0));
+			$alivePlayers = max(0, (int)($context['alive_player_count'] ?? 0));
+			if ($alivePlayers < $minimum) {
+				$message = trim((string)($limit['message'] ?? ''));
+				return $message !== '' ? $message : 'This ability is not valid in the current game state.';
+			}
+		}
+	}
+
+	return null;
+}
+
 function rumble_ability_modifier_sum(array $ability, string $stat, string $operation, string $timing): float
 {
 	$contract = rumble_ability_runtime_contract($ability);
@@ -147,6 +176,47 @@ function rumble_ability_modifier_sum(array $ability, string $stat, string $opera
 		}
 	}
 	return $total;
+}
+
+function rumble_ability_trigger_rules(array $ability, string $event): array
+{
+	$contract = rumble_ability_runtime_contract($ability);
+	$rules = [];
+	foreach ((array)($contract['triggers'] ?? []) as $rule) {
+		if (!is_array($rule)) {
+			continue;
+		}
+		if ((string)($rule['event'] ?? '') !== $event) {
+			continue;
+		}
+		$rules[] = $rule;
+	}
+	return $rules;
+}
+
+function rumble_ability_on_defeat_restore_rule(array $ability): ?array
+{
+	foreach (rumble_ability_trigger_rules($ability, 'on_defeat') as $rule) {
+		foreach ((array)($rule['effects'] ?? []) as $effect) {
+			if (!is_array($effect) || (string)($effect['kind'] ?? '') !== 'restore_health') {
+				continue;
+			}
+			$formula = is_array($effect['formula'] ?? null) ? (array)$effect['formula'] : [];
+			$value = rumble_runtime_formula_value($formula, []);
+			if ($value === null) {
+				continue;
+			}
+
+			$consumption = is_array($rule['consumption'] ?? null) ? (array)$rule['consumption'] : [];
+			return [
+				'restored_health' => max(0, (int)floor($value)),
+				'priority' => (int)($rule['priority'] ?? 0),
+				'remove_from_owned' => !empty($consumption['remove_from_owned']),
+			];
+		}
+	}
+
+	return null;
 }
 
 function rumble_runtime_state_from_payload(array $payload, int $ownerUserId, ?int $targetUserId = null): ?array
@@ -230,7 +300,7 @@ function rumble_apply_runtime_state_to_battle_context(array $state, int $ownerUs
 	rumble_apply_runtime_state_to_targeting_maps($state, $ownerUserId, $targetUserId, $untargetableByUser, $cannotAttackByUser, $blockedAttackTargetsByUser);
 }
 
-function rumble_apply_runtime_activation_effect(array $effect, int $ownerUserId, ?int $targetUserId, array $activation, array &$untargetableByUser, array &$cannotAttackByUser, array &$blockedAttackTargetsByUser, array &$nimbleDodgeByUser, array &$focusedDefenseByUser, array &$activatedDefenseBonusByUser, array &$mineLayerDamageByUser, array &$schemingTargetByUser, array &$effectPayload): void
+function rumble_apply_runtime_activation_effect(array $effect, int $ownerUserId, ?int $targetUserId, string $abilityId, array $activation, array &$untargetableByUser, array &$cannotAttackByUser, array &$blockedAttackTargetsByUser, array &$nimbleDodgeByUser, array &$focusedDefenseByUser, array &$activatedDefenseBonusByUser, array &$mineLayerDamageByUser, array &$schemingTargetByUser, array &$blockedDamageEnergyBonusRulesByUser, array &$effectPayload): void
 {
 	$kind = trim((string)($effect['kind'] ?? ''));
 	if ($kind === 'grant_state' && isset($effect['state']) && is_array($effect['state'])) {
@@ -276,6 +346,18 @@ function rumble_apply_runtime_activation_effect(array $effect, int $ownerUserId,
 			$focusedDefenseByUser[$ownerUserId][$targetUserId] = (float)$value;
 			$effectPayload['incoming_attack_multiplier'] = (float)$value;
 			$effectPayload['focused_attacker_user_id'] = $targetUserId;
+		}
+	}
+
+	if ($kind === 'set_blocked_damage_energy_bonus') {
+		$formula = is_array($effect['formula'] ?? null) ? (array)$effect['formula'] : [];
+		$value = rumble_runtime_formula_value($formula, $activation);
+		if ($value !== null && $value > 0) {
+			$blockedDamageEnergyBonusRulesByUser[$ownerUserId][] = [
+				'multiplier' => (float)$value,
+				'source_ability_id' => $abilityId,
+			];
+			$effectPayload['blocked_damage_energy_multiplier'] = (float)$value;
 		}
 	}
 }

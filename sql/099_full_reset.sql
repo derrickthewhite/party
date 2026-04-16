@@ -310,13 +310,13 @@ VALUES
     'target_policy', 'single_opponent',
     'cost_mode', 'fixed',
     'cost_formula', JSON_OBJECT('kind', 'constant', 'value', 10),
-    'effect_formula', NULL
+    'effect_formula', JSON_OBJECT('kind', 'damage_constant', 'value', 20, 'channel', 'defense_only')
   ), 1),
   ('loitering_munitions', 'Loitering Munitions', 'activated_attack', 'activated_spend_with_target_policy', JSON_ARRAY('attack', 'single_target', 'delayed'), 'Spend X Energy. At the start of next round, deal X damage to one opponent.', JSON_OBJECT(
     'target_policy', 'single_opponent',
     'cost_mode', 'variable',
     'cost_formula', JSON_OBJECT('kind', 'variable_x'),
-    'effect_formula', NULL
+    'effect_formula', JSON_OBJECT('kind', 'next_round_damage_x')
   ), 1),
   ('torpedo_bays', 'Torpedo Bays', 'activated_attack_modifier', 'activated_spend_with_target_policy', JSON_ARRAY('attack', 'delayed', 'modifier'), 'Spend X Energy. Next round, add X bonus damage to one attack.', JSON_OBJECT(
     'target_policy', 'none',
@@ -353,7 +353,7 @@ VALUES
     'triggers', JSON_ARRAY(),
     'conditions', JSON_ARRAY(),
     'consumption', JSON_ARRAY(),
-    'limits', JSON_ARRAY(),
+    'limits', JSON_ARRAY(JSON_OBJECT('kind', 'min_alive_players', 'value', 3, 'message', 'This ability is not valid when only two players remain.')),
     'ui', JSON_ARRAY()
   ), 1),
   ('hailing_frequencies', 'Hailing Frequencies', 'utility_status', 'activated_self_or_toggle', JSON_ARRAY('utility', 'status', 'duel_lockout'), 'Choose one opponent. Next round, neither of you may attack the other. Not valid if only two players remain.', JSON_OBJECT(
@@ -381,7 +381,7 @@ VALUES
     'triggers', JSON_ARRAY(),
     'conditions', JSON_ARRAY(),
     'consumption', JSON_ARRAY(),
-    'limits', JSON_ARRAY(),
+    'limits', JSON_ARRAY(JSON_OBJECT('kind', 'min_alive_players', 'value', 3, 'message', 'This ability is not valid when only two players remain.')),
     'ui', JSON_ARRAY()
   ), 1),
   ('scheming', 'Scheming', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'retaliation', 'burn'), 'Burn 10. Choose one opponent. If that opponent attacks you this round, you ignore their largest attack and they take that much damage.', JSON_OBJECT(
@@ -404,24 +404,61 @@ VALUES
     'ui', JSON_ARRAY()
   ), 1),
   ('death_ray', 'Death Ray', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('attack', 'passive'), 'Passive. If you make exactly one attack this round, increase that attack by 50%.', JSON_OBJECT(), 1),
-  ('heavy_guns', 'Heavy Guns', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('attack', 'passive'), 'Passive. Each of your attacks deals +10 damage.', JSON_OBJECT(), 1),
-  ('holoship', 'Holoship', 'passive_modifier', 'round_end_effect', JSON_ARRAY('defense', 'passive', 'upkeep_cost'), 'Passive. You cannot be targeted by attacks. At end of round, lose 5 Health.', JSON_OBJECT(
+  ('heavy_guns', 'Heavy Guns', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('attack', 'passive'), 'Passive. Each of your attacks deals +10 damage.', JSON_OBJECT(
     'schema_version', 1,
     'activation', JSON_OBJECT(),
     'passive', JSON_ARRAY(JSON_OBJECT(
-      'apply_timing', 'always',
+      'apply_timing', 'attack',
       'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
-      'modifiers', JSON_ARRAY(),
-      'granted_states', JSON_ARRAY(JSON_OBJECT(
-        'state_key', 'untargetable',
-        'scope', 'self',
-        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
-        'duration', JSON_OBJECT('kind', 'while_owned'),
-        'metadata', JSON_OBJECT()
-      ))
+      'modifiers', JSON_ARRAY(JSON_OBJECT(
+        'stat', 'outgoing_attack_damage',
+        'operation', 'add',
+        'formula', JSON_OBJECT('kind', 'constant', 'value', 10),
+        'timing', 'attack',
+        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY())
+      )),
+      'granted_states', JSON_ARRAY()
     )),
     'triggers', JSON_ARRAY(),
-    'conditions', JSON_ARRAY()
+    'conditions', JSON_ARRAY(),
+    'consumption', JSON_ARRAY(),
+    'limits', JSON_ARRAY(),
+    'ui', JSON_ARRAY()
+  ), 1),
+  ('holoship', 'Holoship', 'passive_modifier', 'round_end_effect', JSON_ARRAY('defense', 'passive', 'upkeep_cost'), 'Passive. You cannot be targeted by attacks. At end of round, lose 5 Health.', JSON_OBJECT(
+    'schema_version', 1,
+    'activation', JSON_OBJECT(),
+    'passive', JSON_ARRAY(
+      JSON_OBJECT(
+        'apply_timing', 'always',
+        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+        'modifiers', JSON_ARRAY(),
+        'granted_states', JSON_ARRAY(JSON_OBJECT(
+          'state_key', 'untargetable',
+          'scope', 'self',
+          'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+          'duration', JSON_OBJECT('kind', 'while_owned'),
+          'metadata', JSON_OBJECT()
+        ))
+      ),
+      JSON_OBJECT(
+        'apply_timing', 'round_end',
+        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+        'modifiers', JSON_ARRAY(JSON_OBJECT(
+          'stat', 'health',
+          'operation', 'subtract',
+          'formula', JSON_OBJECT('kind', 'constant', 'value', 5),
+          'timing', 'round_end',
+          'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY())
+        )),
+        'granted_states', JSON_ARRAY()
+      )
+    ),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY(),
+    'consumption', JSON_ARRAY(),
+    'limits', JSON_ARRAY(),
+    'ui', JSON_ARRAY()
   ), 1),
   ('hyperdrive', 'Hyperdrive', 'utility_status', 'activated_self_or_toggle', JSON_ARRAY('utility', 'status', 'burn', 'win_condition'), 'Burn 5 to enter or leave Hyperspace. In Hyperspace, you cannot attack or be attacked.', JSON_OBJECT(
     'schema_version', 1,
@@ -518,8 +555,47 @@ VALUES
     'triggers', JSON_ARRAY(),
     'conditions', JSON_ARRAY()
   ), 1),
-  ('reflective_shield', 'Reflective Shield', 'trigger_on_attacked', 'trigger_on_attacked', JSON_ARRAY('defense', 'retaliation', 'passive'), 'Passive. Whenever you take attack damage, the attacker takes half that damage.', JSON_OBJECT(), 1),
-  ('energy_absorption', 'Energy Absorption', 'round_start_effect', 'round_start_effect', JSON_ARRAY('resource', 'delayed'), 'Spend 10 Energy. At the start of next round, gain Energy equal to half the damage your Defense blocked this round.', JSON_OBJECT(), 1),
+  ('reflective_shield', 'Reflective Shield', 'trigger_on_attacked', 'trigger_on_attacked', JSON_ARRAY('defense', 'retaliation', 'passive'), 'Passive. Whenever you take attack damage, the attacker takes half that damage.', JSON_OBJECT(
+    'schema_version', 1,
+    'activation', JSON_OBJECT(),
+    'passive', JSON_ARRAY(JSON_OBJECT(
+      'apply_timing', 'on_damage_taken',
+      'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY()),
+      'modifiers', JSON_ARRAY(JSON_OBJECT(
+        'stat', 'retaliation_damage_ratio',
+        'operation', 'add',
+        'formula', JSON_OBJECT('kind', 'constant', 'value', 0.5),
+        'timing', 'on_damage_taken',
+        'selector', JSON_OBJECT('subject', 'owner', 'filters', JSON_ARRAY())
+      )),
+      'granted_states', JSON_ARRAY()
+    )),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY(),
+    'consumption', JSON_ARRAY(),
+    'limits', JSON_ARRAY(),
+    'ui', JSON_ARRAY()
+  ), 1),
+  ('energy_absorption', 'Energy Absorption', 'round_start_effect', 'round_start_effect', JSON_ARRAY('resource', 'delayed'), 'Spend 10 Energy. At the start of next round, gain Energy equal to half the damage your Defense blocked this round.', JSON_OBJECT(
+    'schema_version', 1,
+    'activation', JSON_OBJECT(
+      'kind', 'activated',
+      'targeting', JSON_OBJECT('policy', 'none', 'required', false, 'filters', JSON_ARRAY(), 'relation', 'one_way'),
+      'costs', JSON_ARRAY(JSON_OBJECT('resource', 'energy', 'formula', JSON_OBJECT('kind', 'constant', 'value', 10), 'timing', 'on_activate')),
+      'effects', JSON_ARRAY(JSON_OBJECT(
+        'kind', 'set_blocked_damage_energy_bonus',
+        'formula', JSON_OBJECT('kind', 'constant', 'value', 0.5)
+      )),
+      'scheduled_effects', JSON_ARRAY(),
+      'mode_options', JSON_ARRAY()
+    ),
+    'passive', JSON_ARRAY(),
+    'triggers', JSON_ARRAY(),
+    'conditions', JSON_ARRAY(),
+    'consumption', JSON_ARRAY(),
+    'limits', JSON_ARRAY(),
+    'ui', JSON_ARRAY()
+  ), 1),
   ('armor', 'Armor', 'passive_modifier', 'passive_modifier_round', JSON_ARRAY('defense', 'passive'), 'Passive. Reduce each incoming attack by 5.', JSON_OBJECT(
     'schema_version', 1,
     'activation', JSON_OBJECT(),
@@ -616,7 +692,7 @@ VALUES
     'triggers', JSON_ARRAY(),
     'conditions', JSON_ARRAY(),
     'consumption', JSON_ARRAY(),
-    'limits', JSON_ARRAY(),
+    'limits', JSON_ARRAY(JSON_OBJECT('kind', 'min_alive_players', 'value', 3, 'message', 'This ability is not valid when only two players remain.')),
     'ui', JSON_ARRAY()
   ), 1),
   ('focused_defense', 'Focused Defense', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'single_opponent'), 'Choose one opponent. Halve attacks from that opponent this round.', JSON_OBJECT(

@@ -270,6 +270,9 @@ function rumble_activation_energy_cost(array $activation, bool $strict = false):
             if (!is_array($cost)) {
                 continue;
             }
+            if ((string)($cost['resource'] ?? 'energy') !== 'energy') {
+                continue;
+            }
             $formula = is_array($cost['formula'] ?? null) ? (array)$cost['formula'] : [];
             $formulaKind = trim((string)($formula['kind'] ?? ''));
             if (in_array($formulaKind, ['variable_x', 'scaled_x'], true) && !array_key_exists('x_cost', $activation) && $strict) {
@@ -289,7 +292,7 @@ function rumble_activation_energy_cost(array $activation, bool $strict = false):
 
     $formulaCost = rumble_evaluate_activation_cost_formula($costFormula, $xCost);
     if ($formulaCost !== null) {
-        return $formulaCost + $healthBurn;
+        return $formulaCost;
     }
 
     if ($templateKey === 'activated_spend_with_target_policy') {
@@ -298,24 +301,82 @@ function rumble_activation_energy_cost(array $activation, bool $strict = false):
             if (!array_key_exists('x_cost', $activation) && $strict) {
                 throw new InvalidArgumentException('x_cost is required for this variable-cost ability.');
             }
-            return $xCost + $healthBurn;
+            return $xCost;
         }
 
-        return $healthBurn;
+        return 0;
     }
 
     if ($templateKey === 'activated_defense_mode') {
         if (array_key_exists('x_cost', $activation)) {
-            return $xCost + $healthBurn;
+            return $xCost;
         }
-        return $healthBurn;
+        return 0;
     }
 
     if ($templateKey === 'activated_self_or_toggle') {
-        return $xCost + $healthBurn;
+        return $xCost;
     }
 
-    return $healthBurn;
+    return 0;
+}
+
+function rumble_attack_energy_cost(array $attacks, array $ownedAbilityIds = [], array $abilityActivations = []): int
+{
+    $totalAttack = 0;
+    $positiveAttackSpends = [];
+    foreach ($attacks as $amountRaw) {
+        if (!is_int($amountRaw) && !ctype_digit((string)$amountRaw)) {
+            continue;
+        }
+
+        $amount = max(0, (int)$amountRaw);
+        if ($amount <= 0) {
+            continue;
+        }
+
+        $totalAttack += $amount;
+        $positiveAttackSpends[] = $amount;
+    }
+
+    if ($totalAttack <= 0 || count($positiveAttackSpends) < 2) {
+        return $totalAttack;
+    }
+
+    $ownedAbilityMap = [];
+    foreach ($ownedAbilityIds as $abilityId) {
+        $canonicalAbilityId = rumble_canonical_ability_id((string)$abilityId);
+        if ($canonicalAbilityId !== '') {
+            $ownedAbilityMap[$canonicalAbilityId] = true;
+        }
+    }
+
+    $secondLargestAttackIsFree = false;
+    foreach ($abilityActivations as $activation) {
+        $abilityId = rumble_canonical_ability_id((string)($activation['ability_id'] ?? ''));
+        if ($abilityId === '' || (!empty($ownedAbilityMap) && !isset($ownedAbilityMap[$abilityId]))) {
+            continue;
+        }
+
+        $ability = rumble_ability_by_id($abilityId);
+        if ($ability === null) {
+            continue;
+        }
+
+        $templateParams = rumble_ability_template_params($ability);
+        $effectFormula = is_array($templateParams['effect_formula'] ?? null) ? (array)$templateParams['effect_formula'] : [];
+        if ((string)($effectFormula['kind'] ?? '') === 'second_largest_attack_free') {
+            $secondLargestAttackIsFree = true;
+            break;
+        }
+    }
+
+    if (!$secondLargestAttackIsFree) {
+        return $totalAttack;
+    }
+
+    rsort($positiveAttackSpends, SORT_NUMERIC);
+    return max(0, $totalAttack - (int)$positiveAttackSpends[1]);
 }
 
 function rumble_fetch_round_start_effects(int $gameId, int $roundNumber): array

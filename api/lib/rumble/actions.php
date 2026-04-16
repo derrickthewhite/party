@@ -401,6 +401,12 @@ function rumble_action_upsert_order(int $gameId): void
 	$targetRows = $targetsStmt->fetchAll();
 	$roundStartEffects = rumble_fetch_round_start_effects($gameId, $roundNumber);
 	$targetingState = rumble_collect_round_targeting_state($targetRows, $roundStartEffects);
+	$alivePlayerCount = 0;
+	foreach ((array)($targetingState['alive_by_user'] ?? []) as $isAlive) {
+		if (!empty($isAlive)) {
+			$alivePlayerCount++;
+		}
+	}
 	$validAttackTargetMap = [];
 	$validAbilityTargetMap = [];
 	foreach ($targetRows as $targetRow) {
@@ -425,7 +431,6 @@ function rumble_action_upsert_order(int $gameId): void
 	}
 
 	$normalizedAttacks = [];
-	$totalAttack = 0;
 	foreach ($attacksRaw as $targetKey => $amountRaw) {
 		if (!is_int($targetKey) && !ctype_digit((string)$targetKey)) {
 			error_response('Attack target ids must be integers.', 422);
@@ -450,7 +455,6 @@ function rumble_action_upsert_order(int $gameId): void
 		}
 
 		$normalizedAttacks[(string)$targetId] = $amount;
-		$totalAttack += $amount;
 	}
 
 	$activationCounts = [];
@@ -459,6 +463,18 @@ function rumble_action_upsert_order(int $gameId): void
 		$abilityId = (string)($activation['ability_id'] ?? '');
 		if ($abilityId === '' || !isset($ownedAbilityMap[$abilityId])) {
 			error_response('One or more activated abilities are not owned by this player.', 422);
+		}
+
+		$ability = rumble_ability_by_id($abilityId);
+		if ($ability === null) {
+			error_response('One or more activated abilities are not owned by this player.', 422);
+		}
+
+		$limitError = rumble_validate_ability_activation_limits($ability, [
+			'alive_player_count' => $alivePlayerCount,
+		]);
+		if ($limitError !== null) {
+			error_response($limitError, 422);
 		}
 
 		$activationCounts[$abilityId] = max(0, (int)($activationCounts[$abilityId] ?? 0)) + 1;
@@ -495,13 +511,13 @@ function rumble_action_upsert_order(int $gameId): void
 	}
 
 	$energyBudget = rumble_player_round_energy_budget($currentHealth, $ownedAbilityIds);
-	$attackEnergySpent = $totalAttack;
+	$attackEnergySpent = rumble_attack_energy_cost($normalizedAttacks, $ownedAbilityIds, $normalizedAbilityActivations);
 	$totalEnergySpent = $attackEnergySpent + $abilityEnergySpent;
 	if ($totalEnergySpent > $energyBudget) {
 		error_response('Invalid order: total energy spent exceeds your round energy budget.', 422);
 	}
 
-	$defense = $currentHealth - $totalAttack;
+	$defense = $currentHealth - $attackEnergySpent;
 	if ($defense < 0) {
 		error_response('Invalid order: defense cannot be negative.', 422);
 	}
