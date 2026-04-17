@@ -850,6 +850,15 @@ button:disabled {
   gap: 10px;
 }
 
+.modal-details-compact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
 .modal-detail-row {
   display: grid;
   gap: 4px;
@@ -870,6 +879,27 @@ button:disabled {
 .modal-detail-value {
   color: var(--ink);
   line-height: 1.4;
+}
+
+.modal-details-compact .modal-detail-row {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+}
+
+.modal-details-compact .modal-detail-label {
+  font-size: 10px;
+  letter-spacing: 0.05em;
+}
+
+.modal-details-compact .modal-detail-value {
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--muted);
 }
 
 .participant-sidebar {

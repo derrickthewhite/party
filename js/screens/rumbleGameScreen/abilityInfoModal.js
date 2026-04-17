@@ -56,6 +56,7 @@ export function showRumbleAbilityInfo(ability) {
 	return showInfoModal({
 		title: fullTitle,
 		message: String(source.description || 'No description available.'),
+		detailsVariant: 'compact',
 		sections: [
 			{ label: 'Type', value: String(source.template_kind || 'unknown') },
 			{ label: 'Template', value: String(source.template_key || 'unknown') },

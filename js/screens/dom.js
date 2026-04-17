@@ -139,6 +139,7 @@ export function showInfoModal(options) {
 	const messageText = String(config.message || '');
 	const closeText = String(config.closeLabel || 'Close');
 	const sections = Array.isArray(config.sections) ? config.sections : [];
+	const detailsVariant = String(config.detailsVariant || 'default');
 	const priorFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
 
 	return new Promise(function resolvePrompt(resolve) {
@@ -166,7 +167,9 @@ export function showInfoModal(options) {
 
 		if (sections.length > 0) {
 			const details = document.createElement('div');
-			details.className = 'modal-details';
+			details.className = detailsVariant === 'compact'
+				? 'modal-details modal-details-compact'
+				: 'modal-details';
 			sections.forEach(function eachSection(section) {
 				const row = document.createElement('div');
 				row.className = 'modal-detail-row';
