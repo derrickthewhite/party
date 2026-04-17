@@ -966,7 +966,7 @@ function mafia_build_final_standings(int $gameId, string $status): ?array
 
     $roleMap = mafia_role_map($gameId);
     $stmt = db()->prepare(
-        'SELECT gps.user_id, gps.final_rank, gps.eliminated_round, gps.elimination_order, gps.result_status, u.username, gm.icon_key '
+        'SELECT gps.user_id, gps.final_rank, gps.eliminated_round, gps.elimination_order, gps.result_status, u.username, ' . game_member_icon_select_sql('gm', 'icon_key') . ' '
         . 'FROM game_player_standings gps '
         . 'JOIN users u ON u.id = gps.user_id '
         . 'LEFT JOIN game_members gm ON gm.game_id = gps.game_id AND gm.user_id = gps.user_id '

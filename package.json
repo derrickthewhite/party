@@ -12,6 +12,7 @@
   "scripts": {
     "start": "node server/index.js",
     "test:api": "jest --config jest.api.config.js --runInBand",
+    "test:frontend": "jest --config jest.frontend.config.js --runInBand",
     "trace-icons": "node scripts/trace-icons.js"
   }
 }

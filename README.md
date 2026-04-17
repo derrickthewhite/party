@@ -33,6 +33,19 @@ The API test harness:
 - isolates PHP session files under `.tmp/api-tests/current/sessions`
 - exercises the HTTP API directly for auth and core game flows
 
+## Frontend Browser Tests
+
+Run `npm run test:frontend` to execute browser-level presentation tests against the disposable local server stack.
+
+The frontend suite:
+
+- drives the real UI with Jest + Puppeteer
+- seeds state through the real HTTP API
+- checks user-visible controls, text, read-only states, and layout overflow behavior
+- is organized by surface under `e2e/`
+
+For the browser test philosophy and authoring rules, see `e2e/README.md`.
+
 For full local host setup, backend API testing, deployment, and DB credential workflows, see `TECHNICAL.md`.
 
 ## Routing and Auth UX
