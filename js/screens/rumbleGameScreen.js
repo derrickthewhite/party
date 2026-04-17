@@ -45,7 +45,7 @@ export function createRumbleGameScreen(deps) {
 	const panel = createNodeFromHtml(RUMBLE_PANEL_HTML);
 	const refs = collectRefs(panel);
 	const refreshBtn = refs.refreshBtn;
-	const phaseTitleText = refs.phaseTitleText;
+	const phaseTitle = refs.phaseTitle;
 	const phaseTitleIcon = refs.phaseTitleIcon;
 	const phaseIcon = refs.phaseIcon;
 	const progressText = refs.progressText;
@@ -369,11 +369,13 @@ export function createRumbleGameScreen(deps) {
 		}
 
 		if (bidding) {
-			phaseTitleText.textContent = 'Rumble Bidding';
+			const labelNode = phaseTitle && phaseTitle.querySelector && phaseTitle.querySelector('span');
+			if (labelNode) labelNode.textContent = 'Rumble Bidding';
 			progressText.textContent = 'Bidding submissions: ' + serverSnapshot.submittedCount + '/' + serverSnapshot.participantCount;
 			biddingPanelController.reconcile();
 		} else {
-			phaseTitleText.textContent = 'Rumble Combat';
+			const labelNode = phaseTitle && phaseTitle.querySelector && phaseTitle.querySelector('span');
+			if (labelNode) labelNode.textContent = 'Rumble Combat';
 			progressText.textContent = 'Round ' + serverSnapshot.roundNumber + ' players submitted: ' + serverSnapshot.submittedCount + '/' + serverSnapshot.participantCount;
 			combatPanelController.reconcile();
 		}
