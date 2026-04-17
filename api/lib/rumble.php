@@ -33,6 +33,28 @@ function rumble_ability_catalog_public_view(): array
         $catalog[] = rumble_ability_public_view($ability);
     }
 
+    if (count($catalog) > 0) {
+        $order = [
+            'activated' => 0,
+            'passive' => 1,
+            'triggered' => 2,
+        ];
+        usort($catalog, static function (array $a, array $b) use ($order): int {
+            $ka = (string)($a['template_kind'] ?? '');
+            $kb = (string)($b['template_kind'] ?? '');
+            $ia = $order[$ka] ?? 99;
+            $ib = $order[$kb] ?? 99;
+            if ($ia !== $ib) {
+                return $ia <=> $ib;
+            }
+            $nameCmp = strcasecmp((string)($a['name'] ?? ''), (string)($b['name'] ?? ''));
+            if ($nameCmp !== 0) {
+                return $nameCmp;
+            }
+            return strcmp((string)($a['id'] ?? ''), (string)($b['id'] ?? ''));
+        });
+    }
+
     return $catalog;
 }
 

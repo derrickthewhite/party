@@ -42,7 +42,33 @@ export function getSelfOwnedAbilities(serverSnapshot) {
 		return [];
 	}
 
-	return selfPlayer.owned_abilities;
+	const owned = selfPlayer.owned_abilities.slice();
+	const catalog = Array.isArray(serverSnapshot && serverSnapshot.abilityCatalog) ? serverSnapshot.abilityCatalog : [];
+	if (!Array.isArray(catalog) || catalog.length === 0) {
+		return owned;
+	}
+
+	const byId = {};
+	owned.forEach(function (item) {
+		const id = String(item && item.id ? item.id : '');
+		if (!byId[id]) byId[id] = [];
+		byId[id].push(item);
+	});
+
+	const ordered = [];
+	catalog.forEach(function (entry) {
+		const id = String(entry && entry.id ? entry.id : '');
+		const items = byId[id] || [];
+		items.forEach(function (it) { ordered.push(it); });
+		delete byId[id];
+	});
+
+	// Append any owned abilities not found in the catalog (stable by original order)
+	Object.keys(byId).forEach(function (k) {
+		(byId[k] || []).forEach(function (it) { ordered.push(it); });
+	});
+
+	return ordered;
 }
 
 export function getCheatEligiblePlayers(serverSnapshot) {

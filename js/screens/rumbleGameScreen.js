@@ -368,8 +368,27 @@ export function createRumbleGameScreen(deps) {
 			return !player.is_self;
 		});
 		const nextPlayers = selfPlayers.concat(otherPlayers);
-		const nextAbilityCatalog = progress && Array.isArray(progress.ability_catalog) ? progress.ability_catalog : [];
-		const nextOfferedAbilities = progress && Array.isArray(progress.offered_abilities) ? progress.offered_abilities : [];
+		let nextAbilityCatalog = progress && Array.isArray(progress.ability_catalog) ? progress.ability_catalog : [];
+		let nextOfferedAbilities = progress && Array.isArray(progress.offered_abilities) ? progress.offered_abilities : [];
+
+		// Client-side stable sort by template_kind: activated, passive, triggered
+		const _abilityKindOrder = { activated: 0, passive: 1, triggered: 2 };
+		function _sortAbilities(list) {
+			if (!Array.isArray(list)) return list;
+			return list.slice().sort(function (a, b) {
+				const ka = String((a && a.template_kind) || '');
+				const kb = String((b && b.template_kind) || '');
+				const ia = Object.prototype.hasOwnProperty.call(_abilityKindOrder, ka) ? _abilityKindOrder[ka] : 99;
+				const ib = Object.prototype.hasOwnProperty.call(_abilityKindOrder, kb) ? _abilityKindOrder[kb] : 99;
+				if (ia !== ib) return ia - ib;
+				const nameCmp = String((a && a.name) || '').localeCompare(String((b && b.name) || ''));
+				if (nameCmp !== 0) return nameCmp;
+				return String((a && a.id) || '').localeCompare(String((b && b.id) || ''));
+			});
+		}
+
+		nextAbilityCatalog = _sortAbilities(nextAbilityCatalog);
+		nextOfferedAbilities = _sortAbilities(nextOfferedAbilities);
 		const nextBids = progress && progress.current_bids !== null && typeof progress.current_bids === 'object'
 			? normalizeBidsMap(progress.current_bids)
 			: null;
