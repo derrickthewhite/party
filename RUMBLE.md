@@ -2,6 +2,8 @@
 
 This document defines the Rumble rules used by this site, the phase-2 ability and bidding system, and the implementation plan for extending Rumble safely.
 
+For the DB-backed storage model and worked raw JSON examples for abilities, see [RUMBLE_ABILITIES_DB.md](RUMBLE_ABILITIES_DB.md).
+
 ## Core Terms
 
 - Health: Primary survivability resource. A player is defeated at 0 Health.
