@@ -754,6 +754,16 @@ button:disabled {
   flex: 0 0 auto;
 }
 
+.rumble-phase-heading {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.game-member-icon-card {
+  padding: 14px;
+}
+
 .game-state-icon {
   width: 48px;
   height: 48px;
@@ -1043,6 +1053,43 @@ button:disabled {
   background: rgba(255, 255, 255, 0.85);
 }
 
+.rumble-player-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 12px;
+  align-items: center;
+}
+
+.rumble-player-identity {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+
+.rumble-player-row-icon {
+  width: 44px;
+  height: 44px;
+}
+
+.rumble-player-controls {
+  min-width: 220px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 4px;
+}
+
+.rumble-player-name {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.rumble-player-row.is-defeated .rumble-player-name {
+  opacity: 0.72;
+}
+
 .rumble-round-report {
   display: flex;
   flex-wrap: wrap;
@@ -1141,6 +1188,12 @@ button:disabled {
   }
   .mafia-target-identity {
     width: 100%;
+  }
+  .rumble-player-row {
+    grid-template-columns: minmax(0, 1fr) 200px;
+  }
+  .rumble-player-controls {
+    min-width: 200px;
   }
   .mafia-target-actions {
     justify-content: stretch;

@@ -1,8 +1,9 @@
 import { collectRefs, createNodeFromHtml, setStatus, showConfirmModal } from './dom.js';
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
 import { createGameParticipantsSidebarController } from './gameParticipantsSidebar.js';
-import { setPlayerIconImage } from '../playerIcons.js';
+import { playerIconLabel, setPlayerIconImage } from '../playerIcons.js';
 import { collectGameInfoIcons, setGameInfoIconNode } from '../gameStateIcons.js';
+import { showGameIconPickerModal } from './gameIconPickerModal.js';
 
 export function createBaseGameScreen(deps, options) {
 	const config = options || {};
@@ -27,6 +28,19 @@ export function createBaseGameScreen(deps, options) {
 				<img class="game-state-icon" data-ref="phaseIcon" alt="" aria-hidden="true">
 			</div>
 			<p data-ref="modeInfo"></p>
+			<div class="card game-member-icon-card" data-ref="memberIconCard" style="display:none;">
+				<p class="top-user-label" data-ref="memberIconIntro"></p>
+				<div class="mafia-icon-row" data-ref="memberIconRow">
+					<div class="mafia-icon-chip">
+						<img class="player-icon mafia-icon-preview" data-ref="memberIconPreview" alt="">
+						<div>
+							<div class="mafia-icon-label" data-ref="memberIconLabel"></div>
+							<small class="mafia-target-meta" data-ref="memberIconHint"></small>
+						</div>
+					</div>
+					${createGameActionButtonMarkup('change-icon', 'changeIconBtn', 'mafia-icon-action-button')}
+				</div>
+			</div>
 			<div class="chat-layout-shell${config.showParticipantsPanel ? ' chat-layout-shell-with-sidebar' : ''}" data-ref="shell">
 				<div class="chat-layout-main" data-ref="chatPanel">
 					<div class="message-feed" data-ref="feed"></div>
@@ -59,6 +73,12 @@ export function createBaseGameScreen(deps, options) {
 	const statusIcon = refs.statusIcon;
 	const phaseIcon = refs.phaseIcon;
 	const modeInfo = refs.modeInfo;
+	const memberIconCard = refs.memberIconCard;
+	const memberIconIntro = refs.memberIconIntro;
+	const memberIconPreview = refs.memberIconPreview;
+	const memberIconLabel = refs.memberIconLabel;
+	const memberIconHint = refs.memberIconHint;
+	const changeIconBtn = refs.changeIconBtn;
 	const feed = refs.feed;
 	const composerRow = refs.composerRow;
 	const messageInput = refs.messageInput;
@@ -78,6 +98,7 @@ export function createBaseGameScreen(deps, options) {
 	let mountedTypePanel = null;
 	let mountedSidebarPanel = null;
 	let sendBusy = false;
+	let iconBusy = false;
 	const participantsSidebarController = config.showParticipantsPanel ? createGameParticipantsSidebarController() : null;
 
 	refs.headingSpacer.style.flex = '1';
@@ -86,6 +107,7 @@ export function createBaseGameScreen(deps, options) {
 	modeInfo.style.opacity = '0.8';
 	refs.gameInfoIcons.style.marginTop = '-3px';
 	refs.gameInfoIcons.style.marginBottom = '2px';
+	memberIconCard.style.margin = '10px 0 8px 0';
 	composerRow.style.marginTop = '10px';
 	actionRow.style.marginTop = '8px';
 	typePanel.style.marginTop = '8px';
@@ -129,6 +151,39 @@ export function createBaseGameScreen(deps, options) {
 			state.setScreen('landing');
 		} catch (err) {
 			setStatus(status, err.message, 'error');
+		}
+	});
+
+	changeIconBtn.addEventListener('click', async function onChangeIcon() {
+		const activeGame = state.state.activeGame;
+		const member = getCurrentUserMember(activeGame);
+		if (!canChangeLobbyIcon(activeGame, member)) {
+			return;
+		}
+
+		const selectedIconKey = await showGameIconPickerModal({
+			currentIconKey: member && member.icon_key ? member.icon_key : null,
+			iconCatalog: Array.isArray(activeGame && activeGame.icon_catalog) ? activeGame.icon_catalog : [],
+			title: 'Choose your icon',
+			message: 'Pick the icon that should represent you in chat and participant lists for this game.',
+		});
+		if (!selectedIconKey || String(selectedIconKey) === String(member && member.icon_key ? member.icon_key : '')) {
+			return;
+		}
+
+		iconBusy = true;
+		setGame(activeGame);
+		try {
+			await api.setGameIcon(activeGame.id, selectedIconKey);
+			const detail = await api.gameDetail(activeGame.id);
+			state.patch({ activeGame: detail.game });
+			setGame(detail.game);
+			setStatus(status, 'Icon updated.', 'ok');
+		} catch (err) {
+			setStatus(status, err.message, 'error');
+		} finally {
+			iconBusy = false;
+			setGame(state.state.activeGame || activeGame);
 		}
 	});
 
@@ -307,6 +362,7 @@ export function createBaseGameScreen(deps, options) {
 
 		const perms = game && game.permissions ? game.permissions : {};
 		const memberRole = game && game.member_role ? game.member_role : 'none';
+		const currentMember = getCurrentUserMember(game);
 		const chatLocked = !perms.can_chat;
 		const actionsLocked = !perms.can_act;
 		const canLeave = !!perms.can_leave;
@@ -331,9 +387,12 @@ export function createBaseGameScreen(deps, options) {
 		adminDelete.disabled = !perms.can_delete;
 		leave.style.display = canLeave ? '' : 'none';
 		leave.disabled = !canLeave;
+		changeIconBtn.classList.toggle('is-busy', iconBusy);
+		setGameActionButtonLabel(changeIconBtn, iconBusy ? 'Saving icon...' : 'Change icon');
 
 		if (!game) {
 			modeInfo.textContent = '';
+			memberIconCard.style.display = 'none';
 			if (participantsSidebarController) {
 				participantsSidebarController.setGame(null);
 			}
@@ -356,6 +415,18 @@ export function createBaseGameScreen(deps, options) {
 			modeInfo.textContent = 'Game in progress: chat and actions are enabled for active players.';
 		}
 
+		const showMemberIconCard = canShowLobbyIconCard(game, currentMember);
+		memberIconCard.style.display = showMemberIconCard ? '' : 'none';
+		if (showMemberIconCard) {
+			memberIconIntro.textContent = 'Choose the icon you want to use in this game while the lobby is open.';
+			setPlayerIconImage(memberIconPreview, currentMember && currentMember.icon_key ? currentMember.icon_key : null, currentMember && currentMember.username ? currentMember.username : 'Player');
+			memberIconLabel.textContent = currentMember && currentMember.icon_key ? playerIconLabel(currentMember.icon_key) : 'No icon assigned yet';
+			memberIconHint.textContent = 'Visible in chat and participant lists.';
+			changeIconBtn.disabled = !canChangeLobbyIcon(game, currentMember);
+		} else {
+			changeIconBtn.disabled = true;
+		}
+
 		if (typeof config.onSetGame === 'function') {
 			config.onSetGame({
 				game,
@@ -376,6 +447,29 @@ export function createBaseGameScreen(deps, options) {
 				},
 			});
 		}
+	}
+
+	function getCurrentUserMember(game) {
+		const userId = Number(state.state.user && state.state.user.id ? state.state.user.id : 0);
+		if (!game || userId <= 0) {
+			return null;
+		}
+
+		return memberByUserId(game).get(userId) || null;
+	}
+
+	function canShowLobbyIconCard(game, member) {
+		return config.showLobbyIconChooser !== false
+			&& !!game
+			&& String(game.status || '') === 'open'
+			&& !!member;
+	}
+
+	function canChangeLobbyIcon(game, member) {
+		return canShowLobbyIconCard(game, member)
+			&& Array.isArray(game && game.icon_catalog)
+			&& game.icon_catalog.length > 0
+			&& !iconBusy;
 	}
 
 	function memberByUserId(game) {

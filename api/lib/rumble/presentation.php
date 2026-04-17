@@ -81,9 +81,10 @@ function rumble_build_final_standings(int $gameId): ?array
 	}
 
 	$stmt = db()->prepare(
-		'SELECT gps.user_id, gps.final_rank, gps.eliminated_round, gps.result_status, u.username, rps.ship_name '
+		'SELECT gps.user_id, gps.final_rank, gps.eliminated_round, gps.result_status, u.username, rps.ship_name, ' . game_member_icon_select_sql('gm', 'icon_key') . ' '
 		. 'FROM game_player_standings gps '
 		. 'JOIN users u ON u.id = gps.user_id '
+		. 'JOIN game_members gm ON gm.game_id = gps.game_id AND gm.user_id = gps.user_id '
 		. 'LEFT JOIN rumble_player_state rps ON rps.game_id = gps.game_id AND rps.user_id = gps.user_id '
 		. 'WHERE gps.game_id = ? AND gps.final_rank IS NOT NULL AND u.is_active = 1 '
 		. 'ORDER BY gps.final_rank ASC, u.username ASC'
@@ -106,6 +107,7 @@ function rumble_build_final_standings(int $gameId): ?array
 			'user_id' => (int)$row['user_id'],
 			'rank' => $rank,
 			'username' => $username,
+			'icon_key' => game_normalize_icon_key($row['icon_key'] ?? null),
 			'ship_name' => trim((string)($row['ship_name'] ?? '')) !== '' ? trim((string)$row['ship_name']) : $username,
 			'eliminated_round' => $row['eliminated_round'] !== null ? (int)$row['eliminated_round'] : null,
 			'result_status' => (string)$row['result_status'],
@@ -157,7 +159,7 @@ function rumble_game_build_detail_payload(int $gameId, array $game, array $user)
 	$submittedCount = (int)$submittedStmt->fetchColumn();
 
 	$playersStmt = db()->prepare(
-		'SELECT gm.user_id, u.username, COALESCE(rps.current_health, 100) AS current_health, COALESCE(rps.starting_health, 100) AS starting_health, gm.role, rps.ship_name, rps.owned_abilities_json '
+		'SELECT gm.user_id, u.username, COALESCE(rps.current_health, 100) AS current_health, COALESCE(rps.starting_health, 100) AS starting_health, gm.role, ' . game_member_icon_select_sql('gm', 'icon_key') . ', rps.ship_name, rps.owned_abilities_json '
 		. 'FROM game_members gm '
 		. 'JOIN users u ON u.id = gm.user_id '
 		. 'LEFT JOIN rumble_player_state rps ON rps.game_id = gm.game_id AND rps.user_id = gm.user_id '
@@ -185,6 +187,7 @@ function rumble_game_build_detail_payload(int $gameId, array $game, array $user)
 		$players[] = [
 			'user_id' => (int)$row['user_id'],
 			'username' => (string)$row['username'],
+			'icon_key' => game_normalize_icon_key($row['icon_key'] ?? null),
 			'ship_name' => trim((string)($row['ship_name'] ?? '')) !== ''
 				? trim((string)$row['ship_name'])
 				: (string)$row['username'],

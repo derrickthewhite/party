@@ -1,5 +1,6 @@
 import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate } from '../dom.js';
 import { getRumbleSummaryIcon } from '../../gameStateIcons.js';
+import { setPlayerIconImage } from '../../playerIcons.js';
 import { normalizeAttacksMap, placeChildAt } from './normalization.js';
 
 const PLAYERS_LIST_SECTION_HTML = `
@@ -11,15 +12,18 @@ const PLAYERS_LIST_SECTION_HTML = `
 `;
 
 const PLAYER_ROW_TEMPLATE_HTML = `
-	<div class="row mobile-stack" style="align-items: center; margin-bottom: 6px;">
-		<div style="flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0;">
-			<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
-				<div data-ref="name"></div>
-				<small data-ref="abilities" style="opacity: 0.85; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;"></small>
+	<div class="rumble-player-row" style="margin-bottom: 6px;">
+		<div class="rumble-player-identity">
+			<img class="player-icon rumble-player-row-icon" data-ref="icon" alt="">
+			<div style="flex: 1; display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+				<div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+					<div class="rumble-player-name" data-ref="name"></div>
+					<small data-ref="abilities" style="opacity: 0.85; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;"></small>
+				</div>
+				<small class="rumble-round-report" data-ref="report"></small>
 			</div>
-			<small class="rumble-round-report" data-ref="report"></small>
 		</div>
-		<div style="min-width: 220px; display: flex; flex-direction: column; justify-content: center; gap: 4px;" data-ref="right">
+		<div class="rumble-player-controls" data-ref="right">
 			<div data-ref="label" style="line-height: 1.2;"></div>
 			<input type="number" min="0" step="1" placeholder="Attack amount" data-ref="input">
 		</div>
@@ -529,6 +533,7 @@ export function createPlayersListController(context) {
 		const rowRefs = collectRefs(row);
 		const nextRefs = {
 			row,
+			icon: rowRefs.icon,
 			name: rowRefs.name,
 			abilities: rowRefs.abilities,
 			report: rowRefs.report,
@@ -619,7 +624,10 @@ export function createPlayersListController(context) {
 			const isDefeated = !!player.is_defeated || Number(player.health || 0) <= 0;
 
 			const displayShipName = getPlayerDisplayName(player);
+			setPlayerIconImage(rowRefs.icon, player && player.icon_key ? player.icon_key : null, player && player.username ? player.username : displayShipName);
+			rowRefs.icon.setAttribute('alt', displayShipName);
 			rowRefs.name.textContent = displayShipName + ' | Health: ' + Math.max(0, Number(player.health || 0));
+			rowRefs.row.classList.toggle('is-defeated', isDefeated);
 			const ownedAbilities = Array.isArray(player.owned_abilities) ? player.owned_abilities : [];
 			reconcileOwnedAbilities(rowRefs, ownedAbilities, context.showAbilityInfoModal);
 			reconcileRoundSummary(rowRefs, previousRoundSummaryByUser.get(key) || null);

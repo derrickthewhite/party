@@ -16,6 +16,8 @@ import { createVictoryScreenController } from './rumbleGameScreen/victoryScreen.
 import { createEventLogsController } from './rumbleGameScreen/eventLogs.js';
 import { showRumbleAbilityInfo } from './rumbleGameScreen/abilityInfoModal.js';
 import { setGameActionButtonLabel } from './gameActionButtons.js';
+import { setPlayerIconImage } from '../playerIcons.js';
+import { collectGameInfoIcons, setGameInfoIconNode } from '../gameStateIcons.js';
 import {
 	clearDraftDirty as clearRumbleDraftDirty,
 	getCheatEligiblePlayers as getCheatEligiblePlayersState,
@@ -43,7 +45,9 @@ export function createRumbleGameScreen(deps) {
 	const panel = createNodeFromHtml(RUMBLE_PANEL_HTML);
 	const refs = collectRefs(panel);
 	const refreshBtn = refs.refreshBtn;
-	const phaseTitle = refs.phaseTitle;
+	const phaseTitleText = refs.phaseTitleText;
+	const phaseTitleIcon = refs.phaseTitleIcon;
+	const phaseIcon = refs.phaseIcon;
 	const progressText = refs.progressText;
 
 	panel.style.marginTop = '8px';
@@ -74,6 +78,7 @@ export function createRumbleGameScreen(deps) {
 		previousRoundEventLog: [],
 		finalStandings: null,
 		selfShipName: '',
+		status: 'open',
 	};
 
 	const localDraft = {
@@ -333,18 +338,42 @@ export function createRumbleGameScreen(deps) {
 
 	function reconcileUi() {
 		const bidding = isBiddingPhase();
+		const selfPlayer = getSelfPlayer();
 		shipNameController.reconcile();
 		adminCheatController.reconcile();
 		phaseControlsController.reconcile();
 		biddingPanelController.setVisible(bidding);
 		combatPanelController.setVisible(!bidding);
 
+		if (selfPlayer && selfPlayer.icon_key) {
+			setPlayerIconImage(phaseIcon, selfPlayer.icon_key, selfPlayer.username || selfPlayer.ship_name || 'Player');
+			phaseIcon.style.display = '';
+			phaseIcon.setAttribute('alt', String(selfPlayer.ship_name || selfPlayer.username || 'Player'));
+		} else {
+			phaseIcon.style.display = 'none';
+		}
+
+		try {
+			const icons = collectGameInfoIcons({
+				game_type: 'rumble',
+				status: serverSnapshot.status,
+				phase: bidding ? 'bidding' : 'battle',
+			}, { hideInProgressWhenPhase: true });
+			const statusKey = String(serverSnapshot.status || '').toLowerCase();
+			const iconToShow = statusKey === 'in_progress' || statusKey === 'in-progress'
+				? (icons && icons.phaseIcon ? icons.phaseIcon : (icons && icons.statusIcon ? icons.statusIcon : null))
+				: (icons && icons.statusIcon ? icons.statusIcon : (icons && icons.phaseIcon ? icons.phaseIcon : null));
+			setGameInfoIconNode(phaseTitleIcon, iconToShow);
+		} catch (err) {
+			phaseTitleIcon.style.display = 'none';
+		}
+
 		if (bidding) {
-			phaseTitle.textContent = 'Rumble Bidding';
+			phaseTitleText.textContent = 'Rumble Bidding';
 			progressText.textContent = 'Bidding submissions: ' + serverSnapshot.submittedCount + '/' + serverSnapshot.participantCount;
 			biddingPanelController.reconcile();
 		} else {
-			phaseTitle.textContent = 'Rumble Combat';
+			phaseTitleText.textContent = 'Rumble Combat';
 			progressText.textContent = 'Round ' + serverSnapshot.roundNumber + ' players submitted: ' + serverSnapshot.submittedCount + '/' + serverSnapshot.participantCount;
 			combatPanelController.reconcile();
 		}
@@ -438,6 +467,7 @@ export function createRumbleGameScreen(deps) {
 		serverSnapshot.previousRoundEventLog = nextPreviousRoundEvents;
 		serverSnapshot.finalStandings = nextFinalStandings;
 		serverSnapshot.selfShipName = nextSelfShipName;
+		serverSnapshot.status = String(game && game.status ? game.status : 'open');
 
 		if (!localDraft.dirtyShipName) {
 			localDraft.shipName = nextSelfShipName;

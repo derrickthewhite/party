@@ -3,7 +3,11 @@ import { createGameActionButtonMarkup } from '../gameActionButtons.js';
 export const RUMBLE_PANEL_HTML = `
 	<div class="card">
 		<div class="row">
-			<h3 data-ref="phaseTitle">Rumble Bidding</h3>
+			<h3 class="rumble-phase-heading" data-ref="phaseTitle">
+				<img class="mafia-game-state-icon" data-ref="phaseTitleIcon" alt="" aria-hidden="true">
+				<span data-ref="phaseTitleText">Rumble Bidding</span>
+			</h3>
+			<img class="player-icon mafia-player-icon" data-ref="phaseIcon" alt="" style="display:none;">
 			<div data-ref="headerSpacer"></div>
 			${createGameActionButtonMarkup('refresh', 'refreshBtn', '')}
 		</div>

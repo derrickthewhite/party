@@ -225,6 +225,33 @@ test('admins can grant and revoke rumble abilities and detail exposes owned abil
   ]);
 });
 
+test('rumble detail exposes updated player icon selections', async () => {
+  const baseURL = getServerInfo().baseURL;
+  const uniqueSuffix = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+  const owner = await registerAndSignIn(baseURL, `icon-owner-${uniqueSuffix}`);
+  const player = await registerAndSignIn(baseURL, `icon-player-${uniqueSuffix}`);
+
+  const createResponse = await owner.client.post('/api/games', {
+    json: {
+      title: `rumble-icons-${uniqueSuffix}`,
+      game_type: 'rumble',
+    },
+  });
+  expect(createResponse.status).toBe(201);
+  const gameId = createResponse.body.data.game.id;
+
+  const joinResponse = await player.client.post(`/api/games/${gameId}/join`);
+  expect(joinResponse.status).toBe(200);
+
+  const playerUserId = (await getCurrentUser(player.client)).id;
+
+  const initialDetail = await getGameDetail(player.client, gameId);
+  const playerEntry = findRumblePlayer(initialDetail, playerUserId);
+  expect(playerEntry).toBeTruthy();
+  expect(playerEntry.user_id).toBe(playerUserId);
+  expect(Object.prototype.hasOwnProperty.call(playerEntry, 'icon_key')).toBe(true);
+});
+
 test('rumble ability orders reject variable-cost activations without x_cost', async () => {
   const { gameId, owner, player, ownerUserId, playerUserId } = await createStartedRumbleGame('variable-cost');
 
