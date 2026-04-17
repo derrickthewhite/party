@@ -79,6 +79,32 @@ const GAME_PHASE_LABELS = {
 	'generic:setup': 'Setup',
 };
 
+const RUMBLE_SUMMARY_ICON_FILES = {
+	energy: 'RumbleReportEnergy.svg',
+	health: 'RumbleReportHealth.svg',
+	attack: 'RumbleReportAttack.svg',
+	abilities: 'RumbleReportAbilities.svg',
+	defense: 'RumbleReportDefense.svg',
+	incoming: 'RumbleReportIncoming.svg',
+	damage: 'RumbleReportDamage.svg',
+	burn: 'RumbleReportBurn.svg',
+	heal: 'RumbleReportHeal.svg',
+	arrow: 'RumbleReportArrow.svg',
+};
+
+const RUMBLE_SUMMARY_LABELS = {
+	energy: 'Energy',
+	health: 'Health',
+	attack: 'Attack spend',
+	abilities: 'Ability spend',
+	defense: 'Defense',
+	incoming: 'Incoming attacks',
+	damage: 'Damage through',
+	burn: 'Health burn',
+	heal: 'Healing',
+	arrow: 'Then',
+};
+
 function iconUrl(fileName) {
 	if (!fileName) {
 		return '';
@@ -134,6 +160,11 @@ export function getGamePhaseIcon(gameType, phase) {
 	}
 
 	return null;
+}
+
+export function getRumbleSummaryIcon(kind) {
+	const key = normalizeToken(kind);
+	return makeDescriptor('rumble_report', key, RUMBLE_SUMMARY_ICON_FILES[key], RUMBLE_SUMMARY_LABELS[key]);
 }
 
 const MEMBER_BADGE_FILE = 'MemberStar.svg';

@@ -1043,6 +1043,46 @@ button:disabled {
   background: rgba(255, 255, 255, 0.85);
 }
 
+.rumble-round-report {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  min-height: 16px;
+  font-size: 12px;
+  line-height: 1.2;
+  color: var(--muted);
+}
+
+.rumble-round-report-segment {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.rumble-round-report-segment.has-title {
+  cursor: help;
+}
+
+.rumble-round-report-icon {
+  width: 14px;
+  height: 14px;
+  display: inline-block;
+  object-fit: contain;
+  flex: 0 0 auto;
+  opacity: 0.85;
+}
+
+.rumble-round-report-arrow {
+  display: inline-flex;
+  align-items: center;
+}
+
+.rumble-round-report-arrow-icon {
+  opacity: 0.65;
+}
+
 .ability-info-button {
   padding: 0;
   border: none;

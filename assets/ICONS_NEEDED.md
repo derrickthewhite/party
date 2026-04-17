@@ -72,6 +72,18 @@ This document lists all icons needed to represent UI states and button choices f
 - Icon: `result` — small result/message marker.
 - Icon: `winner` — trophy badge for winner summaries.
 
+## Rumble Round Report
+- Icon: `rumble-report-energy` — round-start energy in the compact per-player last-round summary.
+- Icon: `rumble-report-health` — start/end health in the compact per-player last-round summary.
+- Icon: `rumble-report-attack` — energy spent on outgoing attacks.
+- Icon: `rumble-report-abilities` — energy spent on ability activations.
+- Icon: `rumble-report-defense` — reserved defense for the round.
+- Icon: `rumble-report-incoming` — incoming attacks before mitigation.
+- Icon: `rumble-report-damage` — damage that got through.
+- Icon: `rumble-report-burn` — health burn or upkeep health loss.
+- Icon: `rumble-report-heal` — healing gained during the round.
+- Icon: `rumble-report-arrow` — separator arrow between summary stages.
+
 ## Accessibility / States
 - `focus-ring` visual treatment for keyboard focus on icon tiles and buttons.
 - `aria-hidden` glyph variants where decorative only.
@@ -220,5 +232,37 @@ Monochrome SVG, 24x24 viewBox, filled glyph of an archive box with lid and label
 ### Future Placeholder: Generic Setup
 Monochrome SVG, 24x24 viewBox, filled glyph of a gear with a center dot, wide teeth and minimal cutouts, readable at 16px.
 
+### Rumble Report: Energy
+Monochrome SVG, 24x24 viewBox, filled glyph of a compact lightning bolt nested in a rounded meter badge, bold silhouette, readable at 14px.
+
+### Rumble Report: Health
+Monochrome SVG, 24x24 viewBox, filled glyph of a sturdy heart medallion with minimal interior cut, bold and compact, readable at 14px.
+
+### Rumble Report: Attack Spend
+Monochrome SVG, 24x24 viewBox, filled glyph of a forward-thrusting sword with a short motion wedge, compact horizontal silhouette, readable at 14px.
+
+### Rumble Report: Ability Spend
+Monochrome SVG, 24x24 viewBox, filled glyph of a radiant star core inside a round badge, suggesting systems activation without thin points, readable at 14px.
+
+### Rumble Report: Defense
+Monochrome SVG, 24x24 viewBox, filled glyph of a broad shield block with a simple center notch, strong silhouette, readable at 14px.
+
+### Rumble Report: Incoming
+Monochrome SVG, 24x24 viewBox, filled glyph of three descending bolts converging on a central point, compact and high contrast, readable at 14px.
+
+### Rumble Report: Damage Through
+Monochrome SVG, 24x24 viewBox, filled glyph of a cracked shield with a sharp impact wedge, compact silhouette, readable at 14px.
+
+### Rumble Report: Burn
+Monochrome SVG, 24x24 viewBox, filled glyph of a simple flame drop with a small inner cut, bold silhouette, readable at 14px.
+
+### Rumble Report: Heal
+Monochrome SVG, 24x24 viewBox, filled glyph of a compact medical cross nested in a round medallion or repair badge, bold silhouette, readable at 14px.
+
+### Rumble Report: Arrow
+Monochrome SVG, 24x24 viewBox, filled glyph of a short broad directional arrow pointing right, simple centered silhouette, readable at 14px.
+
 ---
 Current implementation includes initial SVGs for `create-game`, `send-message`, `change-icon`, `suggest`, `vote`, and `withdraw-vote` under `assets/ButtonIcons/`.
+
+The compact Rumble round-report icon set is implemented under `assets/GameStateIcons/` as `RumbleReportEnergy.svg`, `RumbleReportHealth.svg`, `RumbleReportAttack.svg`, `RumbleReportAbilities.svg`, `RumbleReportDefense.svg`, `RumbleReportIncoming.svg`, `RumbleReportDamage.svg`, `RumbleReportBurn.svg`, `RumbleReportHeal.svg`, and `RumbleReportArrow.svg`.
