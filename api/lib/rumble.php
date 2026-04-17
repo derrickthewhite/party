@@ -270,7 +270,8 @@ function rumble_activation_energy_cost(array $activation, bool $strict = false):
             if (!is_array($cost)) {
                 continue;
             }
-            if ((string)($cost['resource'] ?? 'energy') !== 'energy') {
+            $resource = (string)($cost['resource'] ?? 'energy');
+            if (!in_array($resource, ['energy', 'health'], true)) {
                 continue;
             }
             $formula = is_array($cost['formula'] ?? null) ? (array)$cost['formula'] : [];
@@ -283,7 +284,7 @@ function rumble_activation_energy_cost(array $activation, bool $strict = false):
                 $totalCost += (int)floor($value);
             }
         }
-        return max(0, $totalCost);
+        return max(0, $totalCost + $healthBurn);
     }
 
     if (in_array($costFormulaKind, ['variable_x', 'scaled_x'], true) && !array_key_exists('x_cost', $activation) && $strict) {
@@ -292,7 +293,7 @@ function rumble_activation_energy_cost(array $activation, bool $strict = false):
 
     $formulaCost = rumble_evaluate_activation_cost_formula($costFormula, $xCost);
     if ($formulaCost !== null) {
-        return $formulaCost;
+        return $formulaCost + $healthBurn;
     }
 
     if ($templateKey === 'activated_spend_with_target_policy') {
@@ -301,24 +302,24 @@ function rumble_activation_energy_cost(array $activation, bool $strict = false):
             if (!array_key_exists('x_cost', $activation) && $strict) {
                 throw new InvalidArgumentException('x_cost is required for this variable-cost ability.');
             }
-            return $xCost;
+            return $xCost + $healthBurn;
         }
 
-        return 0;
+        return $healthBurn;
     }
 
     if ($templateKey === 'activated_defense_mode') {
         if (array_key_exists('x_cost', $activation)) {
-            return $xCost;
+            return $xCost + $healthBurn;
         }
-        return 0;
+        return $healthBurn;
     }
 
     if ($templateKey === 'activated_self_or_toggle') {
-        return $xCost;
+        return $xCost + $healthBurn;
     }
 
-    return 0;
+    return $healthBurn;
 }
 
 function rumble_attack_energy_cost(array $attacks, array $ownedAbilityIds = [], array $abilityActivations = []): int
@@ -647,6 +648,68 @@ function rumble_round_end_winners(array $aliveRows, int $roundNumber): array
     return $winnerRows;
 }
 
+function rumble_hyperspace_outside_winners(int $gameId, int $roundNumber, array $aliveRows): array
+{
+    if (count($aliveRows) <= 1) {
+        return [];
+    }
+
+    $aliveByUserId = [];
+    foreach ($aliveRows as $row) {
+        $userId = (int)($row['user_id'] ?? 0);
+        if ($userId > 0) {
+            $aliveByUserId[$userId] = true;
+        }
+    }
+    if (empty($aliveByUserId)) {
+        return [];
+    }
+
+    $nextRoundEffects = rumble_fetch_round_start_effects($gameId, $roundNumber + 1);
+    if (empty($nextRoundEffects)) {
+        return [];
+    }
+
+    $inHyperspaceByUserId = [];
+    foreach ($nextRoundEffects as $effectRow) {
+        $ownerUserId = (int)($effectRow['owner_user_id'] ?? 0);
+        if ($ownerUserId <= 0 || !isset($aliveByUserId[$ownerUserId])) {
+            continue;
+        }
+
+        $targetUserId = isset($effectRow['target_user_id']) && $effectRow['target_user_id'] !== null
+            ? (int)$effectRow['target_user_id']
+            : null;
+        $payload = json_decode((string)($effectRow['payload'] ?? '{}'), true);
+        if (!is_array($payload)) {
+            continue;
+        }
+
+        $state = rumble_runtime_state_from_payload($payload, $ownerUserId, $targetUserId);
+        if (!is_array($state)) {
+            continue;
+        }
+
+        if ((string)($state['state_key'] ?? '') === 'hyperspace_active') {
+            $inHyperspaceByUserId[$ownerUserId] = true;
+        }
+    }
+
+    if (empty($inHyperspaceByUserId)) {
+        return [];
+    }
+
+    $outsideRows = [];
+    foreach ($aliveRows as $row) {
+        $userId = (int)($row['user_id'] ?? 0);
+        if ($userId > 0 && empty($inHyperspaceByUserId[$userId])) {
+            $outsideRows[] = $row;
+        }
+    }
+
+    return count($outsideRows) === 1 ? $outsideRows : [];
+}
+
 function rumble_finalize_standings(PDO $pdo, int $gameId, int $roundNumber, array $winnerRows): ?int
 {
     if (!rumble_has_standings_table() || empty($winnerRows)) {
@@ -773,6 +836,9 @@ function rumble_finalize_standings_if_won(PDO $pdo, int $gameId, int $roundNumbe
 
     $aliveRows = rumble_list_alive_players($pdo, $gameId);
     $winnerRows = rumble_round_end_winners($aliveRows, $roundNumber);
+    if (empty($winnerRows)) {
+        $winnerRows = rumble_hyperspace_outside_winners($gameId, $roundNumber, $aliveRows);
+    }
     if (empty($winnerRows) && count($aliveRows) === 1) {
         $winnerRows = [$aliveRows[0]];
     }

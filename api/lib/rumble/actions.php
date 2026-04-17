@@ -517,10 +517,7 @@ function rumble_action_upsert_order(int $gameId): void
 		error_response('Invalid order: total energy spent exceeds your round energy budget.', 422);
 	}
 
-	$defense = $currentHealth - $attackEnergySpent;
-	if ($defense < 0) {
-		error_response('Invalid order: defense cannot be negative.', 422);
-	}
+	$defense = max(0, $currentHealth - $totalEnergySpent);
 
 	ksort($normalizedAttacks, SORT_NUMERIC);
 	$payload = [

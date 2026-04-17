@@ -2,8 +2,6 @@
 
 This document defines the Rumble rules used by this site, the phase-2 ability and bidding system, and the implementation plan for extending Rumble safely.
 
-For the DB-backed storage model and worked raw JSON examples for abilities, see [RUMBLE_ABILITIES_DB.md](RUMBLE_ABILITIES_DB.md).
-
 ## Core Terms
 
 - Health: Primary survivability resource. A player is defeated at 0 Health.
@@ -98,6 +96,8 @@ Template examples:
 
 Phase 2 uses a static library. Future phases can add custom ability authoring that maps into the same template schema.
 
+For the DB-backed storage model and worked raw JSON examples for abilities, see [RUMBLE_ABILITIES_DB.md](RUMBLE_ABILITIES_DB.md).
+
 ## Ability Catalog (Current)
 
 1. Meson Beam: Spend 10 Energy. Deal 5 unblockable damage to one opponent.
@@ -149,3 +149,5 @@ Planned next:
 - Full frontend bidding UI integrated into rumble screen.
 - Resolver hook pipeline for ability effects during battle rounds.
 - Deterministic replay/trace logs for tie-break and trigger ordering.
+
+

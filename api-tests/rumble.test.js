@@ -271,11 +271,11 @@ test('rumble orders account for granted abilities when validating energy spend',
   expect(orderResponse.body.data).toEqual(
     expect.objectContaining({
       submitted: true,
-      defense: 15,
+      defense: 0,
       energy_budget: 110,
       attack_energy_spent: 85,
-      ability_energy_spent: 20,
-      total_energy_spent: 105,
+      ability_energy_spent: 25,
+      total_energy_spent: 110,
     })
   );
 
@@ -286,11 +286,11 @@ test('rumble orders account for granted abilities when validating energy spend',
       attacks: {
         [ownerUserId]: 85,
       },
-      defense: 15,
+      defense: 0,
       energy_budget: 110,
       attack_energy_spent: 85,
-      ability_energy_spent: 20,
-      total_energy_spent: 105,
+      ability_energy_spent: 25,
+      total_energy_spent: 110,
       ability_activations: [
         expect.objectContaining({
           ability_id: 'cloaking_field',
@@ -872,7 +872,7 @@ test('energy absorption grants next-round energy from damage blocked by defense'
     expect.objectContaining({
       payload: expect.objectContaining({
         normal_incoming: 40,
-        defense_available: 100,
+        defense_available: 90,
         final_damage: 0,
         next_health: 100,
       }),
@@ -919,7 +919,7 @@ test('energy absorption counts only defense-blocked damage when armor also reduc
     expect.objectContaining({
       payload: expect.objectContaining({
         normal_incoming: 15,
-        defense_available: 100,
+        defense_available: 90,
         final_damage: 0,
         next_health: 100,
       }),
@@ -1045,7 +1045,7 @@ test('shield capacitors add 20 defense for the current round', async () => {
   await resolveRound(owner.client, gameId);
 
   const detail = await getGameDetail(owner.client, gameId);
-  expect(findRumblePlayer(detail, playerUserId).health).toBe(100);
+  expect(findRumblePlayer(detail, playerUserId).health).toBe(90);
   expect(eventsForUser(detail, playerUserId, 'activation:shield_capacitors')).toEqual([
     expect.objectContaining({
       payload: expect.objectContaining({
@@ -1058,9 +1058,9 @@ test('shield capacitors add 20 defense for the current round', async () => {
     expect.objectContaining({
       payload: expect.objectContaining({
         normal_incoming: 120,
-        defense_available: 120,
-        final_damage: 0,
-        next_health: 100,
+        defense_available: 110,
+        final_damage: 10,
+        next_health: 90,
       }),
     }),
   ]);
@@ -1238,7 +1238,7 @@ test('efficient targeting discounts the second-largest attack for order validati
         attack_energy_spent: testCase.expectedAttackEnergySpent,
         ability_energy_spent: 10,
         total_energy_spent: testCase.expectedAttackEnergySpent + 10,
-        defense: 110 - testCase.expectedAttackEnergySpent,
+        defense: Math.max(0, 110 - (testCase.expectedAttackEnergySpent + 10)),
       })
     );
 
@@ -1302,7 +1302,7 @@ test('mining rig spends 3X energy and heals X health', async () => {
   expect(orderResponse.body.data).toEqual(
     expect.objectContaining({
       submitted: true,
-      defense: 95,
+      defense: 80,
       energy_budget: 95,
       attack_energy_spent: 0,
       ability_energy_spent: 15,
@@ -1500,7 +1500,7 @@ test('nimble dodge negates the largest incoming attack and is invalid with only 
   await resolveRound(owner.client, gameId);
 
   let detail = await getGameDetail(owner.client, gameId);
-  expect(findRumblePlayer(detail, defender.userId).health).toBe(20);
+  expect(findRumblePlayer(detail, defender.userId).health).toBe(10);
   expect(eventsForUser(detail, defender.userId, 'trigger:nimble_dodge')).toEqual([
     expect.objectContaining({
       payload: expect.objectContaining({
@@ -1638,7 +1638,11 @@ test('holoship prevents targeting and applies a 5 health upkeep each round', asy
 });
 
 test('hyperdrive enters hyperspace next round, blocks attacks while active, and can be toggled off', async () => {
-  const { gameId, owner, ownerUserId, player, playerUserId } = await createStartedRumbleGame('hyperdrive');
+  const { gameId, owner, ownerUserId, participants } = await createStartedRumbleGame('hyperdrive', {
+    playerLabels: ['attacker', 'other'],
+    observerLabels: [],
+  });
+  const [, attacker, other] = participants;
 
   await grantAbilities(owner.client, gameId, ownerUserId, ['hyperdrive']);
   await enterBattlePhase(owner.client, gameId);
@@ -1651,10 +1655,14 @@ test('hyperdrive enters hyperspace next round, blocks attacks while active, and 
       },
     ],
   });
-  await submitOrder(player.client, gameId, {
+  await submitOrder(attacker.client, gameId, {
     attacks: {
       [ownerUserId]: 20,
     },
+    ability_activations: [],
+  });
+  await submitOrder(other.client, gameId, {
+    attacks: {},
     ability_activations: [],
   });
   await resolveRound(owner.client, gameId);
@@ -1670,7 +1678,7 @@ test('hyperdrive enters hyperspace next round, blocks attacks while active, and 
     }),
   ]);
 
-  const blockedPlayerAttack = await player.client.post(`/api/games/${gameId}/actions/rumble-order`, {
+  const blockedPlayerAttack = await attacker.client.post(`/api/games/${gameId}/actions/rumble-order`, {
     json: {
       attacks: {
         [ownerUserId]: 10,
@@ -1683,18 +1691,34 @@ test('hyperdrive enters hyperspace next round, blocks attacks while active, and 
   const blockedOwnerAttack = await owner.client.post(`/api/games/${gameId}/actions/rumble-order`, {
     json: {
       attacks: {
-        [playerUserId]: 10,
+        [attacker.userId]: 10,
       },
       ability_activations: [],
     },
   });
   expect(blockedOwnerAttack.status).toBe(422);
 
+  const blockedOwnerAttackAgainstOther = await owner.client.post(`/api/games/${gameId}/actions/rumble-order`, {
+    json: {
+      attacks: {
+        [other.userId]: 10,
+      },
+      ability_activations: [],
+    },
+  });
+  expect(blockedOwnerAttackAgainstOther.status).toBe(422);
+
   await submitOrder(owner.client, gameId, {
     attacks: {},
     ability_activations: [],
   });
-  await submitOrder(player.client, gameId, {
+  await submitOrder(attacker.client, gameId, {
+    attacks: {
+      [other.userId]: 10,
+    },
+    ability_activations: [],
+  });
+  await submitOrder(other.client, gameId, {
     attacks: {},
     ability_activations: [],
   });
@@ -1711,7 +1735,11 @@ test('hyperdrive enters hyperspace next round, blocks attacks while active, and 
       },
     ],
   });
-  await submitOrder(player.client, gameId, {
+  await submitOrder(attacker.client, gameId, {
+    attacks: {},
+    ability_activations: [],
+  });
+  await submitOrder(other.client, gameId, {
     attacks: {},
     ability_activations: [],
   });
@@ -1730,16 +1758,72 @@ test('hyperdrive enters hyperspace next round, blocks attacks while active, and 
 
   await setHealth(owner.client, gameId, ownerUserId, 10, 100);
 
-  await submitOrder(player.client, gameId, {
+  await submitOrder(attacker.client, gameId, {
     attacks: {
       [ownerUserId]: 20,
     },
+    ability_activations: [],
+  });
+  await submitOrder(other.client, gameId, {
+    attacks: {},
     ability_activations: [],
   });
   await resolveRound(owner.client, gameId);
 
   detail = await getGameDetail(owner.client, gameId);
   expect(findRumblePlayer(detail, ownerUserId).health).toBe(0);
+});
+
+test('hyperdrive closes the game when only one remaining player is outside hyperspace', async () => {
+  const { gameId, owner, participants } = await createStartedRumbleGame('hyperdrive-last-outside-wins', {
+    playerLabels: ['hyperspace-target', 'winner'],
+    observerLabels: [],
+  });
+  const [ownerParticipant, hyperspaceTarget, winner] = participants;
+
+  await grantAbilities(owner.client, gameId, ownerParticipant.userId, ['hyperdrive']);
+  await grantAbilities(owner.client, gameId, hyperspaceTarget.userId, ['hyperdrive']);
+  await enterBattlePhase(owner.client, gameId);
+
+  await submitOrder(owner.client, gameId, {
+    attacks: {},
+    ability_activations: [
+      {
+        ability_id: 'hyperdrive',
+      },
+    ],
+  });
+  await submitOrder(hyperspaceTarget.client, gameId, {
+    attacks: {},
+    ability_activations: [
+      {
+        ability_id: 'hyperdrive',
+      },
+    ],
+  });
+  await submitOrder(winner.client, gameId, {
+    attacks: {},
+    ability_activations: [],
+  });
+
+  await resolveRound(owner.client, gameId);
+
+  const detail = await getGameDetail(owner.client, gameId);
+  expect(detail.status).toBe('closed');
+  expect(detail.final_standings).toEqual(
+    expect.objectContaining({
+      winner_name: winner.credentials.username,
+    })
+  );
+  expect(detail.final_standings.entries).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        user_id: winner.userId,
+        rank: 1,
+        result_status: 'winner',
+      }),
+    ])
+  );
 });
 
 test('phase bomb deals floor(X/2) damage to all other opponents', async () => {
@@ -1962,4 +2046,291 @@ test('torpedo bays add X bonus damage to one attack on the next round', async ()
 
   detail = await getGameDetail(owner.client, gameId);
   expect(findRumblePlayer(detail, playerUserId).health).toBe(25);
+});
+
+test('burn adds to energy cost for hyperdrive and prevents overbudget orders', async () => {
+  const first = await createStartedRumbleGame('hyperdrive-energy-valid');
+  const { gameId, owner, ownerUserId, playerUserId } = first;
+
+  await grantAbilities(owner.client, gameId, ownerUserId, ['hyperdrive']);
+  await enterBattlePhase(owner.client, gameId);
+
+  const okResponse = await owner.client.post(`/api/games/${gameId}/actions/rumble-order`, {
+    json: {
+      attacks: {
+        [playerUserId]: 80,
+      },
+      ability_activations: [
+        {
+          ability_id: 'hyperdrive',
+        },
+      ],
+    },
+  });
+
+  expect(okResponse.status).toBe(201);
+  expect(okResponse.body.data).toEqual(
+    expect.objectContaining({
+      ability_energy_spent: 5,
+      defense: 15,
+      attack_energy_spent: 80,
+      total_energy_spent: 85,
+    })
+  );
+
+  const second = await createStartedRumbleGame('hyperdrive-energy-invalid');
+  const { gameId: g2, owner: o2 } = second;
+  await grantAbilities(o2.client, g2, second.ownerUserId, ['hyperdrive']);
+  await enterBattlePhase(o2.client, g2);
+
+  const badResponse = await o2.client.post(`/api/games/${g2}/actions/rumble-order`, {
+    json: {
+      attacks: {
+        [second.playerUserId]: 100,
+      },
+      ability_activations: [
+        {
+          ability_id: 'hyperdrive',
+        },
+      ],
+    },
+  });
+
+  expect(badResponse.status).toBe(422);
+  expect(badResponse.body.error).toBe('Invalid order: total energy spent exceeds your round energy budget.');
+});
+
+test('backup generator plus two escape pods restores three times but not four', async () => {
+  const { gameId, owner, participants } = await createStartedRumbleGame('backup-plus-escapes', {
+    playerLabels: ['target', 'attacker'],
+    observerLabels: [],
+  });
+
+  const [, target, attacker] = participants;
+
+  await grantAbilities(owner.client, gameId, target.userId, ['backup_generator', 'escape_pods', 'escape_pods']);
+  await setHealth(owner.client, gameId, target.userId, 10, 100);
+  await enterBattlePhase(owner.client, gameId);
+
+  // The three restore abilities can resolve in priority order; the contract here is three restores total, then none.
+  await submitOrder(owner.client, gameId, { attacks: { [target.userId]: 20 }, ability_activations: [] });
+  await submitOrder(attacker.client, gameId, { attacks: { [target.userId]: 20 }, ability_activations: [] });
+  await resolveRound(owner.client, gameId);
+
+  let detail = await getGameDetail(owner.client, gameId);
+  expect(findRumblePlayer(detail, target.userId).health).toBeGreaterThan(0);
+  expect(findRumblePlayer(detail, target.userId).owned_abilities).toHaveLength(2);
+  expect(eventsForUser(detail, target.userId, 'trigger:on_defeat_restore')).toHaveLength(1);
+
+  // Second defeat -> another restore fires
+  await submitOrder(owner.client, gameId, { attacks: { [target.userId]: 40 }, ability_activations: [] });
+  await submitOrder(attacker.client, gameId, { attacks: { [target.userId]: 40 }, ability_activations: [] });
+  await resolveRound(owner.client, gameId);
+
+  detail = await getGameDetail(owner.client, gameId);
+  expect(findRumblePlayer(detail, target.userId).health).toBeGreaterThan(0);
+  expect(findRumblePlayer(detail, target.userId).owned_abilities).toHaveLength(1);
+  expect(eventsForUser(detail, target.userId, 'trigger:on_defeat_restore')).toHaveLength(1);
+
+  // Third defeat -> final restore fires
+  await submitOrder(owner.client, gameId, { attacks: { [target.userId]: 40 }, ability_activations: [] });
+  await submitOrder(attacker.client, gameId, { attacks: { [target.userId]: 40 }, ability_activations: [] });
+  await resolveRound(owner.client, gameId);
+
+  detail = await getGameDetail(owner.client, gameId);
+  expect(findRumblePlayer(detail, target.userId).health).toBeGreaterThan(0);
+  expect(findRumblePlayer(detail, target.userId).owned_abilities).toEqual([]);
+  expect(eventsForUser(detail, target.userId, 'trigger:on_defeat_restore')).toHaveLength(1);
+
+  // Fourth defeat -> no restores remain
+  await submitOrder(owner.client, gameId, { attacks: { [target.userId]: 40 }, ability_activations: [] });
+  await submitOrder(attacker.client, gameId, { attacks: { [target.userId]: 40 }, ability_activations: [] });
+  await resolveRound(owner.client, gameId);
+
+  detail = await getGameDetail(owner.client, gameId);
+  expect(findRumblePlayer(detail, target.userId).health).toBe(0);
+});
+
+test('shield boosters and shield capacitors combine for full defense', async () => {
+  const { gameId, owner, ownerUserId, player, playerUserId } = await createStartedRumbleGame('shield-combo');
+
+  await grantAbilities(owner.client, gameId, playerUserId, ['shield_boosters', 'shield_capacitors']);
+  await setHealth(owner.client, gameId, ownerUserId, 140, 140);
+  await enterBattlePhase(owner.client, gameId);
+
+  await submitOrder(player.client, gameId, {
+    attacks: {},
+    ability_activations: [
+      {
+        ability_id: 'shield_capacitors',
+      },
+    ],
+  });
+  await submitOrder(owner.client, gameId, {
+    attacks: {
+      [playerUserId]: 140,
+    },
+    ability_activations: [],
+  });
+  await resolveRound(owner.client, gameId);
+
+  const detail = await getGameDetail(owner.client, gameId);
+  expect(findRumblePlayer(detail, playerUserId).health).toBe(90);
+  expect(eventsForUser(detail, playerUserId, 'step2:passive_round_start_defense')).toEqual(
+    expect.arrayContaining([expect.objectContaining({ payload: expect.objectContaining({ source_ability_id: 'shield_boosters', defense_bonus: 20 }) })])
+  );
+  expect(eventsForUser(detail, playerUserId, 'activation:shield_capacitors')).toEqual(
+    expect.arrayContaining([expect.objectContaining({ payload: expect.objectContaining({ ability_id: 'shield_capacitors', applied_defense_bonus: 20 }) })])
+  );
+  expect(eventsForUser(detail, playerUserId, 'step6:damage_resolution')).toEqual(
+    expect.arrayContaining([expect.objectContaining({ payload: expect.objectContaining({ normal_incoming: 140, defense_available: 130, final_damage: 10 }) })])
+  );
+});
+
+test('multiple meson beams stack when activated together', async () => {
+  const { gameId, owner, ownerUserId, playerUserId } = await createStartedRumbleGame('meson-multi');
+
+  await grantAbilities(owner.client, gameId, ownerUserId, ['meson_beam', 'meson_beam']);
+  await setHealth(owner.client, gameId, playerUserId, 15, 15);
+  await enterBattlePhase(owner.client, gameId);
+
+  await submitOrder(owner.client, gameId, {
+    attacks: {},
+    ability_activations: [
+      { ability_id: 'meson_beam', target_user_id: playerUserId },
+      { ability_id: 'meson_beam', target_user_id: playerUserId },
+    ],
+  });
+  await resolveRound(owner.client, gameId);
+
+  const detail = await getGameDetail(owner.client, gameId);
+  expect(findRumblePlayer(detail, playerUserId).health).toBe(5);
+  expect(eventsForUser(detail, ownerUserId, 'activation:meson_beam').length).toBeGreaterThanOrEqual(2);
+});
+
+test('various X abilities behave when X is zero (phase_bomb, loitering_munitions, torpedo_bays)', async () => {
+  const { gameId, owner, ownerUserId, participants } = await createStartedRumbleGame('x-zero', {
+    playerLabels: ['t1', 't2'],
+    observerLabels: [],
+  });
+  const [, t1, t2] = participants;
+
+  // Phase bomb with X=0 should do zero damage
+  await grantAbilities(owner.client, gameId, ownerUserId, ['phase_bomb', 'loitering_munitions', 'torpedo_bays']);
+  await setHealth(owner.client, gameId, t1.userId, 10, 10);
+  await setHealth(owner.client, gameId, t2.userId, 10, 10);
+  await enterBattlePhase(owner.client, gameId);
+
+  await submitOrder(owner.client, gameId, {
+    attacks: {},
+    ability_activations: [
+      { ability_id: 'phase_bomb', x_cost: 0 },
+      { ability_id: 'loitering_munitions', target_user_id: t1.userId, x_cost: 0 },
+      { ability_id: 'torpedo_bays', x_cost: 0 },
+    ],
+  });
+  await resolveRound(owner.client, gameId);
+
+  let detail = await getGameDetail(owner.client, gameId);
+  expect(eventsForUser(detail, ownerUserId, 'activation:phase_bomb')).toEqual(
+    expect.arrayContaining([expect.objectContaining({ payload: expect.objectContaining({ applied_damage_each: 0 }) })])
+  );
+  expect(findRumblePlayer(detail, t1.userId).health).toBe(10);
+  expect(findRumblePlayer(detail, t2.userId).health).toBe(10);
+
+  // loitering_munitions scheduled for next round with X=0 should deal 0
+  await resolveRound(owner.client, gameId);
+  detail = await getGameDetail(owner.client, gameId);
+  expect(findRumblePlayer(detail, t1.userId).health).toBe(10);
+});
+
+test('torpedo bays adds its bonus to only one attack next round', async () => {
+  const { gameId, owner, ownerUserId, participants } = await createStartedRumbleGame('torpedo-single', {
+    playerLabels: ['a', 'b'],
+    observerLabels: [],
+  });
+  const [, a, b] = participants;
+
+  await grantAbilities(owner.client, gameId, ownerUserId, ['torpedo_bays']);
+  await setHealth(owner.client, gameId, a.userId, 30, 30);
+  await setHealth(owner.client, gameId, b.userId, 30, 30);
+  await enterBattlePhase(owner.client, gameId);
+
+  // Schedule torpedo for next round
+  await submitOrder(owner.client, gameId, { attacks: {}, ability_activations: [{ ability_id: 'torpedo_bays', x_cost: 15 }] });
+  await resolveRound(owner.client, gameId);
+
+  // Next round attack both targets; only one should receive the +15
+  await submitOrder(owner.client, gameId, { attacks: { [a.userId]: 20, [b.userId]: 20 }, ability_activations: [] });
+  await resolveRound(owner.client, gameId);
+
+  const detail = await getGameDetail(owner.client, gameId);
+  expect(findRumblePlayer(detail, a.userId).health).toBe(25);
+  expect(findRumblePlayer(detail, b.userId).health).toBe(30);
+  expect(eventsForUser(detail, a.userId, 'step6:damage_resolution')).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          normal_incoming: 35,
+          defense_available: 30,
+          final_damage: 5,
+        }),
+      }),
+    ])
+  );
+  expect(eventsForUser(detail, b.userId, 'step6:damage_resolution')).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          normal_incoming: 20,
+          defense_available: 30,
+          final_damage: 0,
+        }),
+      }),
+    ])
+  );
+});
+
+test('hailing frequencies lasts a single turn and is undone after use', async () => {
+  const threePlayer = await createStartedRumbleGame('hailing-single-turn', {
+    playerLabels: ['target', 'other'],
+    observerLabels: [],
+  });
+  const { gameId, owner, ownerUserId, participants } = threePlayer;
+  const [, target, other] = participants;
+
+  await grantAbilities(owner.client, gameId, ownerUserId, ['hailing_frequencies']);
+  await enterBattlePhase(owner.client, gameId);
+
+  await submitOrder(owner.client, gameId, {
+    attacks: {},
+    ability_activations: [{ ability_id: 'hailing_frequencies', target_user_id: target.userId }],
+  });
+  await resolveRound(owner.client, gameId);
+
+  // Blocked this round
+  const blockedOwnerAttack = await owner.client.post(`/api/games/${gameId}/actions/rumble-order`, {
+    json: { attacks: { [target.userId]: 10 }, ability_activations: [] },
+  });
+  expect(blockedOwnerAttack.status).toBe(422);
+
+  const blockedTargetAttack = await target.client.post(`/api/games/${gameId}/actions/rumble-order`, {
+    json: { attacks: { [ownerUserId]: 10 }, ability_activations: [] },
+  });
+  expect(blockedTargetAttack.status).toBe(422);
+
+  // Advance round without interactions between them so effect expires
+  await submitOrder(other.client, gameId, { attacks: {}, ability_activations: [] });
+  await resolveRound(owner.client, gameId);
+
+  // Now attacks between owner and target should be allowed
+  const ownerOk = await owner.client.post(`/api/games/${gameId}/actions/rumble-order`, {
+    json: { attacks: { [target.userId]: 10 }, ability_activations: [] },
+  });
+  expect(ownerOk.status).toBe(201);
+
+  const targetOk = await target.client.post(`/api/games/${gameId}/actions/rumble-order`, {
+    json: { attacks: { [ownerUserId]: 10 }, ability_activations: [] },
+  });
+  expect(targetOk.status).toBe(201);
 });

@@ -983,7 +983,7 @@ function rumble_action_resolve_round_and_advance(int $gameId, int $roundNumber):
 
 		$attackEnergySpentByUser[$userId] = $used;
 		$totalEnergySpentByUser[$userId] = $attackEnergySpentByUser[$userId] + $abilityEnergySpentByUser[$userId];
-		$defenseByUser[$userId] = max(0, $health - $used);
+		$defenseByUser[$userId] = max(0, $health - $totalEnergySpentByUser[$userId]);
 
 		foreach ((array)($activePersistentRoundStartEffectsByUser[$userId] ?? []) as $sourceAbilityId => $persistentEffect) {
 			if (!empty(($toggleActivatedByUser[$userId] ?? [])[$sourceAbilityId])) {
