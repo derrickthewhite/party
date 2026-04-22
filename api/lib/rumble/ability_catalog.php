@@ -256,11 +256,80 @@ function rumble_ability_template_params(array $ability): array
 		: [];
 }
 
+function rumble_legacy_constant_formula_value($formula): ?int
+{
+	if (!is_array($formula)) {
+		return null;
+	}
+
+	if (trim((string)($formula['kind'] ?? '')) !== 'constant') {
+		return null;
+	}
+
+	return max(0, (int)floor((float)($formula['value'] ?? 0)));
+}
+
+function rumble_template_params_with_legacy_activation_fields(array $params): array
+{
+	$legacyParams = $params;
+	$activation = isset($params['activation']) && is_array($params['activation'])
+		? $params['activation']
+		: null;
+	if (!is_array($activation)) {
+		return $legacyParams;
+	}
+
+	if (!array_key_exists('target_policy', $legacyParams)) {
+		$targeting = isset($activation['targeting']) && is_array($activation['targeting'])
+			? $activation['targeting']
+			: null;
+		$targetPolicy = trim((string)($targeting['policy'] ?? ''));
+		if ($targetPolicy !== '') {
+			$legacyParams['target_policy'] = $targetPolicy;
+		}
+	}
+
+	$costs = isset($activation['costs']) && is_array($activation['costs'])
+		? $activation['costs']
+		: [];
+	$hasCostFormula = isset($legacyParams['cost_formula']) && is_array($legacyParams['cost_formula']);
+	$hasHealthBurn = array_key_exists('health_burn', $legacyParams);
+	$healthBurn = $hasHealthBurn ? max(0, (int)floor((float)$legacyParams['health_burn'])) : 0;
+
+	foreach ($costs as $cost) {
+		if (!is_array($cost)) {
+			continue;
+		}
+
+		$resource = trim((string)($cost['resource'] ?? ''));
+		$formula = isset($cost['formula']) && is_array($cost['formula']) ? $cost['formula'] : null;
+		if ($resource === 'energy' && !$hasCostFormula && is_array($formula)) {
+			$legacyParams['cost_formula'] = $formula;
+			$hasCostFormula = true;
+			continue;
+		}
+
+		if ($resource === 'health' && !$hasHealthBurn) {
+			$constantValue = rumble_legacy_constant_formula_value($formula);
+			if ($constantValue !== null) {
+				$healthBurn += $constantValue;
+			}
+		}
+	}
+
+	if (!$hasHealthBurn && $healthBurn > 0) {
+		$legacyParams['health_burn'] = $healthBurn;
+	}
+
+	return $legacyParams;
+}
+
 function rumble_ability_public_view(array $ability): array
 {
 	$templateKey = rumble_ability_template_key($ability);
 	$catalog = rumble_ability_template_catalog();
 	$templateMeta = $catalog[$templateKey] ?? ['id' => $templateKey, 'kind' => 'unknown', 'inputs' => []];
+	$templateParams = rumble_template_params_with_legacy_activation_fields(rumble_ability_template_params($ability));
 
 	return [
 		'id' => (string)($ability['id'] ?? ''),
@@ -270,7 +339,7 @@ function rumble_ability_public_view(array $ability): array
 		'template_key' => $templateKey,
 		'template_kind' => (string)($templateMeta['kind'] ?? 'unknown'),
 		'template_inputs' => (array)($templateMeta['inputs'] ?? []),
-		'template_params' => rumble_ability_template_params($ability),
+		'template_params' => $templateParams,
 		'tags' => array_values(array_map(static fn ($v): string => (string)$v, (array)($ability['tags'] ?? []))),
 		'description' => (string)($ability['text_short'] ?? ''),
 	];

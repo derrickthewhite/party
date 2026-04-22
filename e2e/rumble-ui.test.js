@@ -117,4 +117,69 @@ describe('rumble presentation coverage', () => {
       await page.close();
     }
   });
+  
+  async function readActivationCostLabels(page) {
+    return page.evaluate(() => {
+      const activeScreen = document.querySelector('.screen:not(.hidden)');
+      if (!activeScreen) {
+        return {};
+      }
+  
+      const rows = Array.from(activeScreen.querySelectorAll('[data-ref="abilityActivationList"] .row.mobile-stack'));
+      return rows.reduce((labels, node) => {
+        const nameNode = node.querySelector('[data-ref="name"]');
+        const labelNode = node.querySelector('[data-ref="toggleLabel"]');
+        const name = nameNode ? nameNode.textContent.trim() : '';
+        const label = labelNode ? labelNode.textContent.trim() : '';
+        if (name) {
+          labels[name] = label;
+        }
+        return labels;
+      }, {});
+    });
+  }
+  
+  test('rumble battle activation labels show normalized ability costs for db-backed abilities', async () => {
+    const owner = await createSession('rumble-cost-owner', { admin: true });
+    const player = await createSession('rumble-cost-player');
+    const game = await createGame(owner, 'rumble', uniqueLabel('rumble-cost-game'));
+  
+    await joinGame(player, game.id);
+    await startGame(owner, game.id);
+    await grantRumbleAbilities(owner, game.id, player.user.id, [
+      'cloaking_field',
+      'hyperdrive',
+      'nimble_dodge',
+      'scheming',
+      'shield_capacitors',
+    ]);
+    await endRumbleBidding(owner, game.id);
+  
+    const detail = await getGameDetail(owner, game.id);
+    const page = await openAuthenticatedPage(player, { screen: 'game', game: game.id }, { viewport: { width: 390, height: 900 } });
+  
+    try {
+      await waitForActiveHeading(page, phaseHeadingForGame(detail, 'Rumble'));
+      await page.waitForFunction(() => {
+        const activeScreen = document.querySelector('.screen:not(.hidden)');
+        if (!activeScreen) {
+          return false;
+        }
+  
+        const labels = Array.from(activeScreen.querySelectorAll('[data-ref="abilityActivationList"] [data-ref="toggleLabel"]'));
+        return labels.length >= 5;
+      });
+  
+      const activationLabels = await readActivationCostLabels(page);
+      expect(activationLabels).toMatchObject({
+        'Cloaking Field': 'Activate (cost: 25)',
+        'Hyperdrive': 'Activate (cost: 5)',
+        'Nimble Dodge': 'Activate (cost: 10)',
+        'Scheming': 'Activate (cost: 10)',
+        'Shield Capacitors': 'Activate (cost: 10)',
+      });
+    } finally {
+      await page.close();
+    }
+  });
 });
