@@ -20,7 +20,7 @@ const PLAYER_ROW_TEMPLATE_HTML = `
 					<div class="rumble-player-name" data-ref="name"></div>
 					<small data-ref="abilities" style="opacity: 0.85; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;"></small>
 				</div>
-				<small class="rumble-round-report" data-ref="report"></small>
+				<div class="rumble-round-report" data-ref="report"></div>
 			</div>
 		</div>
 		<div class="rumble-player-controls" data-ref="right">
