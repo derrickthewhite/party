@@ -182,6 +182,36 @@ async function resolveRound(ownerClient, gameId) {
   return response.body.data;
 }
 
+test('two-player rumble start offers exclude unusable and self-losing abilities', async () => {
+  const forbiddenAbilityIds = new Set([
+    'hailing_frequencies',
+    'hyperdrive',
+    'mine_layer',
+    'nimble_dodge',
+  ]);
+  const observedAbilityIds = new Set();
+
+  for (let attempt = 0; attempt < 100; attempt += 1) {
+    const { gameId, owner } = await createStartedRumbleGame(`two-player-offers-${attempt}`, {
+      playerLabels: ['rival'],
+      observerLabels: [],
+    });
+
+    const detail = await getGameDetail(owner.client, gameId);
+    const offeredAbilities = detail.rumble_turn_progress.offered_abilities;
+
+    expect(detail.rumble_turn_progress.participant_count).toBe(2);
+    expect(offeredAbilities.length).toBeGreaterThan(0);
+
+    for (const ability of offeredAbilities) {
+      observedAbilityIds.add(ability.id);
+      expect(forbiddenAbilityIds.has(ability.id)).toBe(false);
+    }
+  }
+
+  expect(observedAbilityIds.size).toBeGreaterThan(1);
+});
+
 test('admins can grant and revoke rumble abilities and detail exposes owned abilities', async () => {
   const { gameId, owner, player, playerUserId } = await createStartedRumbleGame('grant-revoke');
 

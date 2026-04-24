@@ -62,9 +62,17 @@ function rumble_ability_catalog_public_view(): array
 
 function rumble_pick_random_abilities(int $count): array
 {
-    $library = rumble_ability_library();
-    $ids = array_keys($library);
+    return rumble_pick_random_abilities_from_ids(array_keys(rumble_ability_library()), $count);
+}
+
+function rumble_pick_random_abilities_from_ids(array $ids, int $count): array
+{
+    $ids = array_values(array_filter($ids, static fn ($abilityId): bool => trim((string)$abilityId) !== ''));
     if ($count <= 0) {
+        return [];
+    }
+
+    if (count($ids) === 0) {
         return [];
     }
 

@@ -153,6 +153,24 @@ function rumble_validate_ability_activation_limits(array $ability, array $contex
 	return null;
 }
 
+function rumble_ability_is_offer_eligible(array $ability, array $context): bool
+{
+	$alivePlayers = max(0, (int)($context['alive_player_count'] ?? 0));
+	foreach (rumble_ability_limits($ability) as $limit) {
+		$kind = trim((string)($limit['kind'] ?? ''));
+		if ($kind !== 'min_alive_players' && $kind !== 'offer_min_alive_players') {
+			continue;
+		}
+
+		$minimum = max(0, (int)($limit['value'] ?? 0));
+		if ($alivePlayers < $minimum) {
+			return false;
+		}
+	}
+
+	return true;
+}
+
 function rumble_ability_modifier_sum(array $ability, string $stat, string $operation, string $timing): float
 {
 	$contract = rumble_ability_runtime_contract($ability);

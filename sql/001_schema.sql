@@ -483,7 +483,7 @@ VALUES
     'triggers', JSON_ARRAY(),
     'conditions', JSON_ARRAY(),
     'consumption', JSON_ARRAY(),
-    'limits', JSON_ARRAY(),
+    'limits', JSON_ARRAY(JSON_OBJECT('kind', 'offer_min_alive_players', 'value', 3)),
     'ui', JSON_ARRAY()
   ), 1),
   ('cloaking_field', 'Cloaking Field', 'activated_defense', 'activated_defense_mode', JSON_ARRAY('defense', 'delayed', 'burn'), 'Spend 20 Energy and Burn 5. You cannot be attacked next round.', JSON_OBJECT(

@@ -243,9 +243,19 @@ function rumble_ensure_bidding_offer(int $gameId, int $roundNumber, int $actorUs
 	]);
 	$participantCount = max(0, (int)$participantsStmt->fetchColumn());
 
-	$abilityCount = count(rumble_ability_library());
+	$offerLibrary = rumble_ability_library();
+	if ($roundNumber === 1 && $participantCount === 2) {
+		$offerLibrary = array_filter(
+			$offerLibrary,
+			static fn (array $ability): bool => rumble_ability_is_offer_eligible($ability, [
+				'alive_player_count' => $participantCount,
+			])
+		);
+	}
+
+	$abilityCount = count($offerLibrary);
 	$offerCount = min($abilityCount, max(0, $participantCount * 2));
-	$offeredAbilityIds = rumble_pick_random_abilities($offerCount);
+	$offeredAbilityIds = rumble_pick_random_abilities_from_ids(array_keys($offerLibrary), $offerCount);
 	$offeredItems = [];
 	foreach ($offeredAbilityIds as $index => $abilityId) {
 		$offeredItems[] = [
