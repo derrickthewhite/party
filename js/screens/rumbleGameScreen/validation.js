@@ -294,8 +294,27 @@ export function getOrderValidation(options) {
 	const ownedAbilityIds = selfOwnedAbilities.map(function eachAbility(ability) {
 		return String(ability.id || '');
 	});
-	const energyBudget = Math.max(0, Number(selfPlayer ? selfPlayer.health || 0 : 0))
-		+ (ownedAbilityIds.indexOf('turbo_generator') >= 0 ? 10 : 0);
+	const currentRoundEvents = Array.isArray(config.currentRoundEventLog) ? config.currentRoundEventLog : [];
+	const currentRoundStartStats = selfPlayer
+		? currentRoundEvents.find(function eachEvent(event) {
+			return Number(event && event.owner_user_id ? event.owner_user_id : 0) === Number(selfPlayer.user_id || 0)
+				&& String(event && event.effect_key ? event.effect_key : '') === 'step1:set_round_stats';
+		})
+		: null;
+	const currentRoundStartPayload = currentRoundStartStats && currentRoundStartStats.payload && typeof currentRoundStartStats.payload === 'object'
+		? currentRoundStartStats.payload
+		: null;
+	const fallbackEnergyBudget = Math.max(
+		0,
+		Number(selfPlayer && Object.prototype.hasOwnProperty.call(selfPlayer, 'energy_budget') ? selfPlayer.energy_budget : 0)
+	) || (
+		Math.max(0, Number(selfPlayer ? selfPlayer.health || 0 : 0))
+		+ (ownedAbilityIds.indexOf('turbo_generator') >= 0 ? 10 : 0)
+	);
+	
+	const energyBudget = currentRoundStartPayload && Object.prototype.hasOwnProperty.call(currentRoundStartPayload, 'energy_budget')
+		? Math.max(0, Number(currentRoundStartPayload.energy_budget || 0))
+		: fallbackEnergyBudget;
 	const baseDefense = energyBudget - totalEnergySpent;
 	const defense = baseDefense;
 

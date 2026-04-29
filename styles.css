@@ -1053,6 +1053,10 @@ button:disabled {
   background: rgba(255, 255, 255, 0.85);
 }
 
+.condition-chip-button {
+  background: rgba(236, 244, 255, 0.95);
+}
+
 .rumble-player-row {
   display: grid;
   grid-template-columns: minmax(0, 1fr) 220px;

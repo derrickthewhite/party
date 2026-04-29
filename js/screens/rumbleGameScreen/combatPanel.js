@@ -25,11 +25,13 @@ export function createCombatPanelController(context) {
 		const validation = context.getOrderValidation();
 		const selfPlayer = context.getSelfPlayer();
 		if (!selfPlayer) {
-			refs.defenseText.textContent = 'Defense: n/a';
+			refs.defenseText.textContent = 'Health: n/a | Defense: n/a';
 		} else if (validation.invalidDefense) {
-			refs.defenseText.textContent = 'Defense: ' + validation.defense + ' (invalid: defense cannot be negative)';
+			refs.defenseText.textContent = 'Health: ' + Number(selfPlayer.health || 0)
+				+ ' | Defense: ' + validation.defense + ' (invalid: defense cannot be negative)';
 		} else {
-			refs.defenseText.textContent = 'Defense: ' + validation.defense;
+			refs.defenseText.textContent = 'Health: ' + Number(selfPlayer.health || 0)
+				+ ' | Defense: ' + validation.defense;
 		}
 
 		refs.defenseModifiersText.textContent = validation.modifierNotes.length > 0

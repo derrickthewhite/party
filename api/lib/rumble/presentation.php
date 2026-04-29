@@ -74,6 +74,199 @@ function rumble_round_effect_human_text(array $effectRow, array $nameByUser = []
 	return implode(' | ', $parts);
 }
 
+function rumble_round_effect_payload(array $effectRow): array
+{
+	$payloadRaw = $effectRow['payload'] ?? [];
+	if (is_string($payloadRaw)) {
+		$decoded = json_decode($payloadRaw, true);
+		return is_array($decoded) ? $decoded : [];
+	}
+	return is_array($payloadRaw) ? $payloadRaw : [];
+}
+
+function rumble_condition_display_text(string $raw): string
+{
+	$normalized = trim($raw);
+	if ($normalized === '') {
+		return '';
+	}
+
+	if (str_ends_with($normalized, '_active')) {
+		$normalized = substr($normalized, 0, -strlen('_active'));
+	}
+
+	return implode(' ', array_map(
+		static function (string $part): string {
+			return ucfirst($part);
+		},
+		array_values(array_filter(explode('_', $normalized), static fn ($part): bool => trim((string)$part) !== ''))
+	));
+}
+
+function rumble_condition_base_label(?array $ability, array $payload, ?array $state): string
+{
+	$effectKind = trim((string)($payload['effect_kind'] ?? ''));
+	$abilityTitle = '';
+	if ($ability !== null) {
+		$abilityTitle = trim((string)($ability['name'] ?? $ability['title'] ?? ''));
+	}
+
+	if (($effectKind === 'delayed_attack' || $effectKind === 'attack_bonus') && $abilityTitle !== '') {
+		return $abilityTitle;
+	}
+
+	$stateKey = trim((string)($state['state_key'] ?? ''));
+	$relation = trim((string)($state['relation'] ?? ''));
+	$scope = trim((string)($state['scope'] ?? ''));
+	if ($abilityTitle !== '' && ($relation === 'symmetric' || $scope === 'pair')) {
+		return $abilityTitle;
+	}
+	if ($stateKey !== '') {
+		$stateLabel = rumble_condition_display_text($stateKey);
+		if ($stateLabel !== '') {
+			return $stateLabel;
+		}
+	}
+	if ($abilityTitle !== '') {
+		return $abilityTitle;
+	}
+	if ($effectKind !== '') {
+		return rumble_condition_display_text($effectKind);
+	}
+
+	return 'Condition';
+}
+
+function rumble_condition_description(?array $ability, array $payload, ?array $state, string $ownerName, string $targetName): string
+{
+	$parts = [];
+	$abilityDescription = trim((string)($ability['description'] ?? ''));
+	if ($abilityDescription !== '') {
+		$parts[] = $abilityDescription;
+	}
+
+	$effectKind = trim((string)($payload['effect_kind'] ?? ''));
+	if ($effectKind === 'delayed_attack') {
+		$damage = max(0, (int)($payload['damage'] ?? 0));
+		if ($damage > 0) {
+			$parts[] = $ownerName . ' has ' . $damage . ' delayed damage queued' . ($targetName !== '' ? ' for ' . $targetName : '') . '.';
+		}
+	} elseif ($effectKind === 'attack_bonus') {
+		$bonusDamage = max(0, (int)($payload['bonus_damage'] ?? 0));
+		if ($bonusDamage > 0) {
+			$parts[] = 'Next attack bonus: +' . $bonusDamage . '.';
+		}
+	} elseif ($targetName !== '') {
+		$relation = trim((string)($state['relation'] ?? ''));
+		if ($relation === 'symmetric') {
+			$parts[] = 'Linked players: ' . $ownerName . ' and ' . $targetName . '.';
+		} else {
+			$parts[] = 'Source: ' . $ownerName . '. Target: ' . $targetName . '.';
+		}
+	}
+
+	return implode(' ', array_values(array_filter($parts, static fn ($part): bool => trim((string)$part) !== '')));
+}
+
+function rumble_condition_label_for_viewer(string $baseLabel, int $viewerUserId, int $ownerUserId, ?int $targetUserId, array $payload, ?array $state, array $nameByUser): string
+{
+	$ownerName = ($ownerUserId > 0 && isset($nameByUser[$ownerUserId])) ? (string)$nameByUser[$ownerUserId] : ('User ' . $ownerUserId);
+	$targetName = ($targetUserId !== null && $targetUserId > 0 && isset($nameByUser[$targetUserId])) ? (string)$nameByUser[$targetUserId] : ($targetUserId !== null && $targetUserId > 0 ? ('User ' . $targetUserId) : '');
+	$effectKind = trim((string)($payload['effect_kind'] ?? ''));
+	$relation = trim((string)($state['relation'] ?? ''));
+	$scope = trim((string)($state['scope'] ?? ''));
+
+	if ($effectKind === 'delayed_attack' && $targetName !== '') {
+		if ($viewerUserId === $ownerUserId) {
+			return $baseLabel . ' -> ' . $targetName;
+		}
+		if ($viewerUserId === $targetUserId) {
+			return $baseLabel . ' <- ' . $ownerName;
+		}
+	}
+
+	if (($relation === 'symmetric' || $scope === 'pair') && $targetName !== '') {
+		if ($viewerUserId === $ownerUserId) {
+			return $baseLabel . ' <-> ' . $targetName;
+		}
+		if ($viewerUserId === $targetUserId) {
+			return $baseLabel . ' <-> ' . $ownerName;
+		}
+	}
+
+	return $baseLabel;
+}
+
+function rumble_build_active_conditions_by_user(array $playerRows, array $roundStartEffects, array $nameByUser): array
+{
+	$conditionsByUser = [];
+	$playerIds = [];
+	foreach ($playerRows as $row) {
+		$userId = (int)($row['user_id'] ?? 0);
+		if ($userId <= 0) {
+			continue;
+		}
+		$conditionsByUser[$userId] = [];
+		$playerIds[$userId] = true;
+	}
+
+	foreach ($roundStartEffects as $effectRow) {
+		$effectId = (int)($effectRow['id'] ?? 0);
+		$ownerUserId = (int)($effectRow['owner_user_id'] ?? 0);
+		$targetUserId = isset($effectRow['target_user_id']) && $effectRow['target_user_id'] !== null ? (int)$effectRow['target_user_id'] : null;
+		if ($ownerUserId <= 0 || !isset($playerIds[$ownerUserId])) {
+			continue;
+		}
+
+		$payload = rumble_round_effect_payload($effectRow);
+		$state = rumble_runtime_state_from_payload($payload, $ownerUserId, $targetUserId);
+		$effectKind = trim((string)($payload['effect_kind'] ?? ''));
+		if ($state === null && $effectKind !== 'delayed_attack' && $effectKind !== 'attack_bonus') {
+			continue;
+		}
+
+		$sourceAbilityId = rumble_canonical_ability_id((string)($payload['source_ability_id'] ?? ''));
+		$ability = $sourceAbilityId !== '' ? rumble_ability_by_id($sourceAbilityId) : null;
+		$baseLabel = rumble_condition_base_label($ability, $payload, $state);
+		$ownerName = ($ownerUserId > 0 && isset($nameByUser[$ownerUserId])) ? (string)$nameByUser[$ownerUserId] : ('User ' . $ownerUserId);
+		$targetName = ($targetUserId !== null && $targetUserId > 0 && isset($nameByUser[$targetUserId])) ? (string)$nameByUser[$targetUserId] : ($targetUserId !== null && $targetUserId > 0 ? ('User ' . $targetUserId) : '');
+		$description = rumble_condition_description($ability, $payload, $state, $ownerName, $targetName);
+
+		$viewerIds = [$ownerUserId];
+		if ($targetUserId !== null && $targetUserId > 0 && isset($playerIds[$targetUserId])) {
+			$viewerIds[] = $targetUserId;
+		}
+
+		foreach (array_values(array_unique($viewerIds)) as $viewerUserId) {
+			$conditionsByUser[$viewerUserId][] = [
+				'id' => 'round_effect_' . $effectId . '_' . $viewerUserId,
+				'effect_row_id' => $effectId,
+				'source_ability_id' => $sourceAbilityId,
+				'owner_user_id' => $ownerUserId,
+				'target_user_id' => $targetUserId,
+				'effect_kind' => $effectKind,
+				'state_key' => $state !== null ? (string)($state['state_key'] ?? '') : '',
+				'label' => rumble_condition_label_for_viewer($baseLabel, $viewerUserId, $ownerUserId, $targetUserId, $payload, $state, $nameByUser),
+				'description' => $description,
+			];
+		}
+	}
+
+	foreach ($conditionsByUser as &$conditions) {
+		usort($conditions, static function (array $left, array $right): int {
+			$leftId = (int)($left['effect_row_id'] ?? 0);
+			$rightId = (int)($right['effect_row_id'] ?? 0);
+			if ($leftId !== $rightId) {
+				return $leftId <=> $rightId;
+			}
+			return strcmp((string)($left['label'] ?? ''), (string)($right['label'] ?? ''));
+		});
+	}
+	unset($conditions);
+
+	return $conditionsByUser;
+}
+
 function rumble_build_final_standings(int $gameId): ?array
 {
 	if (!rumble_has_standings_table()) {
@@ -177,9 +370,10 @@ function rumble_game_build_detail_payload(int $gameId, array $game, array $user)
 	foreach ($playersStmt->fetchAll() as $row) {
 		$ownedAbilityIds = rumble_parse_owned_abilities(isset($row['owned_abilities_json']) ? (string)$row['owned_abilities_json'] : null);
 		$ownedAbilities = rumble_owned_abilities_public_view($ownedAbilityIds);
+		$currentHealth = max(0, (int)$row['current_health']);
 		$playerRows[] = [
 			'user_id' => (int)$row['user_id'],
-			'current_health' => max(0, (int)$row['current_health']),
+			'current_health' => $currentHealth,
 			'starting_health' => max(0, (int)($row['starting_health'] ?? 100)),
 			'owned_ability_ids' => $ownedAbilityIds,
 		];
@@ -191,8 +385,9 @@ function rumble_game_build_detail_payload(int $gameId, array $game, array $user)
 			'ship_name' => trim((string)($row['ship_name'] ?? '')) !== ''
 				? trim((string)$row['ship_name'])
 				: (string)$row['username'],
-			'health' => max(0, (int)$row['current_health']),
+			'health' => $currentHealth,
 			'starting_health' => max(0, (int)($row['starting_health'] ?? 100)),
+			'energy_budget' => rumble_player_round_energy_budget($currentHealth, $ownedAbilityIds),
 			'is_self' => (int)$row['user_id'] === (int)$user['id'],
 			'is_defeated' => (int)$row['current_health'] <= 0,
 			'member_role' => (string)$row['role'],
@@ -205,7 +400,23 @@ function rumble_game_build_detail_payload(int $gameId, array $game, array $user)
 	}
 
 	$roundStartEffects = rumble_fetch_round_start_effects($gameId, $roundNumber);
+	$roundStartEnergyBonusByUser = [];
+	foreach ($roundStartEffects as $effectRow) {
+		$ownerUserId = (int)($effectRow['owner_user_id'] ?? 0);
+		if ($ownerUserId <= 0) {
+			continue;
+		}
+
+		$payload = rumble_round_effect_payload($effectRow);
+		if ((string)($payload['effect_kind'] ?? '') !== 'energy_bonus') {
+			continue;
+		}
+
+		$roundStartEnergyBonusByUser[$ownerUserId] = max(0, (int)($roundStartEnergyBonusByUser[$ownerUserId] ?? 0))
+			+ max(0, (int)($payload['energy_bonus'] ?? 0));
+	}
 	$targetingState = rumble_collect_round_targeting_state($playerRows, $roundStartEffects);
+	$activeConditionsByUser = rumble_build_active_conditions_by_user($playerRows, $roundStartEffects, $playerNameByUserId);
 	$selfUserId = (int)$user['id'];
 	$selfCannotAttack = !empty($targetingState['cannot_attack_by_user'][$selfUserId]);
 	foreach ($players as &$playerEntry) {
@@ -215,10 +426,12 @@ function rumble_game_build_detail_payload(int $gameId, array $game, array $user)
 		$playerEntry['is_opponent_targetable'] = $isOpponentTargetable;
 		$playerEntry['can_be_attacked_by_self'] = $isOpponentTargetable && !$isBlockedForSelfAttack;
 		$playerEntry['cannot_attack'] = !empty($targetingState['cannot_attack_by_user'][$playerId]);
+		$playerEntry['energy_budget'] = max(0, (int)($playerEntry['energy_budget'] ?? 0)) + max(0, (int)($roundStartEnergyBonusByUser[$playerId] ?? 0));
 		$playerEntry['blocked_attack_target_user_ids'] = array_map(
 			'intval',
 			array_keys((array)($targetingState['blocked_attack_targets_by_user'][$playerId] ?? []))
 		);
+		$playerEntry['active_conditions'] = array_values((array)($activeConditionsByUser[$playerId] ?? []));
 	}
 	unset($playerEntry);
 

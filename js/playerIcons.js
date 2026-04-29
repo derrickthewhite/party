@@ -157,10 +157,6 @@ const EXPLICIT_HUMAN_ICONS = new Set([
 	'AliensByRegionHeads/Human X.svg',
 	'AliensByRegionHeads/Human Y.svg',
 	'AliensByRegionHeads/Human Z.svg',
-
-	'CrimsonNetworkHeads/AquaOracle.svg',
-	'CrimsonNetworkHeads/BronzeCenturion.svg',
-	'CrimsonNetworkHeads/BronzeVanguard.svg',
 	
 	'CrimsonNetworkHeads/Human 1.svg',
 	'CrimsonNetworkHeads/Human 2.svg',

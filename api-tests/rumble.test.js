@@ -18,6 +18,11 @@ function findRumblePlayer(gameDetail, userId) {
   return gameDetail.rumble_turn_progress.players.find((entry) => entry.user_id === userId);
 }
 
+function activeConditionsForPlayer(gameDetail, userId) {
+  const player = findRumblePlayer(gameDetail, userId);
+  return Array.isArray(player && player.active_conditions) ? player.active_conditions : [];
+}
+
 function lastResolvedEventLog(gameDetail) {
   if (gameDetail.status === 'closed') {
     const currentRoundEventLog = gameDetail.rumble_turn_progress.current_round_event_log;
@@ -789,6 +794,14 @@ test('cloaking field burns on use, prevents attacks next round, and expires afte
 
   let detail = await getGameDetail(owner.client, gameId);
   expect(findRumblePlayer(detail, ownerUserId).health).toBe(95);
+  expect(activeConditionsForPlayer(detail, ownerUserId)).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        source_ability_id: 'cloaking_field',
+        state_key: 'untargetable',
+      }),
+    ])
+  );
   expect(eventsForUser(detail, ownerUserId, 'activation:cloaking_field')).toEqual([
     expect.objectContaining({
       payload: expect.objectContaining({
@@ -1459,6 +1472,26 @@ test('hailing frequencies blocks attacks both directions next round and is inval
   });
   await resolveRound(owner.client, gameId);
 
+  let detail = await getGameDetail(owner.client, gameId);
+  expect(activeConditionsForPlayer(detail, ownerUserId)).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        source_ability_id: 'hailing_frequencies',
+        owner_user_id: ownerUserId,
+        target_user_id: target.userId,
+      }),
+    ])
+  );
+  expect(activeConditionsForPlayer(detail, target.userId)).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        source_ability_id: 'hailing_frequencies',
+        owner_user_id: ownerUserId,
+        target_user_id: target.userId,
+      }),
+    ])
+  );
+
   const blockedOwnerAttack = await owner.client.post(`/api/games/${gameId}/actions/rumble-order`, {
     json: {
       attacks: {
@@ -1499,7 +1532,7 @@ test('hailing frequencies blocks attacks both directions next round and is inval
   });
   await resolveRound(owner.client, gameId);
 
-  let detail = await getGameDetail(owner.client, gameId);
+  detail = await getGameDetail(owner.client, gameId);
   expect(findRumblePlayer(detail, ownerUserId).health).toBe(100);
   expect(findRumblePlayer(detail, target.userId).health).toBe(100);
 
@@ -1726,6 +1759,14 @@ test('hyperdrive enters hyperspace next round, blocks attacks while active, and 
 
   let detail = await getGameDetail(owner.client, gameId);
   expect(findRumblePlayer(detail, ownerUserId).health).toBe(95);
+  expect(activeConditionsForPlayer(detail, ownerUserId)).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        source_ability_id: 'hyperdrive',
+        state_key: 'hyperspace_active',
+      }),
+    ])
+  );
   expect(eventsForUser(detail, ownerUserId, 'activation:hyperdrive')).toEqual([
     expect.objectContaining({
       payload: expect.objectContaining({
@@ -2052,6 +2093,26 @@ test('loitering munitions deal X damage at the start of the next round', async (
   await resolveRound(owner.client, gameId);
 
   let detail = await getGameDetail(owner.client, gameId);
+  expect(activeConditionsForPlayer(detail, ownerUserId)).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        source_ability_id: 'loitering_munitions',
+        owner_user_id: ownerUserId,
+        target_user_id: playerUserId,
+        effect_kind: 'delayed_attack',
+      }),
+    ])
+  );
+  expect(activeConditionsForPlayer(detail, playerUserId)).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        source_ability_id: 'loitering_munitions',
+        owner_user_id: ownerUserId,
+        target_user_id: playerUserId,
+        effect_kind: 'delayed_attack',
+      }),
+    ])
+  );
   expect(eventsForUser(detail, ownerUserId, 'activation:loitering_munitions')).toEqual([
     expect.objectContaining({
       payload: expect.objectContaining({
@@ -2085,6 +2146,14 @@ test('torpedo bays add X bonus damage to one attack on the next round', async ()
   await resolveRound(owner.client, gameId);
 
   let detail = await getGameDetail(owner.client, gameId);
+  expect(activeConditionsForPlayer(detail, ownerUserId)).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        source_ability_id: 'torpedo_bays',
+        effect_kind: 'attack_bonus',
+      }),
+    ])
+  );
   expect(eventsForUser(detail, ownerUserId, 'activation:torpedo_bays')).toEqual([
     expect.objectContaining({
       payload: expect.objectContaining({

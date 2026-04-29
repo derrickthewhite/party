@@ -42,6 +42,50 @@ export function createAbilityActivationController(context) {
 	const abilityActivationRowTemplate = createTemplate(ABILITY_ACTIVATION_ROW_TEMPLATE_HTML);
 	const abilityActivationRowsById = new Map();
 
+	function getAvailableAbilityTargets() {
+		return context.serverSnapshot.players.filter(function eachPlayer(player) {
+			return !player.is_self
+				&& !player.is_defeated
+				&& Number(player.health || 0) > 0
+				&& player.is_opponent_targetable !== false;
+		});
+	}
+
+	function getRandomAbilityTargetId(players) {
+		if (!Array.isArray(players) || players.length === 0) {
+			return null;
+		}
+
+		const index = Math.floor(Math.random() * players.length);
+		const target = players[index] || null;
+		const targetId = Number(target && target.user_id ? target.user_id : 0);
+		return targetId > 0 ? targetId : null;
+	}
+
+	function maybeAssignRequiredTarget(ability, activation) {
+		const controlSpec = getAbilityControlSpec(ability);
+		if (!controlSpec.targetRequired) {
+			return;
+		}
+
+		const availableTargets = getAvailableAbilityTargets();
+		const currentTargetId = Math.max(0, Number(activation.target_user_id || 0));
+		const hasValidCurrentTarget = availableTargets.some(function eachTarget(player) {
+			return Number(player.user_id || 0) === currentTargetId;
+		});
+		if (hasValidCurrentTarget) {
+			return;
+		}
+
+		const randomTargetId = getRandomAbilityTargetId(availableTargets);
+		if (randomTargetId === null) {
+			delete activation.target_user_id;
+			return;
+		}
+
+		activation.target_user_id = randomTargetId;
+	}
+
 	function ensureAbilityActivationRow(ability) {
 		const key = getOwnedAbilityDraftKey(ability);
 		if (abilityActivationRowsById.has(key)) {
@@ -73,6 +117,9 @@ export function createAbilityActivationController(context) {
 			const current = normalizeAbilityActivationMap(context.localDraft.abilityActivations || {});
 			const nextEntry = current[key] || {};
 			nextEntry.is_enabled = !!rowRefs.toggleInput.checked;
+			if (nextEntry.is_enabled) {
+				maybeAssignRequiredTarget(ability, nextEntry);
+			}
 			current[key] = nextEntry;
 			context.localDraft.abilityActivations = current;
 			context.localDraft.dirtyAbilityActivations = true;
@@ -156,12 +203,7 @@ export function createAbilityActivationController(context) {
 			});
 		}
 
-		const aliveTargets = context.serverSnapshot.players.filter(function eachPlayer(player) {
-			return !player.is_self
-				&& !player.is_defeated
-				&& Number(player.health || 0) > 0
-				&& player.is_opponent_targetable !== false;
-		});
+		const aliveTargets = getAvailableAbilityTargets();
 
 		const active = new Set();
 		selfOwnedAbilities.forEach(function eachAbility(ability) {

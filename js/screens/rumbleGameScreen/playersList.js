@@ -20,6 +20,7 @@ const PLAYER_ROW_TEMPLATE_HTML = `
 					<div class="rumble-player-name" data-ref="name"></div>
 					<small data-ref="abilities" style="opacity: 0.85; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;"></small>
 				</div>
+				<small data-ref="conditions" style="opacity: 0.85; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap;"></small>
 				<div class="rumble-round-report" data-ref="report"></div>
 			</div>
 		</div>
@@ -56,6 +57,19 @@ function buildAbilityNameById(abilityCatalog) {
 		names.set(abilityId, label || fallbackAbilityName(abilityId));
 	});
 	return names;
+}
+
+function buildAbilityById(abilityCatalog) {
+	const abilities = new Map();
+	(Array.isArray(abilityCatalog) ? abilityCatalog : []).forEach(function eachAbility(ability) {
+		const abilityId = String(ability && ability.id ? ability.id : '').trim();
+		if (!abilityId) {
+			return;
+		}
+
+		abilities.set(abilityId, ability);
+	});
+	return abilities;
 }
 
 function getAbilityName(abilityNameById, abilityId) {
@@ -452,6 +466,22 @@ function createArrowSeparator() {
 	return root;
 }
 
+function ensureChipButton(chipMap, chipId, extraClassName) {
+	let badge = chipMap.get(chipId);
+	if (badge) {
+		return badge;
+	}
+
+	badge = document.createElement('button');
+	badge.type = 'button';
+	badge.className = extraClassName ? ('ability-chip-button ' + extraClassName) : 'ability-chip-button';
+	badge.style.padding = '1px 6px';
+	badge.style.border = '1px solid rgba(0, 0, 0, 0.2)';
+	badge.style.borderRadius = '999px';
+	chipMap.set(chipId, badge);
+	return badge;
+}
+
 function reconcileOwnedAbilities(refs, ownedAbilities, showAbilityInfoModal) {
 	const list = Array.isArray(ownedAbilities) ? ownedAbilities : [];
 	if (list.length === 0) {
@@ -483,16 +513,7 @@ function reconcileOwnedAbilities(refs, ownedAbilities, showAbilityInfoModal) {
 		const ability = groupedEntry.ability;
 		activeIds.add(abilityId);
 
-		let badge = refs.abilityBadgeById.get(abilityId);
-		if (!badge) {
-			badge = document.createElement('button');
-			badge.type = 'button';
-			badge.className = 'ability-chip-button';
-			badge.style.padding = '1px 6px';
-			badge.style.border = '1px solid rgba(0, 0, 0, 0.2)';
-			badge.style.borderRadius = '999px';
-			refs.abilityBadgeById.set(abilityId, badge);
-		}
+			const badge = ensureChipButton(refs.abilityBadgeById, abilityId, '');
 
 		const abilityName = String(ability && (ability.title || ability.name) ? (ability.title || ability.name) : 'Unknown');
 		const description = String(ability && ability.description ? ability.description : 'No description available.');
@@ -517,6 +538,52 @@ function reconcileOwnedAbilities(refs, ownedAbilities, showAbilityInfoModal) {
 	});
 }
 
+function reconcileActiveConditions(refs, activeConditions, abilityById, showAbilityInfoModal) {
+	const list = Array.isArray(activeConditions) ? activeConditions : [];
+	if (list.length === 0) {
+		refs.conditions.style.display = 'none';
+		refs.conditions.textContent = '';
+		refs.conditions.title = '';
+		refs.conditionBadgeById.clear();
+		return;
+	}
+
+	refs.conditions.style.display = '';
+	refs.conditions.title = '';
+
+	const activeIds = new Set();
+	list.forEach(function eachCondition(condition, index) {
+		const conditionId = String(condition && condition.id ? condition.id : ('condition_' + String(index)));
+		activeIds.add(conditionId);
+		const badge = ensureChipButton(refs.conditionBadgeById, conditionId, 'condition-chip-button');
+		const label = String(condition && condition.label ? condition.label : 'Condition');
+		const description = String(condition && condition.description ? condition.description : '');
+		const sourceAbilityId = String(condition && condition.source_ability_id ? condition.source_ability_id : '').trim();
+		const sourceAbility = sourceAbilityId ? abilityById.get(sourceAbilityId) : null;
+
+		badge.textContent = label;
+		badge.title = description || label;
+		badge.onclick = sourceAbility
+			? function onConditionClick() {
+				showAbilityInfoModal(sourceAbility);
+			}
+			: null;
+		placeChildAt(refs.conditions, badge, index);
+	});
+
+	Array.from(refs.conditionBadgeById.keys()).forEach(function eachExisting(conditionId) {
+		if (activeIds.has(conditionId)) {
+			return;
+		}
+
+		const badge = refs.conditionBadgeById.get(conditionId);
+		if (badge && badge.parentNode === refs.conditions) {
+			refs.conditions.removeChild(badge);
+		}
+		refs.conditionBadgeById.delete(conditionId);
+	});
+}
+
 export function createPlayersListController(context) {
 	const root = createNodeFromHtml(PLAYERS_LIST_SECTION_HTML);
 	const refs = collectRefs(root);
@@ -536,11 +603,13 @@ export function createPlayersListController(context) {
 			icon: rowRefs.icon,
 			name: rowRefs.name,
 			abilities: rowRefs.abilities,
+			conditions: rowRefs.conditions,
 			report: rowRefs.report,
 			right: rowRefs.right,
 			label: rowRefs.label,
 			input: rowRefs.input,
 			abilityBadgeById: new Map(),
+			conditionBadgeById: new Map(),
 			reportStartEnergy: createSummarySegment('energy'),
 			reportStartHealth: createSummarySegment('health'),
 			reportAttackSpend: createSummarySegment('attack'),
@@ -616,6 +685,7 @@ export function createPlayersListController(context) {
 		const submittedAttacks = normalizeAttacksMap(context.serverSnapshot.currentOrder && context.serverSnapshot.currentOrder.attacks ? context.serverSnapshot.currentOrder.attacks : {});
 		const editableAttacks = normalizeAttacksMap(context.localDraft.attacks || {});
 		const previousRoundSummaryByUser = buildPreviousRoundSummaryMap(context);
+		const abilityById = buildAbilityById(context.serverSnapshot.abilityCatalog);
 
 		context.serverSnapshot.players.forEach(function eachPlayer(player) {
 			const key = String(Number(player.user_id));
@@ -629,7 +699,9 @@ export function createPlayersListController(context) {
 			rowRefs.name.textContent = displayShipName + ' | Health: ' + Math.max(0, Number(player.health || 0));
 			rowRefs.row.classList.toggle('is-defeated', isDefeated);
 			const ownedAbilities = Array.isArray(player.owned_abilities) ? player.owned_abilities : [];
+			const activeConditions = Array.isArray(player.active_conditions) ? player.active_conditions : [];
 			reconcileOwnedAbilities(rowRefs, ownedAbilities, context.showAbilityInfoModal);
+			reconcileActiveConditions(rowRefs, activeConditions, abilityById, context.showAbilityInfoModal);
 			reconcileRoundSummary(rowRefs, previousRoundSummaryByUser.get(key) || null);
 			placeChildAt(refs.playersList, rowRefs.row, active.size - 1);
 

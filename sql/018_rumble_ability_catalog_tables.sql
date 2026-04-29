@@ -349,7 +349,7 @@ VALUES
     'limits', JSON_ARRAY(),
     'ui', JSON_ARRAY()
   ), 1),
-  ('energy_absorption', 'Energy Absorption', 'round_start_effect', 'round_start_effect', JSON_ARRAY('resource', 'delayed'), 'Spend 10 Energy. At the start of next round, gain Energy equal to half the damage your Defense blocked this round.', JSON_OBJECT(
+    ('energy_absorption', 'Energy Absorption', 'round_start_effect', 'activated_self_or_toggle', JSON_ARRAY('resource', 'delayed'), 'Spend 10 Energy. At the start of next round, gain Energy equal to half the damage your Defense blocked this round.', JSON_OBJECT(
     'schema_version', 1,
     'activation', JSON_OBJECT(
       'kind', 'activated',

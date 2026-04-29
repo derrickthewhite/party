@@ -1,6 +1,59 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
-  <path d="M18 46 Q10 46 10 38 Q10 30 18 30 Q20 22 28 22 Q33 16 40 19 Q48 19 51 27 Q56 28 56 36 Q56 46 46 46 Z" fill="#D8B4FE"/>
-  <circle cx="24" cy="33" r="3" fill="#222"/>
-  <circle cx="40" cy="33" r="3" fill="#222"/>
-  <path d="M23 41 Q32 47 41 41" stroke="#222" stroke-width="3" stroke-linecap="round" fill="none"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="64"
+   height="64"
+   viewBox="0 0 64 64"
+   fill="none"
+   version="1.1"
+   id="svg2"
+   sodipodi:docname="LavenderCloud.svg"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs2" />
+  <sodipodi:namedview
+     id="namedview2"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="9.1171875"
+     inkscape:cx="10.310197"
+     inkscape:cy="23.746358"
+     inkscape:window-width="2560"
+     inkscape:window-height="1369"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg2" />
+  <path
+     d="m 11.137365,50.869565 q -10.78260902,0 -10.78260902,-10.782608 0,-10.782609 10.78260902,-10.782609 2.695652,-10.782609 13.47826,-10.782609 6.739131,-8.086956 16.173914,-4.043478 10.782608,0 14.826086,10.782608 6.739131,1.347827 6.739131,12.130435 0,13.478261 -13.478261,13.478261 z"
+     fill="#d8b4fe"
+     id="path1"
+     style="stroke-width:1.34783" />
+  <circle
+     cx="24"
+     cy="33"
+     r="3"
+     fill="#222"
+     id="circle1" />
+  <circle
+     cx="40"
+     cy="33"
+     r="3"
+     fill="#222"
+     id="circle2" />
+  <path
+     d="M23 41 Q32 47 41 41"
+     stroke="#222"
+     stroke-width="3"
+     stroke-linecap="round"
+     fill="none"
+     id="path2" />
 </svg>

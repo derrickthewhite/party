@@ -211,6 +211,7 @@ export function createRumbleGameScreen(deps) {
 			hasSubmittedOrder: hasSubmittedOrder(),
 			isEditing: uiState.isEditing,
 			currentOrder: serverSnapshot.currentOrder,
+			currentRoundEventLog: serverSnapshot.currentRoundEventLog,
 			players: serverSnapshot.players,
 			effectiveAttacks: getEffectiveAttacks(),
 			effectiveAbilityActivationMap: getEffectiveAbilityActivationMap(),

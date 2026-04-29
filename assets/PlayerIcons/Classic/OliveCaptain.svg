@@ -1,9 +1,80 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
-  <circle cx="32" cy="35" r="25" fill="#B7C97D"/>
-  <path d="M16 16 H48 L42 6 H22 Z" fill="#FFFFFF"/>
-  <rect x="14" y="16" width="36" height="8" rx="4" fill="#1D3557"/>
-  <circle cx="32" cy="16" r="4.5" fill="#D4AF37"/>
-  <circle cx="23" cy="32" r="3.5" fill="#222"/>
-  <circle cx="41" cy="32" r="3.5" fill="#222"/>
-  <path d="M21 46 Q32 51 43 46" stroke="#222" stroke-width="3" stroke-linecap="round" fill="none"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="64"
+   height="64"
+   viewBox="0 0 64 64"
+   fill="none"
+   version="1.1"
+   id="svg4"
+   sodipodi:docname="OliveCaptain.svg"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs4" />
+  <sodipodi:namedview
+     id="namedview4"
+     pagecolor="#aeaeae"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="12.89365"
+     inkscape:cx="27.998278"
+     inkscape:cy="32.457837"
+     inkscape:window-width="2560"
+     inkscape:window-height="1369"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg4" />
+  <circle
+     cx="32"
+     cy="35"
+     r="25"
+     fill="#B7C97D"
+     id="circle1" />
+  <path
+     d="M 13.285486,16 H 50.714514 L 43.696572,6 H 20.303428 Z"
+     fill="#ffffff"
+     id="path1"
+     style="stroke-width:1.08151" />
+  <rect
+     x="10.587467"
+     y="14"
+     width="42.825066"
+     height="8"
+     rx="4.7583404"
+     fill="#1d3557"
+     id="rect1"
+     style="stroke-width:1.09068" />
+  <circle
+     cx="32"
+     cy="16"
+     r="4.5"
+     fill="#D4AF37"
+     id="circle2" />
+  <circle
+     cx="23"
+     cy="32"
+     r="3.5"
+     fill="#222"
+     id="circle3" />
+  <circle
+     cx="41"
+     cy="32"
+     r="3.5"
+     fill="#222"
+     id="circle4" />
+  <path
+     d="M21 46 Q32 51 43 46"
+     stroke="#222"
+     stroke-width="3"
+     stroke-linecap="round"
+     fill="none"
+     id="path4" />
 </svg>

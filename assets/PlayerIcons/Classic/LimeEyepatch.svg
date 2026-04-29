@@ -1,7 +1,67 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64" fill="none">
-  <circle cx="32" cy="32" r="28" fill="#A8E063"/>
-  <path d="M12 21 L52 27" stroke="#222" stroke-width="3" stroke-linecap="round"/>
-  <path d="M17 22 Q22 17 28 22 Q22 29 17 22" fill="#222"/>
-  <circle cx="42" cy="27" r="3.5" fill="#222"/>
-  <path d="M19 42 Q32 54 45 42" stroke="#222" stroke-width="3" stroke-linecap="round" fill="none"/>
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="64"
+   height="64"
+   viewBox="0 0 64 64"
+   fill="none"
+   version="1.1"
+   id="svg3"
+   sodipodi:docname="LimeEyepatch.svg"
+   inkscape:version="1.4.2 (f4327f4, 2025-05-13)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs3" />
+  <sodipodi:namedview
+     id="namedview3"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="18.234375"
+     inkscape:cx="31.972579"
+     inkscape:cy="32"
+     inkscape:window-width="2560"
+     inkscape:window-height="1369"
+     inkscape:window-x="-8"
+     inkscape:window-y="-8"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg3" />
+  <circle
+     cx="32"
+     cy="32"
+     r="28"
+     fill="#A8E063"
+     id="circle1" />
+  <path
+     d="M 54.961439,17.928877 5.0899741,26.616109"
+     stroke="#222222"
+     stroke-width="3"
+     stroke-linecap="round"
+     id="path1"
+     sodipodi:nodetypes="cc" />
+  <path
+     d="M 11.918788,26.014337 C 16.521725,19.011186 22.905073,17.691069 31.068832,22.053984 26.562474,34.726952 20.233146,36.263149 11.918788,26.014337"
+     fill="#222222"
+     id="path2"
+     style="stroke-width:1.77775"
+     sodipodi:nodetypes="ccc" />
+  <circle
+     cx="42"
+     cy="27"
+     r="3.5"
+     fill="#222"
+     id="circle2" />
+  <path
+     d="M19 42 Q32 54 45 42"
+     stroke="#222"
+     stroke-width="3"
+     stroke-linecap="round"
+     fill="none"
+     id="path3" />
 </svg>

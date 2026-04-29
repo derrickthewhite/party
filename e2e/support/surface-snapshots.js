@@ -109,6 +109,7 @@ async function readRumbleSnapshot(page) {
     const playerRows = Array.from(activeScreen.querySelectorAll('.rumble-player-row')).map((node) => ({
       name: (node.querySelector('[data-ref="name"]') || { textContent: '' }).textContent.trim(),
       abilities: (node.querySelector('[data-ref="abilities"]') || { textContent: '' }).textContent.trim(),
+      conditions: (node.querySelector('[data-ref="conditions"]') || { textContent: '' }).textContent.trim(),
     }));
 
     const targetOptions = Array.from(activeScreen.querySelectorAll('[data-ref="adminCheatTargetSelect"] option')).map((node) => node.textContent.trim());
