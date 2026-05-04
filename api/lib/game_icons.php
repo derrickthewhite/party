@@ -6,6 +6,171 @@ require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/http.php';
 require_once __DIR__ . '/sql.php';
 
+function game_prefixed_icon_catalog(string $folderName, array $fileNames): array
+{
+    return array_map(static function (string $fileName) use ($folderName): string {
+        return $folderName . '/' . $fileName;
+    }, $fileNames);
+}
+
+function game_explicit_human_icon_catalog(): array
+{
+    return array_merge(
+        game_prefixed_icon_catalog('FairyTaleWarHeads', [
+            'BarredHelm.svg',
+            'BeardedKing.svg',
+            'CrownedKing.svg',
+            'GreatHelm.svg',
+            'GreyHoodWoman.svg',
+            'HeadbandPage.svg',
+            'HeadbandWarrior.svg',
+            'MailCapWarrior.svg',
+            'MustachedKing.svg',
+            'NasalHelm.svg',
+            'SternKing.svg',
+            'StripedCapPage.svg',
+            'SunPriestess.svg',
+            'WhiteHairedNoble.svg',
+            'Witch.svg',
+            'YoungKing.svg',
+            'ClosedKnightHelm.svg',
+            'TVisorHelm.svg',
+        ]),
+        game_prefixed_icon_catalog('FantasyHeads', [
+            'Black Headwrap Man.svg',
+            'Grenadier Mustache.svg',
+            'Outlaw.svg',
+            'Roman Soldier.svg',
+            'Tall Shako Soldier.svg',
+            'Long Bandana Skull.svg',
+        ]),
+        game_prefixed_icon_catalog('AliensByRegionHeads', [
+            'Human A.svg',
+            'Human B.svg',
+            'Human C.svg',
+            'Human D.svg',
+            'Human E.svg',
+            'Human F.svg',
+            'Human G.svg',
+            'Human H.svg',
+            'Human I.svg',
+            'Human J.svg',
+            'Human K.svg',
+            'Human L.svg',
+            'Human M.svg',
+            'Human N.svg',
+            'Human R.svg',
+            'Human X.svg',
+            'Human Y.svg',
+            'Human Z.svg',
+        ]),
+        game_prefixed_icon_catalog('CrimsonNetworkHeads', [
+            'Human 1.svg',
+            'Human 2.svg',
+            'Human 3.svg',
+            'Human 4.svg',
+            'Human 5.svg',
+            'Human 6.svg',
+            'Human 7.svg',
+            'Human 8.svg',
+            'Human 9.svg',
+        ]),
+        game_prefixed_icon_catalog('PsiWarsHeads', [
+            'Human A1.svg',
+            'Human A2.svg',
+            'Human A3.svg',
+            'Human A4.svg',
+            'Human A5.svg',
+            'Human A6.svg',
+            'Human A7.svg',
+            'Human A8.svg',
+            'Human A9.svg',
+            'Human A10.svg',
+            'Human A11.svg',
+            'Human A12.svg',
+            'Human A13.svg',
+            'Human A14.svg',
+            'Human A15.svg',
+            'Human A16.svg',
+            'Human A17.svg',
+            'Human A18.svg',
+            'Human B2.svg',
+            'Human B3.svg',
+            'Human B4.svg',
+            'Human B5.svg',
+            'Human B6.svg',
+            'Human B7.svg',
+            'Human B8.svg',
+            'Human B9.svg',
+            'Human B10.svg',
+            'Human B11.svg',
+            'Human B12.svg',
+            'Human B13.svg',
+            'Human b14.svg',
+            'Human B15.svg',
+            'Human Helmet 1.svg',
+        ])
+    );
+}
+
+function game_explicit_animal_icon_catalog(): array
+{
+    return array_merge(
+        game_prefixed_icon_catalog('FairyTaleWarHeads', [
+            'BlackCat.svg',
+            'BoarHead.svg',
+            'GreenDragon.svg',
+            'TuskOgre.svg',
+        ]),
+        game_prefixed_icon_catalog('FantasyHeads', [
+            'Black Horse.svg',
+            'Brown Horse.svg',
+            'Brown Lizard.svg',
+            'Brown Mare.svg',
+            'Buckskin Horse.svg',
+            'Chameleon.svg',
+            'Panda.svg',
+            'Red Panda.svg',
+            'Pterosaur.svg',
+            'Raptor.svg',
+            'Triceratops.svg',
+            'Turtle Beast.svg',
+            'Tyrannasaur.svg',
+            'Wolf.svg',
+            'Unicorn.svg',
+            'Dragon.svg',
+        ]),
+        game_prefixed_icon_catalog('Classic', [
+            'RoseCatGlasses.svg',
+        ]),
+        game_prefixed_icon_catalog('AliensByRegionHeads', [
+            'Cat (Black).svg',
+            'Cat (Ginger).svg',
+            'Cat (Grey).svg',
+            'Cat (Tiger).svg',
+            'Cat (White).svg',
+            'Snake (Black).svg',
+            'Snake (Brown).svg',
+            'Snake (Green).svg',
+            'Snake (Orange).svg',
+            'Mogwai A.svg',
+            'Mogwai B.svg',
+        ]),
+        game_prefixed_icon_catalog('CrimsonNetworkHeads', [
+            'GoldFox.svg',
+            'SandFox.svg',
+            'Scarab.svg',
+            'Tiger.svg',
+            'Saurian.svg',
+            'Ant.svg',
+            'Keleni.svg',
+            'Hunter 1.svg',
+            'Hunter 2.svg',
+            'Grey Hairless.svg',
+        ])
+    );
+}
+
 function game_default_icon_catalog(): array
 {
     static $defaultCatalog = null;
@@ -13,7 +178,7 @@ function game_default_icon_catalog(): array
         return $defaultCatalog;
     }
 
-    $defaultCatalog = [
+    $defaultCatalog = array_values(array_unique(array_merge([
         'Classic/AmberHardHat.svg',
         'Classic/AquaAviators.svg',
         'Classic/BlackMask.svg',
@@ -46,9 +211,27 @@ function game_default_icon_catalog(): array
         'Classic/SlateFedora.svg',
         'Classic/TealWink.svg',
         'Classic/yellowSmile.svg',
-    ];
+    ], game_explicit_human_icon_catalog(), game_explicit_animal_icon_catalog())));
 
     return $defaultCatalog;
+}
+
+function game_default_icon_catalog_for_game(int $gameId): array
+{
+    static $catalogByGameId = [];
+    if (isset($catalogByGameId[$gameId]) && is_array($catalogByGameId[$gameId])) {
+        return $catalogByGameId[$gameId];
+    }
+
+    $catalog = game_default_icon_catalog();
+    usort($catalog, static function (string $left, string $right) use ($gameId): int {
+        $leftWeight = hash('sha256', $gameId . ':' . $left);
+        $rightWeight = hash('sha256', $gameId . ':' . $right);
+        return strcmp($leftWeight, $rightWeight);
+    });
+
+    $catalogByGameId[$gameId] = $catalog;
+    return $catalogByGameId[$gameId];
 }
 
 function game_icon_assets_dir(): string
@@ -224,7 +407,7 @@ function game_assign_missing_member_icons(int $gameId): void
         return;
     }
 
-    $catalog = game_default_icon_catalog();
+    $catalog = game_default_icon_catalog_for_game($gameId);
     if (empty($catalog)) {
         return;
     }

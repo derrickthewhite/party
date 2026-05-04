@@ -35,6 +35,7 @@ CREATE TABLE IF NOT EXISTS game_members (
   game_id INTEGER NOT NULL,
   user_id INTEGER NOT NULL,
   role TEXT NOT NULL DEFAULT 'player' CHECK(role IN ('owner', 'player', 'observer')),
+  icon_key TEXT NULL,
   joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (game_id, user_id),
   FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE ON UPDATE CASCADE,

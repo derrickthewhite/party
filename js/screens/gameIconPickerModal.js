@@ -5,6 +5,7 @@ import {
 	normalizePlayerIconKey,
 	playerIconGroupLabel,
 	playerIconLabel,
+	playerIconThemeKey,
 	setPlayerIconImage,
 } from '../playerIcons.js';
 
@@ -23,6 +24,16 @@ const ICON_PICKER_MODAL_HTML = `
 		</div>
 	</div>
 `;
+
+const ICON_GROUP_ORDER = new Map([
+	['classic', 0],
+	['humans', 1],
+	['animals', 2],
+	['monster', 3],
+	['fantasy', 4],
+	['alien', 5],
+	['science-fiction', 6],
+]);
 
 function buildIconGroups(iconCatalog) {
 	const availableIcons = Array.isArray(iconCatalog) ? iconCatalog.slice() : [];
@@ -54,14 +65,21 @@ function buildIconGroups(iconCatalog) {
 		if (isPlayerIconHuman(iconKey)) {
 			addToGroup('humans');
 		}
+		const themeKey = playerIconThemeKey(iconKey);
+		if (themeKey) {
+			addToGroup(themeKey);
+		}
 	});
 
 	return Array.from(iconGroupsByKey.values()).sort(function compareIconGroups(left, right) {
-		if (left.key === '' && right.key !== '') {
-			return -1;
-		}
-		if (left.key !== '' && right.key === '') {
-			return 1;
+		const leftOrder = ICON_GROUP_ORDER.has(String(left.key || '').toLowerCase())
+			? ICON_GROUP_ORDER.get(String(left.key || '').toLowerCase())
+			: Number.MAX_SAFE_INTEGER;
+		const rightOrder = ICON_GROUP_ORDER.has(String(right.key || '').toLowerCase())
+			? ICON_GROUP_ORDER.get(String(right.key || '').toLowerCase())
+			: Number.MAX_SAFE_INTEGER;
+		if (leftOrder !== rightOrder) {
+			return leftOrder - rightOrder;
 		}
 
 		return left.label.localeCompare(right.label);
