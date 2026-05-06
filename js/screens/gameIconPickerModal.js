@@ -88,11 +88,11 @@ function buildIconGroups(iconCatalog) {
 
 export function showGameIconPickerModal(options) {
 	const config = options || {};
-	const normalizedCurrentIconKey = typeof config.currentIconKey === 'string' ? config.currentIconKey.trim() : '';
+	const normalizedCurrentIconKey = normalizePlayerIconKey(config.currentIconKey);
 	const tabGroups = buildIconGroups(config.iconCatalog);
 	let activeGroupKey = tabGroups.find(function hasCurrentSelection(group) {
 		return group.icons.some(function isCurrentIcon(iconKey) {
-			return String(iconKey) === String(normalizedCurrentIconKey);
+			return normalizePlayerIconKey(iconKey) === normalizedCurrentIconKey;
 		});
 	})?.key || (tabGroups[0] ? tabGroups[0].key : '');
 	const priorFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -172,7 +172,7 @@ export function showGameIconPickerModal(options) {
 				const option = document.createElement('button');
 				option.type = 'button';
 				option.className = 'mafia-icon-option';
-				option.classList.toggle('is-selected', String(iconKey) === String(normalizedCurrentIconKey));
+				option.classList.toggle('is-selected', normalizePlayerIconKey(iconKey) === normalizedCurrentIconKey);
 
 				const icon = document.createElement('img');
 				icon.className = 'player-icon mafia-icon-option-image';

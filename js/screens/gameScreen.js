@@ -1,7 +1,7 @@
 import { collectRefs, createNodeFromHtml, setStatus, showConfirmModal } from './dom.js';
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
 import { createGameParticipantsSidebarController } from './gameParticipantsSidebar.js';
-import { playerIconLabel, setPlayerIconImage } from '../playerIcons.js';
+import { pickRandomPlayerIconKey, playerIconLabel, setPlayerIconImage } from '../playerIcons.js';
 import { collectGameInfoIcons, setGameInfoIconNode } from '../gameStateIcons.js';
 import { showGameIconPickerModal } from './gameIconPickerModal.js';
 
@@ -38,7 +38,10 @@ export function createBaseGameScreen(deps, options) {
 							<small class="mafia-target-meta" data-ref="memberIconHint"></small>
 						</div>
 					</div>
-					${createGameActionButtonMarkup('change-icon', 'changeIconBtn', 'mafia-icon-action-button')}
+					<div class="row" data-ref="memberIconActions">
+						${createGameActionButtonMarkup('random-icon', 'randomIconBtn', 'mafia-icon-action-button')}
+						${createGameActionButtonMarkup('change-icon', 'changeIconBtn', 'mafia-icon-action-button')}
+					</div>
 				</div>
 			</div>
 			<div class="chat-layout-shell${config.showParticipantsPanel ? ' chat-layout-shell-with-sidebar' : ''}" data-ref="shell">
@@ -78,6 +81,7 @@ export function createBaseGameScreen(deps, options) {
 	const memberIconPreview = refs.memberIconPreview;
 	const memberIconLabel = refs.memberIconLabel;
 	const memberIconHint = refs.memberIconHint;
+	const randomIconBtn = refs.randomIconBtn;
 	const changeIconBtn = refs.changeIconBtn;
 	const feed = refs.feed;
 	const composerRow = refs.composerRow;
@@ -171,21 +175,43 @@ export function createBaseGameScreen(deps, options) {
 			return;
 		}
 
+		await saveSelectedIcon(activeGame, selectedIconKey, 'Icon updated.');
+	});
+
+	randomIconBtn.addEventListener('click', async function onRandomizeIcon() {
+		const activeGame = state.state.activeGame;
+		const member = getCurrentUserMember(activeGame);
+		if (!canChangeLobbyIcon(activeGame, member)) {
+			return;
+		}
+
+		const randomIconKey = pickRandomPlayerIconKey(
+			Array.isArray(activeGame && activeGame.icon_catalog) ? activeGame.icon_catalog : [],
+			member && member.icon_key ? member.icon_key : null
+		);
+		if (!randomIconKey) {
+			return;
+		}
+
+		await saveSelectedIcon(activeGame, randomIconKey, 'Icon randomized.');
+	});
+
+	async function saveSelectedIcon(activeGame, iconKey, successMessage) {
 		iconBusy = true;
 		setGame(activeGame);
 		try {
-			await api.setGameIcon(activeGame.id, selectedIconKey);
+			await api.setGameIcon(activeGame.id, iconKey);
 			const detail = await api.gameDetail(activeGame.id);
 			state.patch({ activeGame: detail.game });
 			setGame(detail.game);
-			setStatus(status, 'Icon updated.', 'ok');
+			setStatus(status, successMessage, 'ok');
 		} catch (err) {
 			setStatus(status, err.message, 'error');
 		} finally {
 			iconBusy = false;
 			setGame(state.state.activeGame || activeGame);
 		}
-	});
+	}
 
 	sendButton.addEventListener('click', async function onSendClick() {
 		const activeGame = state.state.activeGame;
@@ -387,6 +413,8 @@ export function createBaseGameScreen(deps, options) {
 		adminDelete.disabled = !perms.can_delete;
 		leave.style.display = canLeave ? '' : 'none';
 		leave.disabled = !canLeave;
+		randomIconBtn.classList.toggle('is-busy', iconBusy);
+		setGameActionButtonLabel(randomIconBtn, iconBusy ? 'Randomizing icon...' : 'Randomize icon');
 		changeIconBtn.classList.toggle('is-busy', iconBusy);
 		setGameActionButtonLabel(changeIconBtn, iconBusy ? 'Saving icon...' : 'Change icon');
 
@@ -422,8 +450,10 @@ export function createBaseGameScreen(deps, options) {
 			setPlayerIconImage(memberIconPreview, currentMember && currentMember.icon_key ? currentMember.icon_key : null, currentMember && currentMember.username ? currentMember.username : 'Player');
 			memberIconLabel.textContent = currentMember && currentMember.icon_key ? playerIconLabel(currentMember.icon_key) : 'No icon assigned yet';
 			memberIconHint.textContent = 'Visible in chat and participant lists.';
+			randomIconBtn.disabled = !canChangeLobbyIcon(game, currentMember);
 			changeIconBtn.disabled = !canChangeLobbyIcon(game, currentMember);
 		} else {
+			randomIconBtn.disabled = true;
 			changeIconBtn.disabled = true;
 		}
 

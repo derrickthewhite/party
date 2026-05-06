@@ -209,3 +209,38 @@ test('default icon assignment can reach human and animal icons', async () => {
   expect(memberIconKeys).toContain(milestones.firstHumanKey);
   expect(memberIconKeys).toContain(milestones.firstAnimalKey);
 });
+
+test('new games do not always assign classic icons first', async () => {
+  const baseURL = getServerInfo().baseURL;
+  const owner = await registerAndSignIn(baseURL, 'mixed-default-owner');
+  const ownerIconKeys = [];
+
+  for (let index = 0; index < 8; index += 1) {
+    const createResponse = await owner.client.post('/api/games', {
+      json: {
+        title: `mixed-default-${index}-${Date.now().toString(36)}`,
+        game_type: 'chat',
+      },
+    });
+
+    expect(createResponse.status).toBe(201);
+    const gameId = createResponse.body.data.game.id;
+
+    const detailResponse = await owner.client.get(`/api/games/${gameId}`);
+    expect(detailResponse.status).toBe(200);
+
+    const ownerMember = detailResponse.body.data.game.members.find((member) => {
+      return member.username === owner.credentials.username;
+    });
+
+    expect(ownerMember).toEqual(expect.objectContaining({
+      username: owner.credentials.username,
+      icon_key: expect.any(String),
+    }));
+
+    ownerIconKeys.push(ownerMember.icon_key);
+  }
+
+  expect(new Set(ownerIconKeys).size).toBeGreaterThan(1);
+  expect(ownerIconKeys.some((iconKey) => !String(iconKey).startsWith('Classic/'))).toBe(true);
+});

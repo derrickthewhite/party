@@ -66,6 +66,7 @@ This document lists all icons needed to represent UI states and button choices f
   - `tab` — icon group tab state (active/inactive).
   - `grid-option` — icon option tile (normal / selected / focused).
   - `selected-check` — overlay checkmark for selected icon.
+  - `random-icon` — randomize to a new icon from the available catalog.
   - `cancel` — cancel selection.
 
 ## History / Results
@@ -123,6 +124,9 @@ Monochrome SVG, 24x24 viewBox, solid glyph of a rolled parchment message with a 
 
 ### Change Icon
 Monochrome SVG, 24x24 viewBox, solid glyph of a round portrait medallion with a simple face silhouette and a small swap arrow motif wrapping one side; medieval badge feel, bold centered silhouette, optimized for 16px, single fill.
+
+### Random Icon
+Monochrome SVG, 24x24 viewBox, solid glyph of a compact die or pair of dice with bold pips and a slight sense of tumble or chance; strong centered silhouette, optimized for 16px, single fill.
 
 ### Suggest
 Monochrome SVG, 24x24 viewBox, solid glyph of a subtle proposing gesture such as a hand or token offering toward a target marker, less forceful than a vote icon; simple readable shapes, strong silhouette, optimized for 16px, single fill.
@@ -263,6 +267,6 @@ Monochrome SVG, 24x24 viewBox, filled glyph of a compact medical cross nested in
 Monochrome SVG, 24x24 viewBox, filled glyph of a short broad directional arrow pointing right, simple centered silhouette, readable at 14px.
 
 ---
-Current implementation includes initial SVGs for `create-game`, `send-message`, `change-icon`, `suggest`, `vote`, and `withdraw-vote` under `assets/ButtonIcons/`.
+Current implementation includes initial SVGs for `create-game`, `send-message`, `change-icon`, `random-icon`, `suggest`, `vote`, and `withdraw-vote` under `assets/ButtonIcons/`.
 
 The compact Rumble round-report icon set is implemented under `assets/GameStateIcons/` as `RumbleReportEnergy.svg`, `RumbleReportHealth.svg`, `RumbleReportAttack.svg`, `RumbleReportAbilities.svg`, `RumbleReportDefense.svg`, `RumbleReportIncoming.svg`, `RumbleReportDamage.svg`, `RumbleReportBurn.svg`, `RumbleReportHeal.svg`, and `RumbleReportArrow.svg`.

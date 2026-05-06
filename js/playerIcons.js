@@ -18,6 +18,41 @@ export function normalizePlayerIconKey(iconKey) {
 	return segments.join('/');
 }
 
+export function pickRandomPlayerIconKey(iconCatalog, currentIconKey) {
+	const normalizedCurrentIconKey = normalizePlayerIconKey(currentIconKey);
+	const availableIcons = Array.isArray(iconCatalog) ? iconCatalog : [];
+	const seenKeys = new Set();
+	const selectableIcons = availableIcons.filter(function isSelectableIcon(iconKey) {
+		const normalizedIconKey = normalizePlayerIconKey(iconKey);
+		if (!normalizedIconKey || seenKeys.has(normalizedIconKey)) {
+			return false;
+		}
+		seenKeys.add(normalizedIconKey);
+		return normalizedIconKey !== normalizedCurrentIconKey;
+	});
+
+	if (!selectableIcons.length) {
+		return null;
+	}
+
+	const index = randomIndex(selectableIcons.length);
+	return selectableIcons[index] || null;
+}
+
+function randomIndex(limit) {
+	if (!Number.isFinite(limit) || limit <= 0) {
+		return 0;
+	}
+
+	if (typeof crypto !== 'undefined' && crypto && typeof crypto.getRandomValues === 'function') {
+		const values = new Uint32Array(1);
+		crypto.getRandomValues(values);
+		return values[0] % limit;
+	}
+
+	return Math.floor(Math.random() * limit);
+}
+
 function humanizeIconName(value) {
 	return String(value || '')
 		.replace(/([a-z0-9])([A-Z])/g, '$1 $2')

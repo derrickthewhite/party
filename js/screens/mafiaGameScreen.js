@@ -1,7 +1,7 @@
 import { cloneTemplateNode, collectRefs, createNodeFromHtml, createTemplate } from './dom.js';
 import { createBaseGameScreen } from './gameScreen.js';
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
-import { playerIconLabel, setPlayerIconImage } from '../playerIcons.js';
+import { pickRandomPlayerIconKey, playerIconLabel, setPlayerIconImage } from '../playerIcons.js';
 import { buttonIconUrl } from '../buttonIcons.js';
 import { ensureActionTypeIcon } from './gameActionButtons.js';
 import { collectGameInfoIcons, setGameInfoIconNode } from '../gameStateIcons.js';
@@ -40,7 +40,10 @@ const MAFIA_PANEL_HTML = `
 						<small class="mafia-target-meta" data-ref="iconHint"></small>
 					</div>
 				</div>
-				${createGameActionButtonMarkup('change-icon', 'changeIconBtn', 'mafia-icon-action-button')}
+				<div class="row" data-ref="iconActions">
+					${createGameActionButtonMarkup('random-icon', 'randomIconBtn', 'mafia-icon-action-button')}
+					${createGameActionButtonMarkup('change-icon', 'changeIconBtn', 'mafia-icon-action-button')}
+				</div>
 			</div>
 			<div class="row mobile-stack">
 				<button class="primary" data-ref="readyBtn">I&apos;m Ready</button>
@@ -111,6 +114,7 @@ export function createMafiaGameScreen(deps) {
 	const iconPreview = refs.iconPreview;
 	const iconLabel = refs.iconLabel;
 	const iconHint = refs.iconHint;
+	const randomIconBtn = refs.randomIconBtn;
 	const changeIconBtn = refs.changeIconBtn;
 	const readyBtn = refs.readyBtn;
 	const voteCard = refs.voteCard;
@@ -612,6 +616,9 @@ export function createMafiaGameScreen(deps) {
 		setPlayerIconImage(iconPreview, player && player.icon_key ? player.icon_key : null, player && player.username ? player.username : 'Player');
 		iconLabel.textContent = player && player.icon_key ? playerIconLabel(player.icon_key) : 'No icon assigned yet';
 		iconHint.textContent = 'Visible in chat and on every mafia player row.';
+		randomIconBtn.classList.toggle('is-busy', iconBusy);
+		setGameActionButtonLabel(randomIconBtn, iconBusy ? 'Randomizing icon...' : 'Randomize icon');
+		randomIconBtn.disabled = !canChangeIcon();
 		changeIconBtn.classList.toggle('is-busy', iconBusy);
 		setGameActionButtonLabel(changeIconBtn, iconBusy ? 'Saving icon...' : 'Change icon');
 		changeIconBtn.disabled = !canChangeIcon();
@@ -658,6 +665,21 @@ export function createMafiaGameScreen(deps) {
 		reconcileUi();
 	}
 
+	async function savePlayerIcon(iconKey, successMessage) {
+		iconBusy = true;
+		reconcileUi();
+		try {
+			await deps.api.setGameIcon(lastGameId, iconKey);
+			await fetchAndApplyGameDetail();
+			setStatusNode(successMessage, 'ok');
+		} catch (err) {
+			setStatusNode(err.message || 'Unable to update icon.', 'error');
+		} finally {
+			iconBusy = false;
+			reconcileUi();
+		}
+	}
+
 	async function updateIconSelection() {
 		const player = selfPlayer();
 		if (!player || !canChangeIcon()) {
@@ -674,18 +696,21 @@ export function createMafiaGameScreen(deps) {
 			return;
 		}
 
-		iconBusy = true;
-		reconcileUi();
-		try {
-			await deps.api.setGameIcon(lastGameId, selectedIconKey);
-			await fetchAndApplyGameDetail();
-			setStatusNode('Icon updated.', 'ok');
-		} catch (err) {
-			setStatusNode(err.message || 'Unable to update icon.', 'error');
-		} finally {
-			iconBusy = false;
-			reconcileUi();
+		await savePlayerIcon(selectedIconKey, 'Icon updated.');
+	}
+
+	async function randomizeIconSelection() {
+		const player = selfPlayer();
+		if (!player || !canChangeIcon()) {
+			return;
 		}
+
+		const randomIconKey = pickRandomPlayerIconKey(serverSnapshot.iconCatalog, player.icon_key || null);
+		if (!randomIconKey) {
+			return;
+		}
+
+		await savePlayerIcon(randomIconKey, 'Icon randomized.');
 	}
 
 	async function updateSetupSelection() {
@@ -866,6 +891,7 @@ export function createMafiaGameScreen(deps) {
 	});
 
 	readyBtn.addEventListener('click', submitReadyAction);
+	randomIconBtn.addEventListener('click', randomizeIconSelection);
 	changeIconBtn.addEventListener('click', updateIconSelection);
 	withdrawVoteBtn.addEventListener('click', withdrawVote);
 
