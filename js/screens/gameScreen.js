@@ -1,7 +1,7 @@
 import { collectRefs, createNodeFromHtml, setStatus, showConfirmModal } from './dom.js';
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
 import { createGameParticipantsSidebarController } from './gameParticipantsSidebar.js';
-import { pickRandomPlayerIconKey, playerIconLabel, setPlayerIconImage } from '../playerIcons.js';
+import { pickRandomPlayerIconKey, setPlayerIconImage } from '../playerIcons.js';
 import { collectGameInfoIcons, setGameInfoIconNode } from '../gameStateIcons.js';
 import { showGameIconPickerModal } from './gameIconPickerModal.js';
 
@@ -33,10 +33,7 @@ export function createBaseGameScreen(deps, options) {
 				<div class="mafia-icon-row" data-ref="memberIconRow">
 					<div class="mafia-icon-chip">
 						<img class="player-icon mafia-icon-preview" data-ref="memberIconPreview" alt="">
-						<div>
-							<div class="mafia-icon-label" data-ref="memberIconLabel"></div>
-							<small class="mafia-target-meta" data-ref="memberIconHint"></small>
-						</div>
+						<small class="mafia-target-meta" data-ref="memberIconHint"></small>
 					</div>
 					<div class="row" data-ref="memberIconActions">
 						${createGameActionButtonMarkup('random-icon', 'randomIconBtn', 'mafia-icon-action-button')}
@@ -79,7 +76,6 @@ export function createBaseGameScreen(deps, options) {
 	const memberIconCard = refs.memberIconCard;
 	const memberIconIntro = refs.memberIconIntro;
 	const memberIconPreview = refs.memberIconPreview;
-	const memberIconLabel = refs.memberIconLabel;
 	const memberIconHint = refs.memberIconHint;
 	const randomIconBtn = refs.randomIconBtn;
 	const changeIconBtn = refs.changeIconBtn;
@@ -448,7 +444,6 @@ export function createBaseGameScreen(deps, options) {
 		if (showMemberIconCard) {
 			memberIconIntro.textContent = 'Choose the icon you want to use in this game while the lobby is open.';
 			setPlayerIconImage(memberIconPreview, currentMember && currentMember.icon_key ? currentMember.icon_key : null, currentMember && currentMember.username ? currentMember.username : 'Player');
-			memberIconLabel.textContent = currentMember && currentMember.icon_key ? playerIconLabel(currentMember.icon_key) : 'No icon assigned yet';
 			memberIconHint.textContent = 'Visible in chat and participant lists.';
 			randomIconBtn.disabled = !canChangeLobbyIcon(game, currentMember);
 			changeIconBtn.disabled = !canChangeLobbyIcon(game, currentMember);

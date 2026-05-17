@@ -169,21 +169,20 @@ export function showGameIconPickerModal(options) {
 			});
 
 			iconOptionsForActiveGroup().forEach(function eachIcon(iconKey) {
+				const iconTitle = playerIconLabel(iconKey);
 				const option = document.createElement('button');
 				option.type = 'button';
 				option.className = 'mafia-icon-option';
 				option.classList.toggle('is-selected', normalizePlayerIconKey(iconKey) === normalizedCurrentIconKey);
+				option.title = iconTitle;
+				option.setAttribute('aria-label', iconTitle);
 
 				const icon = document.createElement('img');
 				icon.className = 'player-icon mafia-icon-option-image';
 				icon.setAttribute('aria-hidden', 'true');
 				setPlayerIconImage(icon, iconKey, 'Player');
 
-				const label = document.createElement('span');
-				label.textContent = playerIconLabel(iconKey);
-
 				option.appendChild(icon);
-				option.appendChild(label);
 				option.addEventListener('click', function onSelect() {
 					close(iconKey);
 				});

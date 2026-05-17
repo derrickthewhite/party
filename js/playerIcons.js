@@ -64,6 +64,10 @@ function humanizeIconName(value) {
 		});
 }
 
+function looksLikeHumanIconFileName(fileName) {
+	return /^human\b/i.test(String(fileName || '').trim());
+}
+
 const PLAYER_ICON_GROUP_LABELS = {
 	humans: 'Humans',
 	animals: 'Animals',
@@ -642,7 +646,11 @@ export function isPlayerIconAnimal(iconKey) {
 export function isPlayerIconHuman(iconKey) {
 	const normalized = normalizePlayerIconKey(iconKey);
 	if (!normalized) return false;
-	return EXPLICIT_HUMAN_ICONS.has(normalized.toLowerCase());
+	if (EXPLICIT_HUMAN_ICONS.has(normalized.toLowerCase())) {
+		return true;
+	}
+
+	return looksLikeHumanIconFileName(playerIconFileName(normalized));
 }
 
 export function playerIconThemeKey(iconKey) {

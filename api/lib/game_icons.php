@@ -13,9 +13,59 @@ function game_prefixed_icon_catalog(string $folderName, array $fileNames): array
     }, $fileNames);
 }
 
+function game_looks_like_human_icon_file(string $fileName): bool
+{
+    return preg_match('/^human\b/i', trim($fileName)) === 1;
+}
+
+function game_detected_human_icon_catalog(): array
+{
+    $assetsDir = game_icon_assets_dir();
+    if (!is_dir($assetsDir)) {
+        return [];
+    }
+
+    $catalog = [];
+    $entries = scandir($assetsDir);
+    if (!is_array($entries)) {
+        return [];
+    }
+
+    foreach ($entries as $folderName) {
+        if (!is_string($folderName) || $folderName === '' || $folderName[0] === '.') {
+            continue;
+        }
+
+        $folderPath = $assetsDir . DIRECTORY_SEPARATOR . $folderName;
+        if (!is_dir($folderPath)) {
+            continue;
+        }
+
+        $fileEntries = scandir($folderPath);
+        if (!is_array($fileEntries)) {
+            continue;
+        }
+
+        foreach ($fileEntries as $fileName) {
+            if (!is_string($fileName) || $fileName === '' || $fileName[0] === '.') {
+                continue;
+            }
+
+            if (!game_looks_like_human_icon_file($fileName)) {
+                continue;
+            }
+
+            $catalog[] = $folderName . '/' . $fileName;
+        }
+    }
+
+    natcasesort($catalog);
+    return array_values(array_unique($catalog));
+}
+
 function game_explicit_human_icon_catalog(): array
 {
-    return array_merge(
+    return array_values(array_unique(array_merge(
         game_prefixed_icon_catalog('FairyTaleWarHeads', [
             'BarredHelm.svg',
             'BeardedKing.svg',
@@ -109,8 +159,9 @@ function game_explicit_human_icon_catalog(): array
             'Human b14.svg',
             'Human B15.svg',
             'Human Helmet 1.svg',
-        ])
-    );
+        ]),
+        game_detected_human_icon_catalog()
+    )));
 }
 
 function game_explicit_animal_icon_catalog(): array

@@ -1,7 +1,7 @@
 import { cloneTemplateNode, collectRefs, createNodeFromHtml, createTemplate } from './dom.js';
 import { createBaseGameScreen } from './gameScreen.js';
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
-import { pickRandomPlayerIconKey, playerIconLabel, setPlayerIconImage } from '../playerIcons.js';
+import { pickRandomPlayerIconKey, setPlayerIconImage } from '../playerIcons.js';
 import { buttonIconUrl } from '../buttonIcons.js';
 import { ensureActionTypeIcon } from './gameActionButtons.js';
 import { collectGameInfoIcons, setGameInfoIconNode } from '../gameStateIcons.js';
@@ -35,10 +35,7 @@ const MAFIA_PANEL_HTML = `
 			<div class="mafia-icon-row" data-ref="iconRow">
 				<div class="mafia-icon-chip">
 					<img class="player-icon mafia-icon-preview" data-ref="iconPreview" alt="">
-					<div>
-						<div class="mafia-icon-label" data-ref="iconLabel"></div>
-						<small class="mafia-target-meta" data-ref="iconHint"></small>
-					</div>
+					<small class="mafia-target-meta" data-ref="iconHint"></small>
 				</div>
 				<div class="row" data-ref="iconActions">
 					${createGameActionButtonMarkup('random-icon', 'randomIconBtn', 'mafia-icon-action-button')}
@@ -112,7 +109,6 @@ export function createMafiaGameScreen(deps) {
 	const readyText = refs.readyText;
 	const iconRow = refs.iconRow;
 	const iconPreview = refs.iconPreview;
-	const iconLabel = refs.iconLabel;
 	const iconHint = refs.iconHint;
 	const randomIconBtn = refs.randomIconBtn;
 	const changeIconBtn = refs.changeIconBtn;
@@ -614,7 +610,6 @@ export function createMafiaGameScreen(deps) {
 				: 'Confirm that you have reviewed your role.');
 		iconRow.style.display = isLobbyOpen && player ? '' : 'none';
 		setPlayerIconImage(iconPreview, player && player.icon_key ? player.icon_key : null, player && player.username ? player.username : 'Player');
-		iconLabel.textContent = player && player.icon_key ? playerIconLabel(player.icon_key) : 'No icon assigned yet';
 		iconHint.textContent = 'Visible in chat and on every mafia player row.';
 		randomIconBtn.classList.toggle('is-busy', iconBusy);
 		setGameActionButtonLabel(randomIconBtn, iconBusy ? 'Randomizing icon...' : 'Randomize icon');
