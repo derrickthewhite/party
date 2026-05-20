@@ -99,18 +99,13 @@ export function playerIconGroupKey(iconKey) {
 		return '';
 	}
 
-	const segments = normalized.split('/').filter(Boolean);
-	const fileName = segments[segments.length - 1] || '';
-	const lowerFile = fileName.toLowerCase();
-	const lowerSegments = segments.map(function (s) { return String(s || '').toLowerCase(); });
-
 	// Use module-level explicit sets for animals/humans.
 	// These are defined once to allow other modules to check membership.
 	// (Lowercased normalized paths.)
 
-	if (EXPLICIT_ANIMAL_ICONS.has(normalized.toLowerCase())) return 'animals';
+	if (isPlayerIconAnimal(normalized)) return 'animals';
 
-	if (EXPLICIT_HUMAN_ICONS.has(normalized.toLowerCase())) return 'humans';
+	if (isPlayerIconHuman(normalized)) return 'humans';
 
 	const lastSlashIndex = normalized.lastIndexOf('/');
 	return lastSlashIndex === -1 ? '' : normalized.slice(0, lastSlashIndex);
@@ -223,6 +218,8 @@ const EXPLICIT_HUMAN_ICON_KEYS = [
 	]),
 	...prefixedIconList('CrimsonNetworkHeads', [
 		'Human 1.svg',
+		'Human 10.svg',
+		'Human 11.svg',
 		'Human 2.svg',
 		'Human 3.svg',
 		'Human 4.svg',
@@ -251,6 +248,7 @@ const EXPLICIT_HUMAN_ICON_KEYS = [
 		'Human A16.svg',
 		'Human A17.svg',
 		'Human A18.svg',
+		'Human A19.svg',
 		'Human B2.svg',
 		'Human B3.svg',
 		'Human B4.svg',
@@ -263,6 +261,17 @@ const EXPLICIT_HUMAN_ICON_KEYS = [
 		'Human B11.svg',
 		'Human B12.svg',
 		'Human B13.svg',
+		'Human A20.svg',
+		'Human A21.svg',
+		'Human A22.svg',
+		'Human A23.svg',
+		'Human A24.svg',
+		'Human A25.svg',
+		'Human A26.svg',
+		'Human A27.svg',
+		'Human A28.svg',
+		'Human A29.svg',
+		'Human A30.svg',
 		'Human b14.svg',
 		'Human B15.svg',
 		'Human Helmet 1.svg',
@@ -298,6 +307,7 @@ const EXPLICIT_FANTASY_THEME_ICON_KEYS = [
 		'Bearded Skull.svg',
 		'Black Horse.svg',
 		'Black Tricorne Skull.svg',
+		'Blob.svg',
 		'Blue Jay.svg',
 		'Blue Pirate Skull.svg',
 		'Brown Horse.svg',
@@ -307,6 +317,7 @@ const EXPLICIT_FANTASY_THEME_ICON_KEYS = [
 		'Chameleon.svg',
 		'Chestnut Mare.svg',
 		'Compsagnathus.svg',
+		'Cowbow Skull.svg',
 		'Dapple Gray Horse.svg',
 		'Dino Warrior A.svg',
 		'Dino Warrior B.svg',
@@ -316,6 +327,7 @@ const EXPLICIT_FANTASY_THEME_ICON_KEYS = [
 		'Grey Speckled Horse.svg',
 		'Long Bandana Skull.svg',
 		'Nightcap Skull.svg',
+		'Nyad.svg',
 		'Outlaw.svg',
 		'Palomino Horse.svg',
 		'Panda.svg',
@@ -330,6 +342,7 @@ const EXPLICIT_FANTASY_THEME_ICON_KEYS = [
 		'Red Tricorne Soldier.svg',
 		'Roman Skull.svg',
 		'Roman Soldier.svg',
+		'Spikey Lizard.svg',
 		'Tall Shako Soldier.svg',
 		'Tan Horse.svg',
 		'Top Knot Skull.svg',
@@ -338,6 +351,7 @@ const EXPLICIT_FANTASY_THEME_ICON_KEYS = [
 		'Tyrannasaur.svg',
 		'Undead Horse.svg',
 		'Unicorn.svg',
+		'Vampire A.svg',
 		'White Horse.svg',
 		'Wide Hat Skull.svg',
 		'Wolf.svg',
@@ -355,7 +369,9 @@ const EXPLICIT_MONSTER_THEME_ICON_KEYS = [
 	...prefixedIconList('FantasyHeads', [
 		'Bearded Skull.svg',
 		'Black Tricorne Skull.svg',
+		'Blob.svg',
 		'Blue Pirate Skull.svg',
+		'Cowbow Skull.svg',
 		'Dragon.svg',
 		'Goblin.svg',
 		'Long Bandana Skull.svg',
@@ -367,6 +383,7 @@ const EXPLICIT_MONSTER_THEME_ICON_KEYS = [
 		'Red Hood Skull.svg',
 		'Roman Skull.svg',
 		'Top Knot Skull.svg',
+		'Vampire A.svg',
 		'Wide Hat Skull.svg',
 		'Yellow Cowl Skull.svg',
 	]),
@@ -408,6 +425,7 @@ const EXPLICIT_MONSTER_THEME_ICON_KEYS = [
 		'Robot 1.svg',
 		'Robot 2.svg',
 		'Robot 3.svg',
+		'Robot 4.svg',
 		'Sand Man.svg',
 		'Temkor (Blue).svg',
 		'Temkor (Red) B.svg',
@@ -575,7 +593,19 @@ const EXPLICIT_SCIENCE_FICTION_THEME_ICON_KEYS = [
 		'Human A16.svg',
 		'Human A17.svg',
 		'Human A18.svg',
+		'Human A19.svg',
 		'Human A2.svg',
+		'Human A20.svg',
+		'Human A21.svg',
+		'Human A22.svg',
+		'Human A23.svg',
+		'Human A24.svg',
+		'Human A25.svg',
+		'Human A26.svg',
+		'Human A27.svg',
+		'Human A28.svg',
+		'Human A29.svg',
+		'Human A30.svg',
 		'Human A3.svg',
 		'Human A4.svg',
 		'Human A5.svg',
@@ -622,6 +652,7 @@ const EXPLICIT_SCIENCE_FICTION_THEME_ICON_KEYS = [
 		'Robot 1.svg',
 		'Robot 2.svg',
 		'Robot 3.svg',
+		'Robot 4.svg',
 		'Sand Man.svg',
 		'Temkor (Blue).svg',
 		'Temkor (Red) B.svg',
