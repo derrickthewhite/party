@@ -122,9 +122,11 @@ const EXPLICIT_ANIMAL_ICON_KEYS = [
 	...prefixedIconList('FantasyHeads', [
 		'Armadillo.svg',
 		'Bear.svg',
+		'Cow.svg',
 		'Black Horse.svg',
 		'Blue Jay.svg',
 		'Brown Horse.svg',
+		'Pig.svg',
 		'Brown Lizard.svg',
 		'Brown Mare.svg',
 		'Buckskin Horse.svg',
@@ -322,6 +324,8 @@ const EXPLICIT_FANTASY_THEME_ICON_KEYS = [
 	...prefixedIconList('FantasyHeads', [
 		'Armadillo.svg',
 		'Bear.svg',
+		'Cow.svg',
+		'Pig.svg',
 		'Bearded Skull.svg',
 		'Black Horse.svg',
 		'Black Tricorne Skull.svg',
@@ -349,6 +353,7 @@ const EXPLICIT_FANTASY_THEME_ICON_KEYS = [
 		'Outlaw.svg',
 		'Palomino Horse.svg',
 		'Panda.svg',
+		'Larvitar.svg',
 		'Plain Skull.svg',
 		'Possum.svg',
 		'Pointed Hood Skull.svg',
