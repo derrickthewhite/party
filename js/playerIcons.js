@@ -116,8 +116,6 @@ const EXPLICIT_ANIMAL_ICON_KEYS = [
 	...prefixedIconList('FairyTaleWarHeads', [
 		'BlackCat.svg',
 		'BoarHead.svg',
-		'GreenDragon.svg',
-		'TuskOgre.svg',
 	]),
 	...prefixedIconList('FantasyHeads', [
 		'Armadillo.svg',
@@ -127,7 +125,6 @@ const EXPLICIT_ANIMAL_ICON_KEYS = [
 		'Blue Jay.svg',
 		'Brown Horse.svg',
 		'Pig.svg',
-		'Brown Lizard.svg',
 		'Brown Mare.svg',
 		'Buckskin Horse.svg',
 		'Chameleon.svg',
@@ -138,13 +135,11 @@ const EXPLICIT_ANIMAL_ICON_KEYS = [
 		'Grey Speckled Horse.svg',
 		'Palomino Horse.svg',
 		'Possum.svg',
-		'pupitar.svg',
 		'Racoon.svg',
 		'Red Panda.svg',
 		'Pterosaur.svg',
 		'Raptor.svg',
 		'Skunk.svg',
-		'Spikey Lizard.svg',
 		'Tan Horse.svg',
 		'Triceratops.svg',
 		'Turtle Beast.svg',
@@ -154,9 +149,6 @@ const EXPLICIT_ANIMAL_ICON_KEYS = [
 		'Wolf.svg',
 		'Unicorn.svg',
 		'Dragon.svg',
-	]),
-	...prefixedIconList('Classic', [
-		'RoseCatGlasses.svg',
 	]),
 	...prefixedIconList('AliensByRegionHeads', [
 		'Cat (Black).svg',
@@ -168,20 +160,13 @@ const EXPLICIT_ANIMAL_ICON_KEYS = [
 		'Snake (Brown).svg',
 		'Snake (Green).svg',
 		'Snake (Orange).svg',
-		'Mogwai A.svg',
-		'Mogwai B.svg',
 	]),
 	...prefixedIconList('CrimsonNetworkHeads', [
 		'GoldFox.svg',
 		'SandFox.svg',
 		'Scarab.svg',
 		'Tiger.svg',
-		'Saurian.svg',
 		'Ant.svg',
-		'Keleni.svg',
-		'Hunter 1.svg',
-		'Hunter 2.svg',
-		'Grey Hairless.svg',
 	]),
 ];
 
