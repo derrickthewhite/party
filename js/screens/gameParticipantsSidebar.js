@@ -1,5 +1,6 @@
 import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate } from './dom.js';
 import { setPlayerIconImage } from '../playerIcons.js';
+import { bindPlayerIconPreview } from './playerIconPreviewModal.js';
 
 const SIDEBAR_HTML = `
 	<aside class="participant-sidebar card">
@@ -60,6 +61,15 @@ export function createGameParticipantsSidebarController() {
 
 		const row = cloneTemplateNode(memberRowTemplate);
 		const nextRefs = collectRefs(row);
+		bindPlayerIconPreview(nextRefs.icon, {
+			title: function title() {
+				const label = String(nextRefs.name.textContent || '').trim() || 'Participant';
+				return label + ' icon';
+			},
+			detail: function detail() {
+				return String(nextRefs.meta.textContent || '').trim();
+			},
+		});
 		nextRefs.row = row;
 		rowRefsByKey.set(key, nextRefs);
 		return nextRefs;

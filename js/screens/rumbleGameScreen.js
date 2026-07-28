@@ -18,6 +18,7 @@ import { showRumbleAbilityInfo } from './rumbleGameScreen/abilityInfoModal.js';
 import { setGameActionButtonLabel } from './gameActionButtons.js';
 import { setPlayerIconImage } from '../playerIcons.js';
 import { collectGameInfoIcons, setGameInfoIconNode } from '../gameStateIcons.js';
+import { bindPlayerIconPreview } from './playerIconPreviewModal.js';
 import {
 	clearDraftDirty as clearRumbleDraftDirty,
 	getCheatEligiblePlayers as getCheatEligiblePlayersState,
@@ -52,6 +53,9 @@ export function createRumbleGameScreen(deps) {
 
 	panel.style.marginTop = '8px';
 	refs.headerSpacer.style.flex = '1';
+	bindPlayerIconPreview(phaseIcon, {
+		title: 'My Icon',
+	});
 
 	let lastGameId = null;
 	let lastPerms = {};

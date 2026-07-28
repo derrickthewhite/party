@@ -4,6 +4,7 @@ import { createGameParticipantsSidebarController } from './gameParticipantsSideb
 import { pickRandomPlayerIconKey, setPlayerIconImage } from '../playerIcons.js';
 import { collectGameInfoIcons, setGameInfoIconNode } from '../gameStateIcons.js';
 import { showGameIconPickerModal } from './gameIconPickerModal.js';
+import { bindPlayerIconPreview } from './playerIconPreviewModal.js';
 
 export function createBaseGameScreen(deps, options) {
 	const config = options || {};
@@ -31,14 +32,16 @@ export function createBaseGameScreen(deps, options) {
 			<div class="card game-member-icon-card" data-ref="memberIconCard" style="display:none;">
 				<p class="top-user-label" data-ref="memberIconIntro"></p>
 				<div class="mafia-icon-row" data-ref="memberIconRow">
-					<div class="mafia-icon-chip">
-						<img class="player-icon mafia-icon-preview" data-ref="memberIconPreview" alt="">
-						<small class="mafia-target-meta" data-ref="memberIconHint"></small>
+					<div class="member-icon-row-main" data-ref="memberIconMainRow">
+						<div class="mafia-icon-chip">
+							<img class="player-icon mafia-icon-preview" data-ref="memberIconPreview" alt="">
+						</div>
+						<div class="row" data-ref="memberIconActions">
+							${createGameActionButtonMarkup('random-icon', 'randomIconBtn', 'mafia-icon-action-button')}
+							${createGameActionButtonMarkup('change-icon', 'changeIconBtn', 'mafia-icon-action-button')}
+						</div>
 					</div>
-					<div class="row" data-ref="memberIconActions">
-						${createGameActionButtonMarkup('random-icon', 'randomIconBtn', 'mafia-icon-action-button')}
-						${createGameActionButtonMarkup('change-icon', 'changeIconBtn', 'mafia-icon-action-button')}
-					</div>
+					<small class="mafia-target-meta member-icon-row-hint" data-ref="memberIconHint"></small>
 				</div>
 			</div>
 			<div class="chat-layout-shell${config.showParticipantsPanel ? ' chat-layout-shell-with-sidebar' : ''}" data-ref="shell">
@@ -115,6 +118,12 @@ export function createBaseGameScreen(deps, options) {
 	adminControls.style.marginTop = '12px';
 	adminControls.style.paddingTop = '10px';
 	adminControls.style.borderTop = '1px solid rgba(0, 0, 0, 0.15)';
+	bindPlayerIconPreview(memberIconPreview, {
+		title: 'Your icon',
+		detail: function detail() {
+			return String(memberIconHint.textContent || '').trim();
+		},
+	});
 
 	if (participantsSidebarController) {
 		mountedSidebarPanel = participantsSidebarController.root;

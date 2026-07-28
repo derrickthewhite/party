@@ -8,6 +8,7 @@ import { collectGameInfoIcons, setGameInfoIconNode } from '../gameStateIcons.js'
 import { MAFIA_REFRESH_MS } from '../config.js';
 import { createMafiaVictoryScreenController } from './mafiaGameScreen/victoryScreen.js';
 import { showGameIconPickerModal } from './gameIconPickerModal.js';
+import { bindPlayerIconPreview } from './playerIconPreviewModal.js';
 
 const MAFIA_PANEL_HTML = `
 	<div class="card mafia-panel">
@@ -33,14 +34,16 @@ const MAFIA_PANEL_HTML = `
 		<div class="mafia-ready-card" data-ref="readyCard">
 			<p data-ref="readyText"></p>
 			<div class="mafia-icon-row" data-ref="iconRow">
-				<div class="mafia-icon-chip">
-					<img class="player-icon mafia-icon-preview" data-ref="iconPreview" alt="">
-					<small class="mafia-target-meta" data-ref="iconHint"></small>
+				<div class="member-icon-row-main" data-ref="iconMainRow">
+					<div class="mafia-icon-chip">
+						<img class="player-icon mafia-icon-preview" data-ref="iconPreview" alt="">
+					</div>
+					<div class="row" data-ref="iconActions">
+						${createGameActionButtonMarkup('random-icon', 'randomIconBtn', 'mafia-icon-action-button')}
+						${createGameActionButtonMarkup('change-icon', 'changeIconBtn', 'mafia-icon-action-button')}
+					</div>
 				</div>
-				<div class="row" data-ref="iconActions">
-					${createGameActionButtonMarkup('random-icon', 'randomIconBtn', 'mafia-icon-action-button')}
-					${createGameActionButtonMarkup('change-icon', 'changeIconBtn', 'mafia-icon-action-button')}
-				</div>
+				<small class="mafia-target-meta member-icon-row-hint" data-ref="iconHint"></small>
 			</div>
 			<div class="row mobile-stack">
 				<button class="primary" data-ref="readyBtn">I&apos;m Ready</button>
@@ -130,6 +133,15 @@ export function createMafiaGameScreen(deps) {
 
 	refs.headerSpacer.style.flex = '1';
 	panel.style.marginTop = '8px';
+	bindPlayerIconPreview(phaseIcon, {
+		title: 'My Icon',
+	});
+	bindPlayerIconPreview(iconPreview, {
+		title: 'Your icon',
+		detail: function detail() {
+			return String(iconHint.textContent || '').trim();
+		},
+	});
 
 	let lastGameId = null;
 	let refreshBusy = false;

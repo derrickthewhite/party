@@ -545,6 +545,21 @@ button:disabled {
   height: 44px;
 }
 
+.member-icon-row-main {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.member-icon-row-main .row {
+  flex-wrap: nowrap;
+}
+
+.member-icon-row-hint {
+  margin-left: auto;
+}
+
 .mafia-target-list {
   margin-top: 12px;
 }
@@ -907,6 +922,36 @@ button:disabled {
   color: var(--muted);
 }
 
+.player-icon-preview-trigger {
+  cursor: zoom-in;
+}
+
+.player-icon-preview-trigger:focus-visible {
+  outline: 2px solid var(--accent-2);
+  outline-offset: 2px;
+}
+
+.player-icon-preview-modal {
+  width: min(520px, 100%);
+}
+
+.player-icon-preview-body {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+}
+
+.player-icon-preview-image {
+  width: min(340px, 80vw);
+  height: min(340px, 80vw);
+  max-height: 62vh;
+  object-fit: contain;
+}
+
+.player-icon-preview-detail {
+  color: var(--muted);
+}
+
 .participant-sidebar {
   padding: 14px;
   position: sticky;
@@ -1213,6 +1258,15 @@ button:disabled {
   .mafia-icon-row {
     align-items: stretch;
     flex-direction: column;
+  }
+  .game-member-icon-card .member-icon-row-main,
+  .mafia-ready-card .member-icon-row-main {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .game-member-icon-card .member-icon-row-hint,
+  .mafia-ready-card .member-icon-row-hint {
+    margin-left: 0;
   }
   .mafia-target-row {
     align-items: stretch;
