@@ -1,0 +1,135 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="64"
+   height="64"
+   viewBox="14.970289879647272 2.256931880786013 47.52966830557525 47.52966830557525"
+   version="1.1"
+   id="svg16"
+   sodipodi:docname="RadiationMonster.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview16"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="22.0625"
+     inkscape:cx="25.155807"
+     inkscape:cy="25.677054"
+     inkscape:window-width="1920"
+     inkscape:window-height="991"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg16" />
+  <defs
+     id="defs1">
+    <filter
+       style="color-interpolation-filters:sRGB"
+       x="-0.1940961"
+       y="-0.046480109"
+       width="1.3881922"
+       height="1.0929602"
+       id="filter1">
+      <feGaussianBlur
+         stdDeviation="3.4637856"
+         id="feGaussianBlur1" />
+    </filter>
+  </defs>
+  <ellipse
+     style="fill:#008000;stroke:#000000;stroke-width:0.742651"
+     id="path16"
+     cx="38.162884"
+     cy="25.85346"
+     rx="16.594992"
+     ry="9.5934525" />
+  <ellipse
+     style="fill:#ffff00;stroke:#000000;stroke-width:0.872833"
+     id="ellipse21"
+     cx="22.556152"
+     cy="-34.588444"
+     rx="2.4004045"
+     ry="2.9747314"
+     transform="rotate(90)" />
+  <g
+     id="g20"
+     style="stroke:#ffff00">
+    <path
+       sodipodi:type="star"
+       style="fill:#000000;stroke:#ffff00;stroke-width:0.742651"
+       id="path17"
+       inkscape:flatsided="true"
+       sodipodi:sides="3"
+       sodipodi:cx="26.288952"
+       sodipodi:cy="11.784703"
+       sodipodi:r1="3.3282828"
+       sodipodi:r2="1.6641414"
+       sodipodi:arg1="-0.52359878"
+       sodipodi:arg2="0.52359878"
+       inkscape:rounded="0"
+       inkscape:randomized="0"
+       d="m 29.171329,10.120562 -2.882377,4.992424 -2.882378,-4.992424 z"
+       transform="matrix(0.37782297,0,0,0.37782297,23.323847,18.872666)"
+       inkscape:transform-center-y="0.31437543" />
+    <path
+       sodipodi:type="star"
+       style="fill:#000000;stroke:#ffff00;stroke-width:0.742651"
+       id="path18"
+       inkscape:flatsided="true"
+       sodipodi:sides="3"
+       sodipodi:cx="26.288952"
+       sodipodi:cy="11.784703"
+       sodipodi:r1="3.3282828"
+       sodipodi:r2="1.6641414"
+       sodipodi:arg1="-0.52359878"
+       sodipodi:arg2="0.52359878"
+       inkscape:rounded="0"
+       inkscape:randomized="0"
+       d="m 29.171329,10.120562 -2.882377,4.992424 -2.882378,-4.992424 z"
+       transform="matrix(0.37782297,0,0,0.37782297,25.590784,18.872666)"
+       inkscape:transform-center-y="0.31437543" />
+    <path
+       sodipodi:type="star"
+       style="fill:#000000;stroke:#ffff00;stroke-width:0.742651"
+       id="path19"
+       inkscape:flatsided="true"
+       sodipodi:sides="3"
+       sodipodi:cx="26.288952"
+       sodipodi:cy="11.784703"
+       sodipodi:r1="3.3282828"
+       sodipodi:r2="1.6641414"
+       sodipodi:arg1="-0.52359878"
+       sodipodi:arg2="0.52359878"
+       inkscape:rounded="0"
+       inkscape:randomized="0"
+       d="m 29.171329,10.120562 -2.882377,4.992424 -2.882378,-4.992424 z"
+       transform="matrix(0.37782297,0,0,0.37782297,24.412875,16.986414)"
+       inkscape:transform-center-y="0.31437547" />
+  </g>
+  <ellipse
+     style="fill:none;stroke:#000000;stroke-width:0.872833"
+     id="path20"
+     cx="22.556152"
+     cy="-34.588444"
+     rx="2.4004045"
+     ry="2.9747314"
+     transform="rotate(90)" />
+  <path
+     style="fill:none;stroke:#000000;stroke-width:0.742651"
+     d="m 22.981681,29.728187 6.059007,-0.205652 2.883702,-1.279127"
+     id="path21" />
+  <ellipse
+     style="fill:#000000;stroke:none;stroke-width:0.464337"
+     id="path22"
+     cx="34.345444"
+     cy="22.730108"
+     rx="0.36823973"
+     ry="0.589683" />
+</svg>

@@ -1,0 +1,105 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg
+   width="64"
+   height="64"
+   viewBox="-2.5721272649478877 244.27977350578792 45.91669065969762 45.91669065969762"
+   version="1.1"
+   id="svg151"
+   sodipodi:docname="Peter Alien.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview151"
+     pagecolor="#ffffff"
+     bordercolor="#000000"
+     borderopacity="0.25"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:zoom="11.03125"
+     inkscape:cx="19.308782"
+     inkscape:cy="28.23796"
+     inkscape:window-width="1920"
+     inkscape:window-height="991"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg151"
+     showgrid="true">
+    <inkscape:grid
+       id="grid151"
+       units="px"
+       originx="0"
+       originy="0"
+       spacingx="0.71744829"
+       spacingy="0.71744829"
+       empcolor="#0099e5"
+       empopacity="0.30196078"
+       color="#0099e5"
+       opacity="0.14901961"
+       empspacing="5"
+       dotted="false"
+       gridanglex="30"
+       gridanglez="30"
+       visible="true" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1">
+    <filter
+       style="color-interpolation-filters:sRGB"
+       x="-0.1940961"
+       y="-0.046480109"
+       width="1.3881922"
+       height="1.0929602"
+       id="filter1">
+      <feGaussianBlur
+         stdDeviation="3.4637856"
+         id="feGaussianBlur1" />
+    </filter>
+  </defs>
+  <path
+     style="fill:#800080;stroke:#000000;stroke-width:1.23554"
+     d="m 12.216944,264.64165 4.284144,-4.94218 2.757368,-6.76426 3.420339,-4.35561 -0.713068,4.74922 3.184152,6.37065 5.543903,7.41325"
+     id="path152"
+     sodipodi:nodetypes="ccccccc" />
+  <path
+     id="path151"
+     style="fill:#ffff00;stroke:#000000;stroke-width:0.702174"
+     d="m 8.5548933,280.47492 c -0.901101,-1.78859 -1.4085482,-3.80951 -1.4085465,-5.94895 5.2e-6,-7.31218 5.9276962,-13.23986 13.2398722,-13.23986 7.312176,0 13.239867,5.92768 13.23987,13.23986 5e-6,7.31218 -5.927687,13.23988 -13.23987,13.23988 -2.528932,0 -4.89226,-0.70904 -6.90204,-1.93916"
+     sodipodi:nodetypes="cssssc" />
+  <path
+     style="fill:#ffffff;stroke:#000000;stroke-width:1.23554"
+     d="m 13.487787,285.82668 7.955467,-5.12301 -13.2536569,-0.55148"
+     id="path153"
+     sodipodi:nodetypes="ccc" />
+  <path
+     style="fill:#999999;stroke:#000000;stroke-width:1.23554"
+     d="m 17.856226,281.35024 -1.235541,-0.58749 -0.317869,0.97165 -0.917672,-0.94005 -0.903897,1.22758 -0.811786,-0.90929 -0.7554,1.12708 -0.839549,-1.30527 -0.701811,1.68147 -1.7850589,-2.47109"
+     id="path154" />
+  <g
+     id="g152"
+     transform="matrix(1.7221332,0,0,1.7221332,-18.676744,-185.24376)">
+    <path
+       style="fill:none;stroke:#000000;stroke-width:0.859456px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+       d="m 18.218958,266.37496 0.95207,-0.85946 h 3.345208"
+       id="path54876-9-8-1-7-1-7"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="ccc" />
+    <path
+       style="fill:#ffffff;stroke:#000000;stroke-width:0.429727;stroke-miterlimit:4;stroke-dashoffset:0;stroke-opacity:1"
+       d="m 21.520274,265.54997 c 0.120958,0.19638 0.190781,0.42766 0.190781,0.67527 0,0.71197 -0.577171,1.28918 -1.289207,1.28918 -0.711988,0 -1.28916,-0.57721 -1.28916,-1.28918 0,-0.25431 0.07364,-0.49152 0.200825,-0.69126 z"
+       id="path54880-1-8-7-9-5-1"
+       inkscape:connector-curvature="0"
+       sodipodi:nodetypes="cssscc" />
+    <circle
+       style="fill:#000000;fill-opacity:1;fill-rule:nonzero;stroke:#008000;stroke-width:0.429727;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1"
+       id="circle54884-3-8-4-9-2-9"
+       cx="20.394533"
+       cy="266.37936"
+       r="0.4297272" />
+  </g>
+</svg>
