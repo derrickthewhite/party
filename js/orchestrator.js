@@ -204,9 +204,14 @@ export function initializePartyApp() {
 				state.setScreen('landing');
 			}
 		} catch (err) {
-			// when not authenticated, honor initial screen (e.g. signup) else welcome
-			if (initialRoute.screen) state.setScreen(initialRoute.screen);
-			else state.setScreen('welcome');
+			const publicScreens = { welcome: true, signup: true, signin: true };
+			if (publicScreens[initialRoute.screen]) {
+				state.setScreen(initialRoute.screen);
+			} else if (initialRoute.screen === 'game' || initialRoute.screen === 'landing') {
+				state.setScreen('signin');
+			} else {
+				state.setScreen('welcome');
+			}
 		}
 	}
 
