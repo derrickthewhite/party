@@ -8,10 +8,14 @@ DiplomacyBoard.mount = function (host, options) {
 
 	var graph = options.graph;
 	DiplomacyBoard.uniteProvinces(graph);
-	var mode = options.mode || "orders";
+	var mode = DiplomacyBoard.knownMode(options.mode);
 	var positionTool = options.positionTool || "own";
 	var playingAs = options.playingAs || "";
 	var orderScope = options.orderScope || "all";
+	var retreats = Array.isArray(options.retreats) ? options.retreats : [];
+	var adjustments = Array.isArray(options.adjustments) ? options.adjustments : [];
+	var readOnly = !!options.readOnly;
+	var suppliedResolution = null;
 	var position = DiplomacyBoard.emptyPosition(graph.source);
 	var orders = [];
 	var showResolved = false;
@@ -102,7 +106,28 @@ DiplomacyBoard.mount = function (host, options) {
 		DiplomacyBoard.paintOwnership(svg, graph, position, originalFill);
 	}
 
+	function orderPhase(next) {
+		return next === "retreat" || next === "build" ? next : "move";
+	}
+
 	function keepOrdersThatMatch() {
+		if (mode === "retreat" || mode === "build") {
+			var kept = [];
+			var tallies = {};
+			for (var k = 0; k < orders.length; k++) {
+				if (!phaseOrderAllowed(orders[k])) continue;
+				if (mode === "build") {
+					var allowance = DiplomacyBoard.findAdjustment(adjustments, orders[k].power);
+					var limit = Math.abs(allowance && allowance.count || 0);
+					var key = orders[k].power + "\0" + orders[k].action;
+					if ((tallies[key] || 0) >= limit) continue;
+					tallies[key] = (tallies[key] || 0) + 1;
+				}
+				kept.push(orders[k]);
+			}
+			orders = kept;
+			return;
+		}
 		var next = [];
 		for (var i = 0; i < orders.length; i++) {
 			var standing = DiplomacyBoard.unitAt(position.units, orders[i].province);
@@ -114,6 +139,30 @@ DiplomacyBoard.mount = function (host, options) {
 		orders = next;
 	}
 
+	function phaseOrderAllowed(order) {
+		if (mode === "retreat") {
+			var entry = DiplomacyBoard.findRetreat(graph, retreats, order.province);
+			if (!entry || order.unit !== entry.unit) return false;
+			if (order.action === "disband") return !!entry.disband;
+			if (order.action !== "retreat") return false;
+			var choices = entry.choices || [];
+			var to = DiplomacyBoard.canonProvince(graph, order.to);
+			for (var i = 0; i < choices.length; i++) {
+				if (DiplomacyBoard.canonProvince(graph, choices[i]) === to) return true;
+			}
+			return false;
+		}
+		if (mode !== "build") return false;
+		var adjustment = DiplomacyBoard.findAdjustment(adjustments, order.power);
+		if (!adjustment) return false;
+		if (order.action === "build") {
+			if (!(adjustment.count > 0)) return false;
+			return DiplomacyBoard.adjustmentBuildsAt(graph, adjustment, order.province).indexOf(order.unit) !== -1;
+		}
+		if (order.action === "disband") return DiplomacyBoard.adjustmentCanDisband(graph, adjustment, order.province);
+		return false;
+	}
+
 	function orderFrom(provinceId) {
 		for (var i = 0; i < orders.length; i++) {
 			if (orders[i].province === provinceId) return orders[i];
@@ -122,6 +171,7 @@ DiplomacyBoard.mount = function (host, options) {
 	}
 
 	function writeOrder(order) {
+		if (readOnly) return;
 		orders = orders.filter(function (item) {
 			return item.province !== order.province;
 		});
@@ -133,6 +183,7 @@ DiplomacyBoard.mount = function (host, options) {
 	}
 
 	function clearOrder(provinceId) {
+		if (readOnly) return;
 		orders = orders.filter(function (order) {
 			return order.province !== provinceId;
 		});
@@ -143,9 +194,44 @@ DiplomacyBoard.mount = function (host, options) {
 	}
 
 	function unitClickable(unit) {
-		if (mode !== "orders") return false;
+		if (readOnly || mode !== "orders") return false;
 		if (orderScope === "all") return true;
 		return !!playingAs && unit.power === playingAs;
+	}
+
+	function retreatClickable(entry) {
+		if (readOnly || !entry) return false;
+		if (orderScope === "all") return true;
+		return !!playingAs && entry.power === playingAs;
+	}
+
+	function editableAdjustments() {
+		if (orderScope === "mine") {
+			var one = DiplomacyBoard.findAdjustment(adjustments, playingAs);
+			return one ? [one] : [];
+		}
+		return adjustments;
+	}
+
+	function adjustmentAt(provinceId) {
+		var list = editableAdjustments();
+		for (var i = 0; i < list.length; i++) {
+			var adjustment = list[i];
+			if (adjustment.count > 0 && DiplomacyBoard.adjustmentBuildsAt(graph, adjustment, provinceId).length) return adjustment;
+			if (DiplomacyBoard.adjustmentCanDisband(graph, adjustment, provinceId)) return adjustment;
+		}
+		return null;
+	}
+
+	function countPhaseOrders(powerId, action, exceptProvince) {
+		var n = 0;
+		for (var i = 0; i < orders.length; i++) {
+			if (phaseOrderKind(orders[i]) !== mode) continue;
+		if (orders[i].power !== powerId || orders[i].action !== action) continue;
+			if (exceptProvince && orders[i].province === exceptProvince) continue;
+			n += 1;
+		}
+		return n;
 	}
 
 	function placePopup() {
@@ -176,8 +262,36 @@ DiplomacyBoard.mount = function (host, options) {
 		return DiplomacyBoard.provinceId(graph, id);
 	}
 
+	function offeredProvinces() {
+		var ids = [];
+		var i;
+		if (mode === "orders") return pickList();
+		if (readOnly) return ids;
+		if (mode === "retreat" && openProvince) {
+			var entry = DiplomacyBoard.findRetreat(graph, retreats, openProvince);
+			if (!retreatClickable(entry)) return ids;
+			var choices = entry.choices || [];
+			for (i = 0; i < choices.length; i++) ids.push(DiplomacyBoard.canonProvince(graph, choices[i]));
+			return ids;
+		}
+		if (mode === "build") {
+			var list = editableAdjustments();
+			for (i = 0; i < list.length; i++) {
+				var adjustment = list[i];
+				var sites = adjustment.count > 0 ? (adjustment.builds || []) : [];
+				var d;
+				for (d = 0; d < sites.length; d++) ids.push(DiplomacyBoard.canonProvince(graph, sites[d].province));
+				if (adjustment.count < 0) {
+					var cuts = adjustment.disbands || [];
+					for (d = 0; d < cuts.length; d++) ids.push(DiplomacyBoard.canonProvince(graph, cuts[d]));
+				}
+			}
+		}
+		return ids;
+	}
+
 	function highlightPicks() {
-		var ids = pickList();
+		var ids = offeredProvinces();
 		var shapes = [];
 		for (var i = 0; i < ids.length; i++) {
 			var parts = DiplomacyBoard.shapeIds(graph, ids[i]);
@@ -187,7 +301,30 @@ DiplomacyBoard.mount = function (host, options) {
 	}
 
 	function showPrompt() {
-		var text = DiplomacyBoard.orderPrompt(pending);
+		var text = "";
+		if (mode === "orders") text = DiplomacyBoard.orderPrompt(pending);
+		else if (!readOnly && mode === "retreat" && openProvince) {
+			var retreatEntry = DiplomacyBoard.findRetreat(graph, retreats, openProvince);
+			if (retreatEntry) text = retreatEntry.disband ? "Choose a retreat, or disband." : "Choose a retreat.";
+		}
+		else if (!readOnly && mode === "build") {
+			var list = editableAdjustments();
+			var parts = [];
+			var seen = {};
+			for (var i = 0; i < list.length; i++) {
+				var line = "";
+				if (list[i].count > 0) line = "Choose " + list[i].count + " build" + (list[i].count === 1 ? "" : "s") + ".";
+				else if (list[i].count < 0) {
+					var n = -list[i].count;
+					line = "Choose " + n + " disband" + (n === 1 ? "" : "s") + ".";
+				}
+				if (line && !seen[line]) {
+					seen[line] = true;
+					parts.push(line);
+				}
+			}
+			text = parts.join(" ");
+		}
 		prompt.textContent = text;
 		prompt.hidden = !text;
 	}
@@ -237,6 +374,16 @@ DiplomacyBoard.mount = function (host, options) {
 			highlightPicks();
 		}
 		return true;
+	}
+
+	function popupStillAllowed() {
+		if (!openProvince || orderScope !== "mine") return true;
+		if (mode === "retreat") {
+			return retreatClickable(DiplomacyBoard.findRetreat(graph, retreats, openProvince));
+		}
+		if (mode === "build") return !!adjustmentAt(openProvince);
+		var standing = DiplomacyBoard.unitAt(position.units, openProvince);
+		return !!(standing && standing.power === playingAs);
 	}
 
 	function closePopup() {
@@ -296,26 +443,35 @@ DiplomacyBoard.mount = function (host, options) {
 	function render() {
 		if (destroyed) return;
 		if (showResolved) {
-			try {
-				resolution = DiplomacyBoard.adjudicate(graph, position, orders);
-			} catch (error) {
-				showResolved = false;
-				resolution = null;
-				if (typeof options.onError === "function") options.onError(error);
+			if (suppliedResolution) {
+				resolution = suppliedResolution;
+			} else {
+				try {
+					resolution = DiplomacyBoard.adjudicate(graph, position, orders);
+				} catch (error) {
+					showResolved = false;
+					resolution = null;
+					if (typeof options.onError === "function") options.onError(error);
+				}
 			}
 		} else {
 			resolution = null;
 		}
 		host.classList.toggle("is-position", mode === "position");
 		host.classList.toggle("is-orders", mode === "orders");
+		host.classList.toggle("is-retreat", mode === "retreat");
+		host.classList.toggle("is-build", mode === "build");
+		host.classList.toggle("is-readonly", readOnly);
 		host.classList.toggle("is-resolved", showResolved);
 		paintOwnership();
+		showPrompt();
 		highlightPicks();
 		drawUnits();
-		if (openProvince && !DiplomacyBoard.unitAt(position.units, openProvince) && !pending) closePopup();
+		if (mode === "orders" && openProvince && !DiplomacyBoard.unitAt(position.units, openProvince) && !pending) closePopup();
 	}
 
 	function placeUnit(provinceId, unitType) {
+		if (readOnly) return;
 		if (!playingAs) return;
 		if (!DiplomacyBoard.powerById(position.powers, playingAs)) return;
 		if (!DiplomacyBoard.canPlace(graph, provinceId, unitType)) return;
@@ -333,6 +489,7 @@ DiplomacyBoard.mount = function (host, options) {
 	}
 
 	function removeUnit(provinceId) {
+		if (readOnly) return;
 		var before = position.units.length;
 		position.units = position.units.filter(function (unit) {
 			return unit.province !== provinceId;
@@ -344,6 +501,7 @@ DiplomacyBoard.mount = function (host, options) {
 	}
 
 	function paintOwner(provinceId, clear) {
+		if (readOnly) return;
 		var province = DiplomacyBoard.province(graph, provinceId);
 		if (!province || province.kind === "sea" || !DiplomacyBoard.isOpen(province)) return;
 		if (clear) {
@@ -357,8 +515,90 @@ DiplomacyBoard.mount = function (host, options) {
 		emit();
 	}
 
+	function rememberPhaseOrder(order) {
+		order.province = DiplomacyBoard.canonProvince(graph, order.province);
+		if (order.to) order.to = DiplomacyBoard.canonProvince(graph, order.to);
+		writeOrder(order);
+	}
+
+	function withinAdjustmentCount(adjustment, action, provinceId) {
+		var limit = adjustment.count > 0 ? adjustment.count : -adjustment.count;
+		var kind = adjustment.count > 0 ? "build" : "disband";
+		if (action !== kind) return false;
+		return countPhaseOrders(adjustment.power, kind, provinceId) < limit;
+	}
+
+	function showRetreatPopup(entry) {
+		if (!retreatClickable(entry)) return;
+		popup.innerHTML = DiplomacyBoard.retreatPopupHtml(graph, entry, orderFrom(DiplomacyBoard.canonProvince(graph, entry.province)));
+		popup.hidden = false;
+		openProvince = DiplomacyBoard.canonProvince(graph, entry.province);
+		placePopup();
+		showPrompt();
+		highlightPicks();
+		drawUnits();
+	}
+
+	function showAdjustPopup(provinceId) {
+		var adjustment = adjustmentAt(provinceId);
+		if (readOnly || !adjustment) return;
+		var id = DiplomacyBoard.canonProvince(graph, provinceId);
+		var units = adjustment.count > 0 ? DiplomacyBoard.adjustmentBuildsAt(graph, adjustment, id) : [];
+		if (!withinAdjustmentCount(adjustment, "build", id)) units = [];
+		var canDisband = DiplomacyBoard.adjustmentCanDisband(graph, adjustment, id) && withinAdjustmentCount(adjustment, "disband", id);
+		if (!units.length && !canDisband && !orderFrom(id)) {
+			if (openProvince === id) closePopup();
+			return;
+		}
+		popup.innerHTML = DiplomacyBoard.adjustPopupHtml(graph, {
+			province: id,
+			units: units,
+			canDisband: canDisband,
+			current: orderFrom(id)
+		});
+		popup.hidden = false;
+		openProvince = id;
+		placePopup();
+		showPrompt();
+		highlightPicks();
+		drawUnits();
+	}
+
+	function chooseRetreatUnit(unit) {
+		var entry = DiplomacyBoard.findRetreat(graph, retreats, unit.province);
+		if (!retreatClickable(entry)) return;
+		var provinceId = DiplomacyBoard.canonProvince(graph, unit.province);
+		if (openProvince === provinceId && popup.hidden === false) {
+			closePopup();
+			highlightPicks();
+			return;
+		}
+		cancelPending();
+		showRetreatPopup(entry);
+	}
+
+	function chooseAdjustUnit(unit) {
+		if (!adjustmentAt(unit.province)) return;
+		var provinceId = DiplomacyBoard.canonProvince(graph, unit.province);
+		if (openProvince === provinceId && popup.hidden === false) {
+			closePopup();
+			highlightPicks();
+			return;
+		}
+		showAdjustPopup(provinceId);
+	}
+
 	function chooseUnit(unit) {
+		if (readOnly) return;
 		var provinceId = unit.province;
+		if (mode === "retreat") {
+			chooseRetreatUnit(unit);
+			return;
+		}
+		if (mode === "build") {
+			chooseAdjustUnit(unit);
+			return;
+		}
 		if (mode === "position") {
 			if (positionTool === "remove-unit") removeUnit(provinceId);
 			else if (positionTool === "army") placeUnit(provinceId, "army");
@@ -387,6 +627,35 @@ DiplomacyBoard.mount = function (host, options) {
 	}
 
 	function chooseProvince(provinceId) {
+		if (readOnly) return;
+		if (mode === "retreat") {
+			var entry = openProvince ? DiplomacyBoard.findRetreat(graph, retreats, openProvince) : null;
+			if (!retreatClickable(entry)) {
+				closePopup();
+				return;
+			}
+			var choices = entry.choices || [];
+			var target = DiplomacyBoard.canonProvince(graph, provinceId);
+			for (var i = 0; i < choices.length; i++) {
+				if (DiplomacyBoard.canonProvince(graph, choices[i]) === target) {
+					rememberPhaseOrder({
+						province: DiplomacyBoard.canonProvince(graph, entry.province),
+						unit: entry.unit,
+						power: entry.power,
+						action: "retreat",
+						to: target
+					});
+					return;
+				}
+			}
+			closePopup();
+			return;
+		}
+		if (mode === "build") {
+			if (adjustmentAt(provinceId)) showAdjustPopup(provinceId);
+			else closePopup();
+			return;
+		}
 		if (mode === "orders") {
 			if (pending) tryPick(provinceId);
 			else closePopup();
@@ -402,6 +671,10 @@ DiplomacyBoard.mount = function (host, options) {
 	function handleMapPointer(event) {
 		var node = provinceFromEvent(event);
 		var provinceId = node ? mapId(node.id) : "";
+		if (mode === "retreat" && openProvince && provinceId && offeredProvinces().indexOf(provinceId) !== -1) {
+			chooseProvince(provinceId);
+			return;
+		}
 		if (pending && provinceId && pickList().indexOf(provinceId) !== -1) {
 			chooseProvince(provinceId);
 			return;
@@ -419,7 +692,7 @@ DiplomacyBoard.mount = function (host, options) {
 	}
 
 	function onMapClick(event) {
-		if (skipClick || swallowClick) return;
+		if (readOnly || skipClick || swallowClick) return;
 		if (event.target.closest(".move-popup, .map-zoom, .order-prompt")) return;
 		handleMapPointer(event);
 	}
@@ -427,10 +700,59 @@ DiplomacyBoard.mount = function (host, options) {
 	function onPopupClick(event) {
 		event.stopPropagation();
 		event.preventDefault();
+		if (readOnly) return;
 		var button = event.target.closest("button");
 		if (!button || !openProvince) return;
 		if (button.dataset.clear) {
 			clearOrder(openProvince);
+			return;
+		}
+		if (mode === "retreat") {
+			var entry = DiplomacyBoard.findRetreat(graph, retreats, openProvince);
+			if (!retreatClickable(entry)) return;
+			if (button.dataset.retreatTo) {
+				rememberPhaseOrder({
+					province: DiplomacyBoard.canonProvince(graph, entry.province),
+					unit: entry.unit,
+					power: entry.power,
+					action: "retreat",
+					to: button.dataset.retreatTo
+				});
+				return;
+			}
+			if (button.dataset.action === "disband" && entry.disband) {
+				rememberPhaseOrder({
+					province: DiplomacyBoard.canonProvince(graph, entry.province),
+					unit: entry.unit,
+					power: entry.power,
+					action: "disband"
+				});
+			}
+			return;
+		}
+		if (mode === "build") {
+			var adjustment = adjustmentAt(openProvince);
+			if (!adjustment) return;
+			if (button.dataset.buildUnit) {
+				if (!withinAdjustmentCount(adjustment, "build", openProvince)) return;
+				var offered = DiplomacyBoard.adjustmentBuildsAt(graph, adjustment, openProvince);
+				if (offered.indexOf(button.dataset.buildUnit) === -1) return;
+				rememberPhaseOrder({
+					province: openProvince,
+					unit: button.dataset.buildUnit,
+					power: adjustment.power,
+					action: "build"
+				});
+				return;
+			}
+			if (button.dataset.action === "disband" && DiplomacyBoard.adjustmentCanDisband(graph, adjustment, openProvince)) {
+				if (!withinAdjustmentCount(adjustment, "disband", openProvince)) return;
+				rememberPhaseOrder({
+					province: openProvince,
+					power: adjustment.power,
+					action: "disband"
+				});
+			}
 			return;
 		}
 		var action = button.dataset.action;
@@ -552,6 +874,7 @@ DiplomacyBoard.mount = function (host, options) {
 			power: doc.power,
 			orders: incoming
 		}, expectedPower);
+		if (mode === "retreat" || mode === "build") mode = "orders";
 		var keepPower = doc.kind === "diplomacy-orders" ? doc.power : null;
 		if (keepPower) {
 			orders = orders.filter(function (order) {
@@ -584,6 +907,7 @@ DiplomacyBoard.mount = function (host, options) {
 		var incoming = Array.isArray(doc.orders) ? DiplomacyBoard.clone(doc.orders) : [];
 		for (var c = 0; c < incoming.length; c++) DiplomacyBoard.canonicalizeOrder(graph, incoming[c]);
 		DiplomacyBoard.validateOrders(graph, position, { kind: doc.kind, map: doc.map, power: doc.power, orders: incoming }, doc.power);
+		if (mode === "retreat" || mode === "build") mode = "orders";
 		for (var i = 0; i < incoming.length; i++) {
 			var standing = DiplomacyBoard.unitAt(position.units, incoming[i].province);
 			orders.push(DiplomacyBoard.copyOrder(incoming[i], standing));
@@ -594,11 +918,91 @@ DiplomacyBoard.mount = function (host, options) {
 		emit();
 	}
 
+	function phaseOrderKind(order) {
+		if (order.action === "retreat") return "retreat";
+		if (order.action === "build") return "build";
+		if (order.action === "disband") return order.unit ? "retreat" : "build";
+		return "";
+	}
+
+	function replacePhaseOrders(powerId, incoming) {
+		orders = orders.filter(function (order) {
+			if (phaseOrderKind(order) !== mode) return false;
+			if (powerId && order.power === powerId) return false;
+			return true;
+		});
+		for (var i = 0; i < incoming.length; i++) orders.push(incoming[i]);
+	}
+
+	function applyRetreats(doc, expectedPower) {
+		var incoming = DiplomacyBoard.clone(doc.orders || []);
+		for (var c = 0; c < incoming.length; c++) DiplomacyBoard.canonicalizeOrder(graph, incoming[c]);
+		DiplomacyBoard.validateRetreats(graph, {
+			kind: doc.kind,
+			map: doc.map,
+			power: doc.power,
+			orders: incoming
+		}, retreats, expectedPower);
+		mode = "retreat";
+		var stored = [];
+		for (var i = 0; i < incoming.length; i++) {
+			var entry = DiplomacyBoard.findRetreat(graph, retreats, incoming[i].province);
+			stored.push({
+				province: DiplomacyBoard.canonProvince(graph, incoming[i].province),
+				unit: incoming[i].unit,
+				power: entry.power,
+				action: incoming[i].action,
+				to: incoming[i].action === "retreat" ? DiplomacyBoard.canonProvince(graph, incoming[i].to) : undefined
+			});
+			if (stored[i].action !== "retreat") delete stored[i].to;
+		}
+		replacePhaseOrders(doc.power || "", stored);
+		cancelPending();
+		closePopup();
+		render();
+		emit();
+	}
+
+	function applyAdjustments(doc, expectedPower) {
+		var incoming = DiplomacyBoard.clone(doc.orders || []);
+		for (var c = 0; c < incoming.length; c++) DiplomacyBoard.canonicalizeOrder(graph, incoming[c]);
+		DiplomacyBoard.validateAdjustments(graph, {
+			kind: doc.kind,
+			map: doc.map,
+			power: doc.power,
+			orders: incoming
+		}, adjustments, expectedPower);
+		mode = "build";
+		var stored = [];
+		for (var i = 0; i < incoming.length; i++) {
+			var order = {
+				province: DiplomacyBoard.canonProvince(graph, incoming[i].province),
+				power: doc.power,
+				action: incoming[i].action
+			};
+			if (incoming[i].action === "build") order.unit = incoming[i].unit;
+			stored.push(order);
+		}
+		replacePhaseOrders(doc.power || "", stored);
+		cancelPending();
+		closePopup();
+		render();
+		emit();
+	}
+
+	function acceptOrders(doc, expectedPower) {
+		if (doc && doc.kind === "diplomacy-retreats") applyRetreats(doc, expectedPower);
+		else if (doc && doc.kind === "diplomacy-adjustments") applyAdjustments(doc, expectedPower);
+		else applyOrders(doc, expectedPower);
+	}
+
 	function applyDocument(doc) {
 		if (!doc || typeof doc !== "object") DiplomacyBoard.fail("Not a Diplomacy document");
 		if (doc.kind === "diplomacy-position") applyPosition(doc);
 		else if (doc.kind === "diplomacy-orders") applyOrders(doc);
 		else if (doc.kind === "diplomacy-board") applyBoard(doc);
+		else if (doc.kind === "diplomacy-retreats") applyRetreats(doc);
+		else if (doc.kind === "diplomacy-adjustments") applyAdjustments(doc);
 		else DiplomacyBoard.fail("Unknown document kind");
 	}
 
@@ -655,6 +1059,8 @@ DiplomacyBoard.mount = function (host, options) {
 			return DiplomacyBoard.clone(orders);
 		},
 		exportOrders: function (powerId) {
+			if (mode === "retreat") return api.exportRetreats(powerId);
+			if (mode === "build") return api.exportAdjustments(powerId);
 			var id = powerId || playingAs;
 			var list = [];
 			for (var i = 0; i < orders.length; i++) {
@@ -669,18 +1075,77 @@ DiplomacyBoard.mount = function (host, options) {
 				orders: list
 			};
 		},
+		exportRetreats: function (powerId) {
+			var id = powerId || playingAs;
+			var list = [];
+			for (var i = 0; i < orders.length; i++) {
+				if (phaseOrderKind(orders[i]) !== "retreat") continue;
+				if (id && orders[i].power !== id) continue;
+				list.push(DiplomacyBoard.exportRetreatOrder(orders[i]));
+			}
+			return {
+				kind: "diplomacy-retreats",
+				map: graph.source,
+				power: id || "",
+				orders: list
+			};
+		},
+		exportAdjustments: function (powerId) {
+			var id = powerId || playingAs;
+			var list = [];
+			for (var i = 0; i < orders.length; i++) {
+				if (phaseOrderKind(orders[i]) !== "build") continue;
+				if (id && orders[i].power !== id) continue;
+				list.push(DiplomacyBoard.exportAdjustmentOrder(orders[i]));
+			}
+			return {
+				kind: "diplomacy-adjustments",
+				map: graph.source,
+				power: id || "",
+				orders: list
+			};
+		},
 		exportBoard: function () {
 			var pos = api.getPosition();
 			pos.kind = "diplomacy-board";
-			pos.orders = DiplomacyBoard.clone(orders);
+			pos.orders = mode === "retreat" || mode === "build" ? [] : DiplomacyBoard.clone(orders);
 			return pos;
 		},
 		setPosition: applyPosition,
-		setOrders: applyOrders,
+		setOrders: acceptOrders,
 		importDocument: applyDocument,
 		setMode: function (next) {
-			mode = next === "position" ? "position" : "orders";
+			var previous = mode;
+			mode = DiplomacyBoard.knownMode(next);
+			var cleared = orderPhase(previous) !== orderPhase(mode);
+			if (cleared) orders = [];
 			if (mode !== "orders") {
+				cancelPending();
+				closePopup();
+			}
+			render();
+			if (cleared) emit();
+		},
+		setRetreats: function (list) {
+			retreats = Array.isArray(list) ? list : [];
+			if (mode === "retreat") {
+				keepOrdersThatMatch();
+				if (openProvince && !retreatClickable(DiplomacyBoard.findRetreat(graph, retreats, openProvince))) closePopup();
+			}
+			render();
+		},
+		setAdjustments: function (list) {
+			adjustments = Array.isArray(list) ? list : [];
+			if (mode === "build") {
+				keepOrdersThatMatch();
+				if (openProvince && !adjustmentAt(openProvince)) closePopup();
+				else if (openProvince) showAdjustPopup(openProvince);
+			}
+			render();
+		},
+		setReadOnly: function (on) {
+			readOnly = !!on;
+			if (readOnly) {
 				cancelPending();
 				closePopup();
 			}
@@ -691,10 +1156,8 @@ DiplomacyBoard.mount = function (host, options) {
 		},
 		setPlayingAs: function (id) {
 			playingAs = id || "";
-			if (orderScope === "mine" && openProvince) {
-				var standing = DiplomacyBoard.unitAt(position.units, openProvince);
-				if (!standing || standing.power !== playingAs) closePopup();
-			}
+			if (!popupStillAllowed()) closePopup();
+			if (mode === "retreat" || mode === "build") highlightPicks();
 			drawUnits();
 		},
 		getShowResolved: function () {
@@ -704,14 +1167,21 @@ DiplomacyBoard.mount = function (host, options) {
 			showResolved = !!on;
 			render();
 		},
+		setResolution: function (result) {
+			suppliedResolution = result ? DiplomacyBoard.clone(result) : null;
+			if (suppliedResolution) showResolved = true;
+			render();
+		},
 		getResolution: function () {
+			if (suppliedResolution) return DiplomacyBoard.clone(suppliedResolution);
 			return DiplomacyBoard.adjudicate(graph, position, orders);
 		},
 		setOrderScope: function (scope) {
 			orderScope = scope === "mine" ? "mine" : "all";
-			if (orderScope === "mine" && openProvince) {
-				var standing = DiplomacyBoard.unitAt(position.units, openProvince);
-				if (!standing || standing.power !== playingAs) closePopup();
+			if (!popupStillAllowed()) closePopup();
+			if (mode === "retreat" || mode === "build") {
+				highlightPicks();
+				showPrompt();
 			}
 			drawUnits();
 		},
@@ -732,14 +1202,14 @@ DiplomacyBoard.mount = function (host, options) {
 			cancelPending();
 			closePopup();
 			host.innerHTML = "";
-			host.classList.remove("diplomacy-board", "is-position", "is-orders", "is-picking", "is-resolved");
+			host.classList.remove("diplomacy-board", "is-position", "is-orders", "is-retreat", "is-build", "is-readonly", "is-picking", "is-resolved");
 		}
 	};
 
 	function ready() {
 		if (options.position) applyPosition(options.position);
 		else render();
-		if (options.orders) applyOrders(options.orders);
+		if (options.orders) acceptOrders(options.orders);
 		if (options.board) applyBoard(options.board);
 		if (typeof options.onReady === "function") options.onReady(api);
 	}

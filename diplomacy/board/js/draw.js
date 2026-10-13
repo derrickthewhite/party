@@ -361,6 +361,70 @@ function paintSnake(ctx, project, token, mapPoints, color, dashed, withHead) {
 	ctx.restore();
 }
 
+function paintPendingDisband(ctx, project, token, center, color) {
+	var at = project(center);
+	var r = token * 0.46;
+	ctx.save();
+	ctx.lineCap = "round";
+	ctx.beginPath();
+	ctx.arc(at.x, at.y, r, 0, Math.PI * 2);
+	ctx.moveTo(at.x - r * 0.62, at.y - r * 0.62);
+	ctx.lineTo(at.x + r * 0.62, at.y + r * 0.62);
+	ctx.strokeStyle = "#ffffff";
+	ctx.lineWidth = 5;
+	ctx.stroke();
+	ctx.beginPath();
+	ctx.arc(at.x, at.y, r, 0, Math.PI * 2);
+	ctx.moveTo(at.x - r * 0.62, at.y - r * 0.62);
+	ctx.lineTo(at.x + r * 0.62, at.y + r * 0.62);
+	ctx.strokeStyle = color;
+	ctx.lineWidth = 2.6;
+	ctx.stroke();
+	ctx.restore();
+}
+
+function paintBuild(ctx, project, token, center, unit, color) {
+	var at = project(center);
+	var r = token / 2;
+	function outline(width, stroke) {
+		if (unit === "fleet") {
+			var s = r * 1.55;
+			ctx.beginPath();
+			ctx.rect(at.x - s / 2, at.y - s / 2, s, s);
+		} else {
+			starPath(ctx, at.x, at.y, r);
+		}
+		ctx.setLineDash([5, 4]);
+		ctx.strokeStyle = stroke;
+		ctx.lineWidth = width;
+		ctx.stroke();
+		ctx.setLineDash([]);
+	}
+	ctx.save();
+	ctx.lineJoin = "round";
+	ctx.lineCap = "round";
+	outline(5, "#ffffff");
+	outline(2.4, color);
+	var arm = r * 0.34;
+	ctx.beginPath();
+	ctx.moveTo(at.x - arm, at.y);
+	ctx.lineTo(at.x + arm, at.y);
+	ctx.moveTo(at.x, at.y - arm);
+	ctx.lineTo(at.x, at.y + arm);
+	ctx.strokeStyle = "#ffffff";
+	ctx.lineWidth = 4;
+	ctx.stroke();
+	ctx.beginPath();
+	ctx.moveTo(at.x - arm, at.y);
+	ctx.lineTo(at.x + arm, at.y);
+	ctx.moveTo(at.x, at.y - arm);
+	ctx.lineTo(at.x, at.y + arm);
+	ctx.strokeStyle = color;
+	ctx.lineWidth = 2;
+	ctx.stroke();
+	ctx.restore();
+}
+
 function paintHold(ctx, project, token, center, color) {
 	var at = project(center);
 	ctx.save();
@@ -412,6 +476,19 @@ function paintOrders(ctx, view) {
 			}
 			continue;
 		}
+		if (action === "retreat") {
+			var retreatTo = DiplomacyBoard.province(graph, order.to);
+			if (retreatTo) paintArrow(ctx, project, token, here.center, retreatTo.center, color, true, true);
+			continue;
+		}
+		if (action === "disband") {
+			paintPendingDisband(ctx, project, token, here.center, color);
+			continue;
+		}
+		if (action === "build") {
+			paintBuild(ctx, project, token, here.center, order.unit, color);
+			continue;
+		}
 		if (action === "convoy") {
 			var origin = DiplomacyBoard.province(graph, order.from || order.province);
 			var landAt = DiplomacyBoard.province(graph, order.to);
@@ -438,7 +515,7 @@ function paintOrders(ctx, view) {
 }
 
 function tokensToDraw(view) {
-	if (view.showResolved && view.resolution) return view.resolution.units;
+	if (view.showResolved && view.resolution && Array.isArray(view.resolution.units)) return view.resolution.units;
 	var list = [];
 	for (var i = 0; i < view.position.units.length; i++) {
 		var unit = view.position.units[i];

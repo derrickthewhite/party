@@ -129,3 +129,30 @@ DiplomacyBoard.orderPopupHtml = function (graph, unit, current) {
 	}
 	return html;
 };
+
+DiplomacyBoard.retreatPopupHtml = function (graph, entry, current) {
+	var province = DiplomacyBoard.province(graph, entry.province);
+	var html = "<h2>Retreat " + DiplomacyBoard.esc(entry.unit) + " in " + DiplomacyBoard.esc(province ? province.name : entry.province) + "</h2>";
+	var choices = entry.choices || [];
+	for (var i = 0; i < choices.length; i++) {
+		var dest = DiplomacyBoard.province(graph, choices[i]);
+		html += "<button type=\"button\" data-retreat-to=\"" + DiplomacyBoard.esc(DiplomacyBoard.canonProvince(graph, choices[i])) + "\">";
+		html += DiplomacyBoard.esc(dest ? dest.name : choices[i]) + "</button>";
+	}
+	if (entry.disband) html += "<button type=\"button\" data-action=\"disband\">Disband</button>";
+	if (current) html += "<button type=\"button\" class=\"clear\" data-clear=\"1\">Clear</button>";
+	return html;
+};
+
+DiplomacyBoard.adjustPopupHtml = function (graph, spec) {
+	var province = DiplomacyBoard.province(graph, spec.province);
+	var name = province ? province.name : spec.province;
+	var html = "<h2>" + DiplomacyBoard.esc(name) + "</h2>";
+	var units = spec.units || [];
+	for (var i = 0; i < units.length; i++) {
+		html += "<button type=\"button\" data-build-unit=\"" + DiplomacyBoard.esc(units[i]) + "\">Build " + DiplomacyBoard.esc(units[i]) + "</button>";
+	}
+	if (spec.canDisband) html += "<button type=\"button\" data-action=\"disband\">Disband</button>";
+	if (spec.current) html += "<button type=\"button\" class=\"clear\" data-clear=\"1\">Clear</button>";
+	return html;
+};

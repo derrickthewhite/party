@@ -386,6 +386,11 @@ DiplomacyBoard.validatePosition = function (graph, doc) {
 	return true;
 };
 
+DiplomacyBoard.knownMode = function (mode) {
+	if (mode === "position" || mode === "retreat" || mode === "build") return mode;
+	return "orders";
+};
+
 DiplomacyBoard.normalizeAction = function (action) {
 	if (action === "attack") return "move";
 	if (action === "support-attack") return "support-move";
@@ -528,5 +533,139 @@ DiplomacyBoard.validateOrders = function (graph, position, doc, expectedPower) {
 			DiplomacyBoard.fail("Illegal " + action + " from " + order.province);
 		}
 	}
+	return true;
+};
+
+// Retreat and adjustment documents repeat the choices the host supplied.
+// They do not consult movement legality or supply-center counts.
+DiplomacyBoard.canonProvince = function (graph, id) {
+	return DiplomacyBoard.provinceId(graph, id);
+};
+
+DiplomacyBoard.findRetreat = function (graph, retreats, provinceId) {
+	var id = DiplomacyBoard.canonProvince(graph, provinceId);
+	var list = retreats || [];
+	for (var i = 0; i < list.length; i++) {
+		if (DiplomacyBoard.canonProvince(graph, list[i].province) === id) return list[i];
+	}
+	return null;
+};
+
+DiplomacyBoard.findAdjustment = function (adjustments, powerId) {
+	var list = adjustments || [];
+	for (var i = 0; i < list.length; i++) {
+		if (list[i].power === powerId) return list[i];
+	}
+	return null;
+};
+
+DiplomacyBoard.adjustmentBuildsAt = function (graph, adjustment, provinceId) {
+	var id = DiplomacyBoard.canonProvince(graph, provinceId);
+	var found = [];
+	var builds = adjustment && adjustment.builds ? adjustment.builds : [];
+	for (var i = 0; i < builds.length; i++) {
+		if (DiplomacyBoard.canonProvince(graph, builds[i].province) === id) found.push(builds[i].unit);
+	}
+	return found;
+};
+
+DiplomacyBoard.adjustmentCanDisband = function (graph, adjustment, provinceId) {
+	if (!adjustment || !(adjustment.count < 0)) return false;
+	var id = DiplomacyBoard.canonProvince(graph, provinceId);
+	var list = adjustment.disbands || [];
+	for (var i = 0; i < list.length; i++) {
+		if (DiplomacyBoard.canonProvince(graph, list[i]) === id) return true;
+	}
+	return false;
+};
+
+DiplomacyBoard.exportRetreatOrder = function (order) {
+	var out = {
+		province: order.province,
+		unit: order.unit,
+		action: order.action
+	};
+	if (order.action === "retreat") out.to = order.to;
+	return out;
+};
+
+DiplomacyBoard.exportAdjustmentOrder = function (order) {
+	if (order.action === "build") {
+		return { action: "build", province: order.province, unit: order.unit };
+	}
+	return { action: "disband", province: order.province };
+};
+
+DiplomacyBoard.validateRetreats = function (graph, doc, retreats, expectedPower) {
+	DiplomacyBoard.requireMap(doc, graph.source);
+	if (!doc || doc.kind !== "diplomacy-retreats") DiplomacyBoard.fail("Expected a retreats document");
+	var powerId = expectedPower != null ? expectedPower : doc.power;
+	if (powerId && doc.power !== powerId) DiplomacyBoard.fail("Retreats are for " + doc.power);
+	var list = Array.isArray(doc.orders) ? doc.orders : DiplomacyBoard.fail("orders must be a list");
+	var used = {};
+	for (var i = 0; i < list.length; i++) {
+		var order = list[i];
+		if (!order || !order.province) DiplomacyBoard.fail("Every retreat needs a province");
+		var provinceId = DiplomacyBoard.canonProvince(graph, order.province);
+		if (used[provinceId]) DiplomacyBoard.fail("Two retreats from " + order.province);
+		used[provinceId] = true;
+		if (!DiplomacyBoard.province(graph, provinceId)) DiplomacyBoard.fail("Unknown province " + order.province);
+		var entry = DiplomacyBoard.findRetreat(graph, retreats, provinceId);
+		if (!entry) DiplomacyBoard.fail("No retreat offered for " + order.province);
+		if (order.unit !== "army" && order.unit !== "fleet") DiplomacyBoard.fail("Retreat in " + order.province + " needs a unit");
+		if (order.unit !== entry.unit) DiplomacyBoard.fail("Retreat in " + order.province + " does not match the unit");
+		if (doc.power && entry.power !== doc.power) DiplomacyBoard.fail("Retreat in " + order.province + " is not for " + doc.power);
+		if (order.action === "retreat") {
+			var to = DiplomacyBoard.canonProvince(graph, order.to);
+			var choices = entry.choices || [];
+			var allowed = false;
+			for (var c = 0; c < choices.length; c++) {
+				if (DiplomacyBoard.canonProvince(graph, choices[c]) === to) allowed = true;
+			}
+			if (!allowed) DiplomacyBoard.fail("Retreat from " + order.province + " is not one of the choices");
+		} else if (order.action === "disband") {
+			if (!entry.disband) DiplomacyBoard.fail("Disband is not offered for " + order.province);
+		} else {
+			DiplomacyBoard.fail("Unknown retreat order " + (order.action || ""));
+		}
+	}
+	return true;
+};
+
+DiplomacyBoard.validateAdjustments = function (graph, doc, adjustments, expectedPower) {
+	DiplomacyBoard.requireMap(doc, graph.source);
+	if (!doc || doc.kind !== "diplomacy-adjustments") DiplomacyBoard.fail("Expected an adjustments document");
+	var powerId = expectedPower != null ? expectedPower : doc.power;
+	if (powerId && doc.power !== powerId) DiplomacyBoard.fail("Adjustments are for " + doc.power);
+	var adjustment = DiplomacyBoard.findAdjustment(adjustments, doc.power);
+	if (!adjustment) DiplomacyBoard.fail("No adjustment offered for " + (doc.power || "that power"));
+	var list = Array.isArray(doc.orders) ? doc.orders : DiplomacyBoard.fail("orders must be a list");
+	var count = adjustment.count || 0;
+	var used = {};
+	var builds = 0;
+	var disbands = 0;
+	for (var i = 0; i < list.length; i++) {
+		var order = list[i];
+		if (!order || !order.province) DiplomacyBoard.fail("Every adjustment needs a province");
+		var provinceId = DiplomacyBoard.canonProvince(graph, order.province);
+		if (used[provinceId]) DiplomacyBoard.fail("Two adjustments in " + order.province);
+		used[provinceId] = true;
+		if (!DiplomacyBoard.province(graph, provinceId)) DiplomacyBoard.fail("Unknown province " + order.province);
+		if (order.action === "build") {
+			var offered = DiplomacyBoard.adjustmentBuildsAt(graph, adjustment, provinceId);
+			if (offered.indexOf(order.unit) === -1) DiplomacyBoard.fail("Build in " + order.province + " is not one of the choices");
+			builds += 1;
+		} else if (order.action === "disband") {
+			if (!DiplomacyBoard.adjustmentCanDisband(graph, adjustment, provinceId)) {
+				DiplomacyBoard.fail("Disband in " + order.province + " is not one of the choices");
+			}
+			disbands += 1;
+		} else {
+			DiplomacyBoard.fail("Unknown adjustment " + (order.action || ""));
+		}
+	}
+	if (count > 0 && (disbands > 0 || builds > count)) DiplomacyBoard.fail("That adjustment allows " + count + " builds");
+	if (count < 0 && (builds > 0 || disbands > -count)) DiplomacyBoard.fail("That adjustment allows " + (-count) + " disbands");
+	if (count === 0 && list.length) DiplomacyBoard.fail("That power has no adjustment");
 	return true;
 };

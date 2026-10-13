@@ -17,7 +17,7 @@ DiplomacyBoard.attachCamera = function (b) {
 	};
 
 	b.setScale = function (next, clientX, clientY) {
-		next = Math.max(1, Math.min(8, next));
+		next = Math.max(0.5, Math.min(8, next));
 		var rect = b.viewport.getBoundingClientRect();
 		if (clientX == null) clientX = rect.left + rect.width / 2;
 		if (clientY == null) clientY = rect.top + rect.height / 2;
