@@ -36,4 +36,4 @@ These tests exist to prove that the real application shows the right information
 - `mafia-ui.test.js`
 - `rumble-ui.test.js`
 - `admin-ui.test.js`
-- `browser-smoke.test.js`
+- `browser-smoke.test.js` (includes room selector / Users & Rooms coverage in lobby and admin specs)

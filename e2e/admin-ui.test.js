@@ -44,4 +44,32 @@ describe('administrator presentation coverage', () => {
       await page.close();
     }
   });
+
+  test('administrator can open the Users & Rooms screen', async () => {
+    const admin = await createSession('admin-users-rooms', { admin: true });
+    const page = await openAuthenticatedPage(admin, { screen: 'admin' }, { viewport: { width: 1280, height: 900 } });
+
+    try {
+      await waitForActiveHeading(page, 'Users & Rooms');
+      await page.waitForSelector('[data-ref="userList"]');
+      await page.waitForSelector('[data-ref="roomList"]');
+      const snapshot = await page.evaluate(() => {
+        const userGames = document.querySelector('[data-ref="userList"] [data-ref="games"]');
+        const roomGames = document.querySelector('[data-ref="roomList"] [data-ref="games"]');
+        const roomEdit = document.querySelector('[data-ref="roomList"] [data-ref="editBtn"]');
+        return {
+          hasCreateRoom: !!document.querySelector('[data-ref="createRoomBtn"]'),
+          userGamesText: userGames ? userGames.textContent.trim() : '',
+          roomGamesText: roomGames ? roomGames.textContent.trim() : '',
+          roomEditText: roomEdit ? roomEdit.textContent.trim() : '',
+        };
+      });
+      expect(snapshot.hasCreateRoom).toBe(true);
+      expect(snapshot.userGamesText).toMatch(/\d+ games?/);
+      expect(snapshot.roomGamesText).toMatch(/\d+ games?/);
+      expect(snapshot.roomEditText).toBe('Edit');
+    } finally {
+      await page.close();
+    }
+  });
 });

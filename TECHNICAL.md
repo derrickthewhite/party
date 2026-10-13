@@ -43,7 +43,7 @@ Base path: `/api`
 
 ### Auth
 
-- `POST /api/auth/signup` — body: `{ "username": "...", "salt": "<hex>", "verifier": "<hex>", "invite_key": "..." }`
+- `POST /api/auth/signup` — body: `{ "username": "...", "salt": "<hex>", "verifier": "<hex>", "invite_key": "..." }` (`invite_key` is a room code)
 - `POST /api/auth/signin/start` — body: `{ "username": "..." }` → response: `{ "salt": "<hex>", "server_public": "<hex>", "params": { ... } }`
 - `POST /api/auth/signin/finish` — body: `{ "username": "...", "client_public": "<hex>", "client_proof": "<hex>" }`
 - `POST /api/auth/signout`
@@ -51,20 +51,32 @@ Base path: `/api`
 - `GET /api/auth/test`
 
 Notes:
-- `signup` creates the account only (does not auto-signin).
-- `me` returns `401` until `signin` succeeds and sets a session cookie.
+- `signup` creates the account only (does not auto-signin) and adds the user to the room matching `invite_key`.
+- `me` returns `401` until `signin` succeeds and sets a session cookie. The user payload includes `rooms`.
 - Auth uses SRP-style verifier/challenge proof exchange; the server stores only `srp_salt` and `srp_verifier`.
 
 ### Games
 
-- `GET /api/games`
-- `POST /api/games` — body: `{ "title": "...", "game_type": "chat|mafia|diplomacy|rumble" }`
+- `GET /api/games` — games in rooms the current user belongs to
+- `POST /api/games` — body: `{ "title": "...", "game_type": "chat|mafia|diplomacy|rumble", "room_id": 1 }` (`room_id` optional when the user has exactly one room)
 - `POST /api/games/{id}/join`
 - `POST /api/games/{id}/observe`
 - `POST /api/games/{id}/start`
 - `POST /api/games/{id}/end`
 - `POST /api/games/{id}/delete`
 - `GET /api/games/{id}`
+
+### Admin (requires `is_admin`)
+
+- `GET /api/admin/users` — includes `game_count` and rooms
+- `GET /api/admin/rooms` — includes `game_count`
+- `POST /api/admin/rooms` — body: `{ "name": "...", "code": "..." }`
+- `POST /api/admin/rooms/{id}` — body: `{ "name": "...", "code": "..." }`
+- `POST /api/admin/rooms/{id}/members` — body: `{ "user_ids": [1, 2] }`
+- `DELETE /api/admin/users/{id}/rooms/{roomId}`
+- `DELETE /api/admin/users/{id}` — only if the user is in 0 games (cannot delete yourself)
+- `DELETE /api/admin/rooms/{id}` — only if the room has 0 games
+- `POST /api/admin/users/{id}/admin` — body: `{ "is_admin": 0|1 }` (self-demote is rejected)
 
 ### Chat
 

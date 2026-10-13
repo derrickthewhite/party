@@ -28,10 +28,14 @@ async function createSession(label, options = {}) {
 }
 
 async function createGame(ownerSession, gameType, title) {
+  const roomId = ownerSession.user && Array.isArray(ownerSession.user.rooms) && ownerSession.user.rooms[0]
+    ? ownerSession.user.rooms[0].id
+    : undefined;
   const response = await ownerSession.client.post('/api/games', {
     json: {
       title: title || uniqueLabel(gameType),
       game_type: gameType,
+      ...(roomId ? { room_id: roomId } : {}),
     },
   });
 

@@ -12,6 +12,10 @@ class ApiClient {
     return this.request('POST', pathname, options);
   }
 
+  async delete(pathname, options) {
+    return this.request('DELETE', pathname, options);
+  }
+
   async request(method, pathname, options = {}) {
     const headers = {
       Accept: 'application/json',

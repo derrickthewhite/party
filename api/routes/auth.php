@@ -153,40 +153,40 @@ function auth_signup(): void
         }
 
         try {
-            $keyStmt = db()->prepare('SELECT setting_value FROM app_settings WHERE setting_key = :key LIMIT 1');
-            $keyStmt->execute(['key' => 'signup_invite_key']);
-            $expectedKey = (string)($keyStmt->fetchColumn() ?: '');
+            $room = room_find_by_code($inviteKey);
         } catch (Throwable $ex) {
             auth_error_response('Unable to validate invite key right now.', 500, 'signup.invite_lookup', $ex);
         }
 
-        if ($expectedKey === '') {
-            auth_error_response('Signup invite key is not configured on the server.', 500, 'signup.invite_missing', null, [
-                'setting_key' => 'signup_invite_key',
-            ]);
-        }
-
-        if (!hash_equals($expectedKey, $inviteKey)) {
+        if ($room === null) {
             error_response('Invalid invite key.', 403, [
                 'stage' => 'signup.invite_compare',
                 'provided_length' => strlen($inviteKey),
-                'expected_length' => strlen($expectedKey),
             ]);
         }
 
+        $pdo = db();
+        $pdo->beginTransaction();
         try {
-            $stmt = db()->prepare('INSERT INTO users (username, srp_salt, srp_verifier) VALUES (:username, :srp_salt, :srp_verifier)');
+            $stmt = $pdo->prepare('INSERT INTO users (username, srp_salt, srp_verifier) VALUES (:username, :srp_salt, :srp_verifier)');
             $stmt->execute([
                 'username' => $username,
                 'srp_salt' => $validatedSalt,
                 'srp_verifier' => $validatedVerifier,
             ]);
+            $userId = (int)$pdo->lastInsertId();
+            rooms_add_user($userId, (int)$room['id']);
+            $pdo->commit();
         } catch (PDOException $ex) {
+            $pdo->rollBack();
             if ((int)$ex->getCode() === 23000) {
                 error_response('Username is already taken.', 409, [
                     'stage' => 'signup.insert_user',
                 ]);
             }
+            auth_error_response('Unable to create account right now.', 500, 'signup.insert_user', $ex);
+        } catch (Throwable $ex) {
+            $pdo->rollBack();
             auth_error_response('Unable to create account right now.', 500, 'signup.insert_user', $ex);
         }
 
@@ -364,26 +364,21 @@ function auth_signin_finish(): void
         }
 
         try {
-            $userStmt = db()->prepare('SELECT id, username FROM users WHERE id = :id LIMIT 1');
-            $userStmt->execute(['id' => $userId]);
-            $user = $userStmt->fetch();
+            $user = current_user();
         } catch (Throwable $ex) {
             auth_error_response('Signed in, but failed to load user data.', 500, 'signin.finish.load_user', $ex, [
                 'user_id' => $userId,
             ]);
         }
 
-        if (!$user) {
+        if ($user === null) {
             error_response('Invalid credentials.', 401, [
                 'stage' => 'signin.finish.user_missing_after_auth',
             ]);
         }
 
         success_response([
-            'user' => [
-                'id' => (int)$user['id'],
-                'username' => (string)$user['username'],
-            ],
+            'user' => $user,
             'server_proof' => $serverProof,
         ]);
     } catch (Throwable $ex) {
@@ -452,6 +447,9 @@ function auth_test(): void
                 'length' => 0,
                 'preview' => '',
             ],
+            'rooms' => [
+                'count' => 0,
+            ],
         ],
         'session' => [
             'status' => session_status(),
@@ -473,11 +471,10 @@ function auth_test(): void
     }
 
     try {
-        $stmt = db()->prepare('SELECT setting_value FROM app_settings WHERE setting_key = :key LIMIT 1');
-        $stmt->execute(['key' => 'signup_invite_key']);
-        $inviteKey = (string)($stmt->fetchColumn() ?: '');
-
-        if ($inviteKey !== '') {
+        $rooms = rooms_list_all();
+        $report['checks']['rooms']['count'] = count($rooms);
+        if (count($rooms) > 0) {
+            $inviteKey = (string)$rooms[0]['code'];
             $report['checks']['invite_key']['configured'] = true;
             $report['checks']['invite_key']['length'] = strlen($inviteKey);
 
@@ -491,6 +488,11 @@ function auth_test(): void
         }
     } catch (Throwable $ex) {
         $report['checks']['invite_key']['error'] = [
+            'type' => get_class($ex),
+            'code' => (string)$ex->getCode(),
+            'message' => $ex->getMessage(),
+        ];
+        $report['checks']['rooms']['error'] = [
             'type' => get_class($ex),
             'code' => (string)$ex->getCode(),
             'message' => $ex->getMessage(),

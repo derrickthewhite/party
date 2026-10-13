@@ -18,9 +18,27 @@ CREATE TABLE IF NOT EXISTS app_settings (
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS rooms (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  name TEXT NOT NULL,
+  code TEXT NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE(code)
+);
+
+CREATE TABLE IF NOT EXISTS user_rooms (
+  user_id INTEGER NOT NULL,
+  room_id INTEGER NOT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, room_id),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS games (
   id INTEGER PRIMARY KEY AUTOINCREMENT,
   owner_user_id INTEGER NOT NULL,
+  room_id INTEGER NOT NULL,
   title TEXT NOT NULL,
   game_type TEXT NOT NULL DEFAULT 'chat',
   mafia_setup_mode TEXT NOT NULL DEFAULT 'auto' CHECK(mafia_setup_mode IN ('auto', 'custom')),
@@ -28,7 +46,8 @@ CREATE TABLE IF NOT EXISTS games (
   status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'in_progress', 'closed')),
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
+  FOREIGN KEY (owner_user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  FOREIGN KEY (room_id) REFERENCES rooms(id) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS game_members (
@@ -176,7 +195,9 @@ CREATE TABLE IF NOT EXISTS rumble_ability_definitions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_games_owner ON games(owner_user_id);
+CREATE INDEX IF NOT EXISTS idx_games_room ON games(room_id);
 CREATE INDEX IF NOT EXISTS idx_games_status_created ON games(status, created_at);
+CREATE INDEX IF NOT EXISTS idx_user_rooms_room ON user_rooms(room_id);
 CREATE INDEX IF NOT EXISTS idx_game_members_user ON game_members(user_id);
 CREATE INDEX IF NOT EXISTS idx_messages_game_created ON game_messages(game_id, created_at);
 CREATE INDEX IF NOT EXISTS idx_game_player_standings_rank ON game_player_standings(game_id, final_rank);

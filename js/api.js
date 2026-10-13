@@ -42,7 +42,27 @@ function createApiModule() {
 		signout: () => request('/auth/signout', 'POST'),
 		me: () => request('/auth/me', 'GET'),
 		listGames: () => request('/games', 'GET'),
-		createGame: (title, gameType) => request('/games', 'POST', { title, game_type: gameType }),
+		createGame: (title, gameType, roomId) => request('/games', 'POST', {
+			title,
+			game_type: gameType,
+			room_id: roomId,
+		}),
+		adminListUsers: () => request('/admin/users', 'GET'),
+		adminListRooms: () => request('/admin/rooms', 'GET'),
+		adminCreateRoom: (name, code) => request('/admin/rooms', 'POST', { name, code }),
+		adminUpdateRoom: (roomId, name, code) => request('/admin/rooms/' + encodeURIComponent(roomId), 'POST', {
+			name,
+			code,
+		}),
+		adminAddRoomMembers: (roomId, userIds) => request('/admin/rooms/' + encodeURIComponent(roomId) + '/members', 'POST', {
+			user_ids: userIds,
+		}),
+		adminRemoveUserRoom: (userId, roomId) => request('/admin/users/' + encodeURIComponent(userId) + '/rooms/' + encodeURIComponent(roomId), 'DELETE'),
+		adminSetUserAdmin: (userId, isAdmin) => request('/admin/users/' + encodeURIComponent(userId) + '/admin', 'POST', {
+			is_admin: isAdmin ? 1 : 0,
+		}),
+		adminDeleteUser: (userId) => request('/admin/users/' + encodeURIComponent(userId), 'DELETE'),
+		adminDeleteRoom: (roomId) => request('/admin/rooms/' + encodeURIComponent(roomId), 'DELETE'),
 		joinGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/join', 'POST'),
 		observeGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/observe', 'POST'),
 		leaveGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/leave', 'POST'),

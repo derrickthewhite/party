@@ -50,9 +50,11 @@ For full local host setup, backend API testing, deployment, and DB credential wo
 
 ## Routing and Auth UX
 
-- The frontend uses query parameters on `index.html` to restore app state: `screen=welcome|signup|signin|landing|game`, `game=<id>`, `next=<path|hash>`.
+- The frontend uses query parameters on `index.html` to restore app state: `screen=welcome|signup|signin|landing|game|admin`, `game=<id>`, `next=<path|hash>`.
+- Signup requires a room invite code (`invite_key`). That code assigns the new account to a room. The lobby lists games from rooms you belong to; users in multiple rooms can pick a room or All (All disables creating a game).
 - Signup redirects to sign-in. Sign-in attempts to reopen `game=<id>` before falling back to `next=`.
 - Usernames are case-insensitive for sign-in; the canonical stored username is used for SRP.
+- `is_admin` users can open Users & Rooms from the lobby to manage room membership and admin flags.
 
 ### Manual checks
 

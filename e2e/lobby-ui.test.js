@@ -17,6 +17,34 @@ const {
 const { expectedLobbyButtons } = require('./support/surface-expectations');
 
 describe('lobby presentation coverage', () => {
+  test('multi-room users can filter the lobby and All disables create', async () => {
+    const admin = await createSession('lobby-room-admin', { admin: true });
+    const user = await createSession('lobby-room-user');
+    const code = uniqueLabel('room-code').slice(0, 40);
+    const roomResponse = await admin.client.post('/api/admin/rooms', {
+      json: { name: 'Second', code },
+    });
+    expect(roomResponse.status).toBe(201);
+    const addResponse = await admin.client.post(`/api/admin/rooms/${roomResponse.body.data.room.id}/members`, {
+      json: { user_ids: [user.user.id] },
+    });
+    expect(addResponse.status).toBe(200);
+
+    const page = await openAuthenticatedPage(user, { screen: 'landing' }, { viewport: { width: 1280, height: 900 } });
+    try {
+      await waitForActiveHeading(page, 'Game Lobby');
+      await page.waitForSelector('[data-ref="roomSelect"]', { visible: true });
+      const createEnabledBefore = await page.$eval('[data-ref="createBtn"]', (node) => !node.disabled);
+      expect(createEnabledBefore).toBe(true);
+
+      await page.select('[data-ref="roomSelect"]', 'all');
+      const createEnabledAfter = await page.$eval('[data-ref="createBtn"]', (node) => !node.disabled);
+      expect(createEnabledAfter).toBe(false);
+    } finally {
+      await page.close();
+    }
+  });
+
   test('lobby shows the empty-state message when no games are available', async () => {
     const admin = await createSession('lobby-empty-admin', { admin: true });
     const existingGames = await listGames(admin);

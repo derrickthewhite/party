@@ -1,0 +1,12 @@
+[
+  {
+    "id": "territory-26",
+    "name": "Denmark",
+    "parts": ["territory-26", "territory-24", "territory-30", "territory-28"]
+  },
+  {
+    "id": "territory-82",
+    "name": "Constantinople",
+    "parts": ["territory-79", "territory-82"]
+  }
+]

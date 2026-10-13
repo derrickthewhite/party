@@ -12,14 +12,14 @@ function buildCredentials(label) {
   };
 }
 
-async function signUp(client, credentials) {
+async function signUp(client, credentials, inviteKey = 'local') {
   const signupPayload = await buildSignupPayload(credentials.username, credentials.password);
   return client.post('/api/auth/signup', {
     json: {
       username: signupPayload.username,
       salt: signupPayload.salt,
       verifier: signupPayload.verifier,
-      invite_key: 'local',
+      invite_key: inviteKey,
     },
   });
 }

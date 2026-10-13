@@ -10,12 +10,20 @@ export function createLandingScreen(deps) {
 	const chat = deps.chat;
 	const refreshGames = deps.refreshGames;
 	const openGame = deps.openGame;
+	const navigateToScreen = deps.navigateToScreen || function fallbackNavigate(screen) {
+		state.setScreen(screen);
+	};
 
 	const root = createNodeFromHtml(`
 		<section class="screen card">
 			<div class="row">
 				<h2>Game Lobby</h2>
 				<div data-ref="headingSpacer"></div>
+				<label class="lobby-room-select-label" data-ref="roomSelectWrap">
+					<span>Room</span>
+					<select data-ref="roomSelect" class="lobby-room-select"></select>
+				</label>
+				<button data-ref="usersRoomsBtn">Users &amp; Rooms</button>
 				<button data-ref="adminUiToggle">Admin UI: On</button>
 				${createGameActionButtonMarkup('refresh', 'refresh', '')}
 				<button class="link" data-ref="signout">Sign out</button>
@@ -53,8 +61,14 @@ export function createLandingScreen(deps) {
 	`);
 	const refs = collectRefs(root);
 	const adminUiToggle = refs.adminUiToggle;
+	const usersRoomsBtn = refs.usersRoomsBtn;
+	const roomSelectWrap = refs.roomSelectWrap;
+	const roomSelect = refs.roomSelect;
+	roomSelectWrap.style.display = 'none';
+	usersRoomsBtn.style.display = 'none';
 	const refresh = refs.refresh;
 	const signout = refs.signout;
+	let selectedRoomFilter = null;
 	const userLabel = refs.userLabel;
 	const gameTitleInput = refs.gameTitleInput;
 	const gameTypeSelect = refs.gameTypeSelect;
@@ -161,6 +175,56 @@ export function createLandingScreen(deps) {
 		const canToggle = hasAdminRights();
 		adminUiToggle.style.display = canToggle ? '' : 'none';
 		adminUiToggle.textContent = 'Admin UI: ' + (isAdminUiEnabled() ? 'On' : 'Off');
+		usersRoomsBtn.style.display = canToggle ? '' : 'none';
+	}
+
+	function sortedUserRooms(rooms) {
+		return (Array.isArray(rooms) ? rooms.slice() : []).sort(function sortRooms(left, right) {
+			return String(left.name || '').localeCompare(String(right.name || ''), undefined, { sensitivity: 'base' });
+		});
+	}
+
+	function syncRoomSelector(rooms) {
+		const sorted = sortedUserRooms(rooms);
+		const showSelect = sorted.length > 1;
+		roomSelectWrap.style.display = showSelect ? '' : 'none';
+
+		const validIds = {};
+		sorted.forEach(function eachRoom(room) {
+			validIds[String(room.id)] = true;
+		});
+
+		if (!showSelect) {
+			selectedRoomFilter = sorted.length === 1 ? String(sorted[0].id) : null;
+		} else if (selectedRoomFilter !== 'all' && !validIds[String(selectedRoomFilter)]) {
+			selectedRoomFilter = String(sorted[0].id);
+		}
+
+		if (showSelect) {
+			const wanted = [{ value: 'all', label: 'All' }].concat(sorted.map(function eachRoom(room) {
+				return { value: String(room.id), label: String(room.name || 'Room') };
+			}));
+			wanted.forEach(function eachOption(entry, index) {
+				let option = roomSelect.options[index];
+				if (!option) {
+					option = document.createElement('option');
+					roomSelect.appendChild(option);
+				}
+				option.value = entry.value;
+				option.textContent = entry.label;
+			});
+			while (roomSelect.options.length > wanted.length) {
+				roomSelect.remove(roomSelect.options.length - 1);
+			}
+			roomSelect.value = selectedRoomFilter;
+		}
+
+		const canCreate = selectedRoomFilter !== 'all' && selectedRoomFilter != null;
+		createBtn.disabled = !canCreate || createBusy;
+		gameTitleInput.disabled = !canCreate;
+		if (gameTypeSelect) {
+			gameTypeSelect.disabled = !canCreate;
+		}
 	}
 
 	function syncGameTypeOptions() {
@@ -182,6 +246,19 @@ export function createLandingScreen(deps) {
 		state.patch({ adminUiEnabled: !state.state.adminUiEnabled });
 		syncAdminUiToggle();
 		syncGameTypeOptions();
+	});
+
+	usersRoomsBtn.addEventListener('click', function onUsersRooms() {
+		if (!hasAdminRights()) {
+			return;
+		}
+
+		navigateToScreen('admin');
+	});
+
+	roomSelect.addEventListener('change', function onRoomChange() {
+		selectedRoomFilter = roomSelect.value || null;
+		renderGames(state.state.games);
 	});
 
 	syncAdminUiToggle();
@@ -208,20 +285,24 @@ export function createLandingScreen(deps) {
 			return;
 		}
 
+		if (selectedRoomFilter === 'all' || selectedRoomFilter == null) {
+			return;
+		}
+
 		createBusy = true;
 		createBtn.disabled = true;
 		setGameActionButtonLabel(createBtn, 'Creating game...');
 		try {
 			setStatus(status, 'Creating game...', '');
-			await api.createGame(gameTitleInput.value.trim(), gameTypeSelect.value);
+			await api.createGame(gameTitleInput.value.trim(), gameTypeSelect.value, Number(selectedRoomFilter));
 			await refreshGames();
 			setStatus(status, 'Game created.', 'ok');
 		} catch (err) {
 			setStatus(status, err.message, 'error');
 		} finally {
 			createBusy = false;
-			createBtn.disabled = false;
 			setGameActionButtonLabel(createBtn, 'Create game');
+			syncRoomSelector((state.state.user && state.state.user.rooms) || []);
 		}
 	});
 	let listRefreshBusy = false;
@@ -296,8 +377,14 @@ export function createLandingScreen(deps) {
 		syncGameTypeOptions();
 		const user = state.state.user || {};
 		userLabel.textContent = user.username ? 'Signed in as: ' + user.username : '';
+		syncRoomSelector(user.rooms || []);
 
-		const rows = Array.isArray(games) ? games : [];
+		const allRows = Array.isArray(games) ? games : [];
+		const rows = selectedRoomFilter === 'all' || selectedRoomFilter == null
+			? allRows
+			: allRows.filter(function eachGame(game) {
+				return String(game.room_id) === String(selectedRoomFilter);
+			});
 		const activeIds = new Set();
 
 		function ensureGameRow(gameId) {
@@ -495,7 +582,9 @@ export function createLandingScreen(deps) {
 			refs.rowState.game = game;
 
 			refs.name.textContent = game.title + ' (' + game.game_type + ')';
-			refs.ownerInfo.textContent = 'Owner: ' + game.owner_username;
+			refs.ownerInfo.textContent = selectedRoomFilter === 'all' && game.room_name
+				? 'Owner: ' + game.owner_username + ' | Room: ' + game.room_name
+				: 'Owner: ' + game.owner_username;
 			refs.playersInfo.textContent = 'Players: ' + Number(game.player_count || 0);
 			refs.observersInfo.textContent = 'Observers: ' + Number(game.observer_count || 0);
 			refs.statusInfo.textContent = 'Status: ' + game.status;

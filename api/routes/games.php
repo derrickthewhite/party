@@ -101,6 +101,8 @@ SELECT
     gs.phase,
     gs.current_round,
     u.username AS owner_username,
+    r.id AS room_id,
+    r.name AS room_name,
     COUNT(DISTINCT gm.user_id) AS member_count,
     SUM(CASE WHEN gm.role = 'observer' THEN 1 ELSE 0 END) AS observer_count,
     SUM(CASE WHEN gm.role <> 'observer' THEN 1 ELSE 0 END) AS player_count,
@@ -120,16 +122,21 @@ SELECT
     END AS category
 FROM games g
 JOIN users u ON u.id = g.owner_user_id
+JOIN rooms r ON r.id = g.room_id
 LEFT JOIN game_state gs ON gs.game_id = g.id
 LEFT JOIN game_members gm ON gm.game_id = g.id
 LEFT JOIN game_members gm_me ON gm_me.game_id = g.id AND gm_me.user_id = :user_id
-GROUP BY g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, gs.phase, gs.current_round, u.username, gm_me.role, COALESCE(gs.updated_at, gs.started_at, gs.ended_at, g.updated_at, g.created_at)
+WHERE g.room_id IN (SELECT ur.room_id FROM user_rooms ur WHERE ur.user_id = :room_user_id)
+GROUP BY g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, gs.phase, gs.current_round, u.username, r.id, r.name, gm_me.role, COALESCE(gs.updated_at, gs.started_at, gs.ended_at, g.updated_at, g.created_at)
 ORDER BY category ASC, last_state_change DESC, LOWER(g.title) ASC
 LIMIT 100
 SQL;
 
         $stmt = db()->prepare($sql);
-        $stmt->execute(['user_id' => $user['id']]);
+        $stmt->execute([
+            'user_id' => $user['id'],
+            'room_user_id' => $user['id'],
+        ]);
         $rows = $stmt->fetchAll();
 
     $gameIds = array_map(static fn (array $row): int => (int)$row['id'], $rows);
@@ -158,6 +165,8 @@ SQL;
             'status' => (string)$row['status'],
             'created_at' => (string)$row['created_at'],
             'owner_username' => (string)$row['owner_username'],
+            'room_id' => (int)$row['room_id'],
+            'room_name' => (string)$row['room_name'],
             'phase' => (string)($row['phase'] ?? default_phase_for_game_type((string)$row['game_type'])),
             'current_round' => (int)($row['current_round'] ?? 1),
             'member_count' => (int)$row['member_count'],
@@ -228,13 +237,27 @@ function games_create(): void
         error_response('Unsupported game type.', 422);
     }
 
+    $roomId = isset($body['room_id']) ? (int)$body['room_id'] : 0;
+    if ($roomId < 1) {
+        $soleRoomId = user_sole_room_id((int)$user['id']);
+        if ($soleRoomId === null) {
+            error_response('Room is required.', 422);
+        }
+        $roomId = $soleRoomId;
+    }
+
+    if (!user_has_room((int)$user['id'], $roomId)) {
+        error_response('Forbidden.', 403);
+    }
+
     $pdo = db();
     $pdo->beginTransaction();
 
     try {
-        $createStmt = $pdo->prepare('INSERT INTO games (owner_user_id, title, game_type) VALUES (:owner_user_id, :title, :game_type)');
+        $createStmt = $pdo->prepare('INSERT INTO games (owner_user_id, room_id, title, game_type) VALUES (:owner_user_id, :room_id, :title, :game_type)');
         $createStmt->execute([
             'owner_user_id' => $user['id'],
+            'room_id' => $roomId,
             'title' => $title,
             'game_type' => $gameType,
         ]);
@@ -269,6 +292,7 @@ function games_create(): void
             'title' => $title,
             'game_type' => $gameType,
             'status' => 'open',
+            'room_id' => $roomId,
         ],
     ], 201);
 }

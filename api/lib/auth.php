@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/http.php';
+require_once __DIR__ . '/rooms.php';
 
 function start_session_if_needed(): void
 {
@@ -46,11 +47,14 @@ function current_user(): ?array
         return null;
     }
 
+    $userId = (int)$user['id'];
+
     return [
-        'id' => (int)$user['id'],
+        'id' => $userId,
         'username' => (string)$user['username'],
         'created_at' => (string)$user['created_at'],
-        'is_admin' => user_is_admin((int)$user['id']) ? 1 : 0,
+        'is_admin' => user_is_admin($userId) ? 1 : 0,
+        'rooms' => rooms_for_user($userId),
     ];
 }
 
@@ -82,6 +86,16 @@ function require_user(): array
     $user = current_user();
     if ($user === null) {
         error_response('Unauthorized.', 401);
+    }
+
+    return $user;
+}
+
+function require_admin(): array
+{
+    $user = require_user();
+    if ((int)($user['is_admin'] ?? 0) !== 1) {
+        error_response('Forbidden.', 403);
     }
 
     return $user;

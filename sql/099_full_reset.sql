@@ -25,9 +25,33 @@ CREATE TABLE IF NOT EXISTS `app_settings` (
   PRIMARY KEY (`setting_key`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+CREATE TABLE IF NOT EXISTS `rooms` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `name` VARCHAR(80) NOT NULL,
+  `code` VARCHAR(80) NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_rooms_code` (`code`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `user_rooms` (
+  `user_id` BIGINT UNSIGNED NOT NULL,
+  `room_id` BIGINT UNSIGNED NOT NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`user_id`, `room_id`),
+  KEY `idx_user_rooms_room` (`room_id`),
+  CONSTRAINT `fk_user_rooms_user`
+    FOREIGN KEY (`user_id`) REFERENCES `users`(`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_user_rooms_room`
+    FOREIGN KEY (`room_id`) REFERENCES `rooms`(`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 CREATE TABLE IF NOT EXISTS `games` (
   `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
   `owner_user_id` BIGINT UNSIGNED NOT NULL,
+  `room_id` BIGINT UNSIGNED NOT NULL,
   `title` VARCHAR(100) NOT NULL,
   `game_type` VARCHAR(60) NOT NULL DEFAULT 'chat',
   `status` ENUM('open', 'in_progress', 'closed') NOT NULL DEFAULT 'open',
@@ -37,10 +61,14 @@ CREATE TABLE IF NOT EXISTS `games` (
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   KEY `idx_games_owner` (`owner_user_id`),
+  KEY `idx_games_room` (`room_id`),
   KEY `idx_games_status_created` (`status`, `created_at`),
   CONSTRAINT `fk_games_owner_user`
     FOREIGN KEY (`owner_user_id`) REFERENCES `users`(`id`)
-    ON DELETE CASCADE ON UPDATE CASCADE
+    ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT `fk_games_room`
+    FOREIGN KEY (`room_id`) REFERENCES `rooms`(`id`)
+    ON DELETE RESTRICT ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 CREATE TABLE IF NOT EXISTS `game_members` (
@@ -789,8 +817,8 @@ ON DUPLICATE KEY UPDATE
   `is_enabled` = VALUES(`is_enabled`),
   `updated_at` = CURRENT_TIMESTAMP;
 
-INSERT INTO `app_settings` (`setting_key`, `setting_value`)
-VALUES ('signup_invite_key', 'party-friends-v1')
+INSERT INTO `rooms` (`name`, `code`)
+VALUES ('Main', 'party-friends-v1')
 ON DUPLICATE KEY UPDATE
-  `setting_value` = VALUES(`setting_value`);
+  `name` = VALUES(`name`);
 

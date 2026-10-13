@@ -1,0 +1,2769 @@
+{
+  "source": "EuropeDiploMap.svg",
+  "provinces": {
+    "territory-1": {
+      "name": "Barents Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 921.21,
+        "y": 46.66
+      },
+      "neighbors": [
+        "territory-4",
+        "territory-6",
+        "territory-7"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-4",
+        "territory-6",
+        "territory-7"
+      ]
+    },
+    "territory-10": {
+      "name": "Sweden",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 697.58,
+        "y": 184.06
+      },
+      "neighbors": [
+        "territory-12",
+        "territory-15",
+        "territory-16",
+        "territory-19",
+        "territory-28",
+        "territory-29",
+        "territory-5",
+        "territory-7"
+      ],
+      "army": [
+        "territory-5",
+        "territory-7"
+      ],
+      "fleet": [
+        "territory-12",
+        "territory-19",
+        "territory-29",
+        "territory-5",
+        "territory-7"
+      ]
+    },
+    "territory-100": {
+      "name": "Tunis",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 493.56,
+        "y": 1163.78
+      },
+      "neighbors": [
+        "territory-85",
+        "territory-92",
+        "territory-94",
+        "territory-99"
+      ],
+      "army": [
+        "territory-99"
+      ],
+      "fleet": [
+        "territory-85",
+        "territory-92",
+        "territory-94",
+        "territory-99"
+      ]
+    },
+    "territory-101": {
+      "name": "Crete",
+      "kind": "land",
+      "access": "unnamed",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 894.83,
+        "y": 1155
+      },
+      "neighbors": [
+        "territory-90",
+        "territory-94",
+        "territory-96"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-11": {
+      "name": "Lake Peipus",
+      "kind": "sea",
+      "access": "neutral-water",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 886.34,
+        "y": 348.43
+      },
+      "neighbors": [
+        "territory-6"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-12": {
+      "name": "Gulf of Bothnia",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 732.83,
+        "y": 415.75
+      },
+      "neighbors": [
+        "territory-10",
+        "territory-22",
+        "territory-29",
+        "territory-5",
+        "territory-6"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-10",
+        "territory-22",
+        "territory-29",
+        "territory-5",
+        "territory-6"
+      ]
+    },
+    "territory-13": {
+      "name": "North Atlantic Ocean",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 150.64,
+        "y": 329.67
+      },
+      "neighbors": [
+        "territory-14",
+        "territory-17",
+        "territory-2",
+        "territory-25",
+        "territory-27",
+        "territory-33",
+        "territory-4",
+        "territory-67"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-17",
+        "territory-27",
+        "territory-33",
+        "territory-4",
+        "territory-67"
+      ]
+    },
+    "territory-14": {
+      "name": "Ireland",
+      "kind": "land",
+      "access": "unnamed",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 284.82,
+        "y": 404.45
+      },
+      "neighbors": [
+        "territory-13"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-15": {
+      "name": "Lake Vänern",
+      "kind": "sea",
+      "access": "neutral-water",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 612.26,
+        "y": 427.38
+      },
+      "neighbors": [
+        "territory-10"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-16": {
+      "name": "Lake Vättern",
+      "kind": "sea",
+      "access": "neutral-water",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 632,
+        "y": 446.75
+      },
+      "neighbors": [
+        "territory-10"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-17": {
+      "name": "Clyde",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 300.19,
+        "y": 449.04
+      },
+      "neighbors": [
+        "territory-13",
+        "territory-18",
+        "territory-27",
+        "territory-4"
+      ],
+      "army": [
+        "territory-18",
+        "territory-27"
+      ],
+      "fleet": [
+        "territory-13",
+        "territory-18",
+        "territory-27",
+        "territory-4"
+      ]
+    },
+    "territory-18": {
+      "name": "Edinburgh",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 330.34,
+        "y": 451.14
+      },
+      "neighbors": [
+        "territory-17",
+        "territory-21",
+        "territory-27",
+        "territory-31",
+        "territory-4"
+      ],
+      "army": [
+        "territory-17",
+        "territory-27",
+        "territory-31"
+      ],
+      "fleet": [
+        "territory-17",
+        "territory-21",
+        "territory-31",
+        "territory-4"
+      ]
+    },
+    "territory-19": {
+      "name": "Skagerrak",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 556.43,
+        "y": 450.68
+      },
+      "neighbors": [
+        "territory-10",
+        "territory-21",
+        "territory-24",
+        "territory-28",
+        "territory-7"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-10",
+        "territory-21",
+        "territory-24",
+        "territory-7"
+      ]
+    },
+    "territory-2": {
+      "name": "Iceland",
+      "kind": "land",
+      "access": "unnamed",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 189.25,
+        "y": 147.93
+      },
+      "neighbors": [
+        "territory-13",
+        "territory-4"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-20": {
+      "name": "Gotland",
+      "kind": "land",
+      "access": "unnamed",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 694,
+        "y": 477.19
+      },
+      "neighbors": [
+        "territory-29"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-21": {
+      "name": "North Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 425.1,
+        "y": 485.37
+      },
+      "neighbors": [
+        "territory-18",
+        "territory-19",
+        "territory-24",
+        "territory-31",
+        "territory-32",
+        "territory-38",
+        "territory-39",
+        "territory-4",
+        "territory-41",
+        "territory-43",
+        "territory-7"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-18",
+        "territory-19",
+        "territory-24",
+        "territory-31",
+        "territory-32",
+        "territory-38",
+        "territory-39",
+        "territory-4",
+        "territory-41",
+        "territory-43",
+        "territory-7"
+      ]
+    },
+    "territory-22": {
+      "name": "Livonia",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 787.19,
+        "y": 525.22
+      },
+      "neighbors": [
+        "territory-12",
+        "territory-23",
+        "territory-29",
+        "territory-34",
+        "territory-40",
+        "territory-6"
+      ],
+      "army": [
+        "territory-23",
+        "territory-34",
+        "territory-40",
+        "territory-6"
+      ],
+      "fleet": [
+        "territory-12",
+        "territory-29",
+        "territory-34",
+        "territory-6"
+      ]
+    },
+    "territory-23": {
+      "name": "Moscow",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 1166.93,
+        "y": 409.2
+      },
+      "neighbors": [
+        "territory-22",
+        "territory-40",
+        "territory-42",
+        "territory-49",
+        "territory-6"
+      ],
+      "army": [
+        "territory-22",
+        "territory-40",
+        "territory-42",
+        "territory-49",
+        "territory-6"
+      ],
+      "fleet": []
+    },
+    "territory-24": {
+      "name": "Jutland",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 542.04,
+        "y": 507.25
+      },
+      "neighbors": [
+        "territory-19",
+        "territory-21",
+        "territory-28",
+        "territory-32",
+        "territory-35"
+      ],
+      "army": [
+        "territory-35"
+      ],
+      "fleet": [
+        "territory-19",
+        "territory-21",
+        "territory-32",
+        "territory-35"
+      ]
+    },
+    "territory-25": {
+      "name": "Isle of Man",
+      "kind": "land",
+      "access": "unnamed",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 221.46,
+        "y": 553.95
+      },
+      "neighbors": [
+        "territory-13",
+        "territory-33"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-26": {
+      "name": "Denmark",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 574.56,
+        "y": 537.06
+      },
+      "neighbors": [
+        "territory-28",
+        "territory-29"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-29"
+      ]
+    },
+    "territory-27": {
+      "name": "Liverpool",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 317.87,
+        "y": 571.96
+      },
+      "neighbors": [
+        "territory-13",
+        "territory-17",
+        "territory-18",
+        "territory-31",
+        "territory-33",
+        "territory-36"
+      ],
+      "army": [
+        "territory-17",
+        "territory-18",
+        "territory-31",
+        "territory-36"
+      ],
+      "fleet": [
+        "territory-13",
+        "territory-17",
+        "territory-33",
+        "territory-36"
+      ]
+    },
+    "territory-28": {
+      "name": "Kattegat",
+      "kind": "sea",
+      "access": "neutral-water",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 556.95,
+        "y": 529.05
+      },
+      "neighbors": [
+        "territory-10",
+        "territory-19",
+        "territory-24",
+        "territory-26",
+        "territory-29",
+        "territory-30",
+        "territory-35"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-29": {
+      "name": "Baltic Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 704.11,
+        "y": 524.05
+      },
+      "neighbors": [
+        "territory-10",
+        "territory-12",
+        "territory-20",
+        "territory-22",
+        "territory-26",
+        "territory-28",
+        "territory-34",
+        "territory-35",
+        "territory-37"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-10",
+        "territory-12",
+        "territory-22",
+        "territory-26",
+        "territory-34",
+        "territory-35",
+        "territory-37"
+      ]
+    },
+    "territory-3": {
+      "name": "Faroes",
+      "kind": "land",
+      "access": "unnamed",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 644.35,
+        "y": 125.87
+      },
+      "neighbors": [
+        "territory-4",
+        "territory-7"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-30": {
+      "name": "Funen",
+      "kind": "land",
+      "access": "unnamed",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 553.65,
+        "y": 544.58
+      },
+      "neighbors": [
+        "territory-28"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-31": {
+      "name": "Yorkshire",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 343.58,
+        "y": 590.93
+      },
+      "neighbors": [
+        "territory-18",
+        "territory-21",
+        "territory-27",
+        "territory-36",
+        "territory-38"
+      ],
+      "army": [
+        "territory-18",
+        "territory-27",
+        "territory-36",
+        "territory-38"
+      ],
+      "fleet": [
+        "territory-18",
+        "territory-21",
+        "territory-38"
+      ]
+    },
+    "territory-32": {
+      "name": "Helgoland Bight",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 496.67,
+        "y": 562.58
+      },
+      "neighbors": [
+        "territory-21",
+        "territory-24",
+        "territory-35",
+        "territory-39"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-21",
+        "territory-24",
+        "territory-35",
+        "territory-39"
+      ]
+    },
+    "territory-33": {
+      "name": "Irish Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 195.16,
+        "y": 618.75
+      },
+      "neighbors": [
+        "territory-13",
+        "territory-25",
+        "territory-27",
+        "territory-36",
+        "territory-41",
+        "territory-67"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-13",
+        "territory-27",
+        "territory-36",
+        "territory-41",
+        "territory-67"
+      ]
+    },
+    "territory-34": {
+      "name": "Prussia",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 674.62,
+        "y": 596.43
+      },
+      "neighbors": [
+        "territory-22",
+        "territory-29",
+        "territory-37",
+        "territory-40",
+        "territory-44"
+      ],
+      "army": [
+        "territory-22",
+        "territory-37",
+        "territory-40",
+        "territory-44"
+      ],
+      "fleet": [
+        "territory-22",
+        "territory-29",
+        "territory-37"
+      ]
+    },
+    "territory-35": {
+      "name": "Kiel",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 528.55,
+        "y": 636.18
+      },
+      "neighbors": [
+        "territory-24",
+        "territory-28",
+        "territory-29",
+        "territory-32",
+        "territory-37",
+        "territory-39",
+        "territory-46",
+        "territory-52"
+      ],
+      "army": [
+        "territory-24",
+        "territory-37",
+        "territory-39",
+        "territory-46",
+        "territory-52"
+      ],
+      "fleet": [
+        "territory-24",
+        "territory-29",
+        "territory-32",
+        "territory-37",
+        "territory-39"
+      ]
+    },
+    "territory-36": {
+      "name": "Wales",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 294.22,
+        "y": 601.12
+      },
+      "neighbors": [
+        "territory-27",
+        "territory-31",
+        "territory-33",
+        "territory-38",
+        "territory-41"
+      ],
+      "army": [
+        "territory-27",
+        "territory-31",
+        "territory-38"
+      ],
+      "fleet": [
+        "territory-27",
+        "territory-33",
+        "territory-38",
+        "territory-41"
+      ]
+    },
+    "territory-37": {
+      "name": "Berlin",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 605.15,
+        "y": 620.9
+      },
+      "neighbors": [
+        "territory-29",
+        "territory-34",
+        "territory-35",
+        "territory-44",
+        "territory-52"
+      ],
+      "army": [
+        "territory-34",
+        "territory-35",
+        "territory-44",
+        "territory-52"
+      ],
+      "fleet": [
+        "territory-29",
+        "territory-34",
+        "territory-35"
+      ]
+    },
+    "territory-38": {
+      "name": "London",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 335.29,
+        "y": 630.37
+      },
+      "neighbors": [
+        "territory-21",
+        "territory-31",
+        "territory-36",
+        "territory-41"
+      ],
+      "army": [
+        "territory-31",
+        "territory-36"
+      ],
+      "fleet": [
+        "territory-21",
+        "territory-31",
+        "territory-36",
+        "territory-41"
+      ]
+    },
+    "territory-39": {
+      "name": "Holland",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 444.06,
+        "y": 637.85
+      },
+      "neighbors": [
+        "territory-21",
+        "territory-32",
+        "territory-35",
+        "territory-43",
+        "territory-46"
+      ],
+      "army": [
+        "territory-35",
+        "territory-43",
+        "territory-46"
+      ],
+      "fleet": [
+        "territory-21",
+        "territory-32",
+        "territory-35",
+        "territory-43"
+      ]
+    },
+    "territory-4": {
+      "name": "Norwegian Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 437.1,
+        "y": 162.79
+      },
+      "neighbors": [
+        "territory-1",
+        "territory-13",
+        "territory-17",
+        "territory-18",
+        "territory-2",
+        "territory-21",
+        "territory-3",
+        "territory-7"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-1",
+        "territory-13",
+        "territory-17",
+        "territory-18",
+        "territory-21",
+        "territory-7"
+      ]
+    },
+    "territory-40": {
+      "name": "Warsaw",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 757,
+        "y": 660.08
+      },
+      "neighbors": [
+        "territory-22",
+        "territory-23",
+        "territory-34",
+        "territory-42",
+        "territory-44",
+        "territory-50"
+      ],
+      "army": [
+        "territory-22",
+        "territory-23",
+        "territory-34",
+        "territory-42",
+        "territory-44",
+        "territory-50"
+      ],
+      "fleet": []
+    },
+    "territory-41": {
+      "name": "English Channel",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 252.47,
+        "y": 675
+      },
+      "neighbors": [
+        "territory-21",
+        "territory-33",
+        "territory-36",
+        "territory-38",
+        "territory-43",
+        "territory-45",
+        "territory-51",
+        "territory-67"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-21",
+        "territory-33",
+        "territory-36",
+        "territory-38",
+        "territory-43",
+        "territory-45",
+        "territory-51",
+        "territory-67"
+      ]
+    },
+    "territory-42": {
+      "name": "Ukraine",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 901.29,
+        "y": 694
+      },
+      "neighbors": [
+        "territory-23",
+        "territory-40",
+        "territory-49",
+        "territory-50",
+        "territory-60"
+      ],
+      "army": [
+        "territory-23",
+        "territory-40",
+        "territory-49",
+        "territory-50",
+        "territory-60"
+      ],
+      "fleet": []
+    },
+    "territory-43": {
+      "name": "Belgium",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 439.1,
+        "y": 673.03
+      },
+      "neighbors": [
+        "territory-21",
+        "territory-39",
+        "territory-41",
+        "territory-45",
+        "territory-46",
+        "territory-56"
+      ],
+      "army": [
+        "territory-39",
+        "territory-45",
+        "territory-46",
+        "territory-56"
+      ],
+      "fleet": [
+        "territory-21",
+        "territory-39",
+        "territory-41",
+        "territory-45"
+      ]
+    },
+    "territory-44": {
+      "name": "Silesia",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 653.7,
+        "y": 658.67
+      },
+      "neighbors": [
+        "territory-34",
+        "territory-37",
+        "territory-40",
+        "territory-48",
+        "territory-50",
+        "territory-52"
+      ],
+      "army": [
+        "territory-34",
+        "territory-37",
+        "territory-40",
+        "territory-48",
+        "territory-50",
+        "territory-52"
+      ],
+      "fleet": []
+    },
+    "territory-45": {
+      "name": "Picardy",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 386.97,
+        "y": 681.78
+      },
+      "neighbors": [
+        "territory-41",
+        "territory-43",
+        "territory-51",
+        "territory-53",
+        "territory-56"
+      ],
+      "army": [
+        "territory-43",
+        "territory-51",
+        "territory-53",
+        "territory-56"
+      ],
+      "fleet": [
+        "territory-41",
+        "territory-43",
+        "territory-51"
+      ]
+    },
+    "territory-46": {
+      "name": "Ruhr",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 478.06,
+        "y": 713.11
+      },
+      "neighbors": [
+        "territory-35",
+        "territory-39",
+        "territory-43",
+        "territory-52",
+        "territory-56"
+      ],
+      "army": [
+        "territory-35",
+        "territory-39",
+        "territory-43",
+        "territory-52",
+        "territory-56"
+      ],
+      "fleet": []
+    },
+    "territory-47": {
+      "name": "Caspian Sea",
+      "kind": "sea",
+      "access": "neutral-water",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1332.93,
+        "y": 688.76
+      },
+      "neighbors": [
+        "territory-49"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-48": {
+      "name": "Bohemia",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 634.65,
+        "y": 712.04
+      },
+      "neighbors": [
+        "territory-44",
+        "territory-50",
+        "territory-52",
+        "territory-55",
+        "territory-57"
+      ],
+      "army": [
+        "territory-44",
+        "territory-50",
+        "territory-52",
+        "territory-55",
+        "territory-57"
+      ],
+      "fleet": []
+    },
+    "territory-49": {
+      "name": "Sevastopol",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 1222.43,
+        "y": 660.57
+      },
+      "neighbors": [
+        "territory-23",
+        "territory-42",
+        "territory-47",
+        "territory-54",
+        "territory-60",
+        "territory-65",
+        "territory-73"
+      ],
+      "army": [
+        "territory-23",
+        "territory-42",
+        "territory-60",
+        "territory-73"
+      ],
+      "fleet": [
+        "territory-60",
+        "territory-65",
+        "territory-73"
+      ]
+    },
+    "territory-5": {
+      "name": "Finland",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 795.01,
+        "y": 311.88
+      },
+      "neighbors": [
+        "territory-10",
+        "territory-12",
+        "territory-6",
+        "territory-7"
+      ],
+      "army": [
+        "territory-10",
+        "territory-6",
+        "territory-7"
+      ],
+      "fleet": [
+        "territory-10",
+        "territory-12",
+        "territory-6"
+      ]
+    },
+    "territory-50": {
+      "name": "Galicia",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 776.18,
+        "y": 737.15
+      },
+      "neighbors": [
+        "territory-40",
+        "territory-42",
+        "territory-44",
+        "territory-48",
+        "territory-55",
+        "territory-59",
+        "territory-60"
+      ],
+      "army": [
+        "territory-40",
+        "territory-42",
+        "territory-44",
+        "territory-48",
+        "territory-55",
+        "territory-59",
+        "territory-60"
+      ],
+      "fleet": []
+    },
+    "territory-51": {
+      "name": "Brest",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 308.45,
+        "y": 744.02
+      },
+      "neighbors": [
+        "territory-41",
+        "territory-45",
+        "territory-53",
+        "territory-61",
+        "territory-67"
+      ],
+      "army": [
+        "territory-45",
+        "territory-53",
+        "territory-61"
+      ],
+      "fleet": [
+        "territory-41",
+        "territory-45",
+        "territory-61",
+        "territory-67"
+      ]
+    },
+    "territory-52": {
+      "name": "Munich",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 548.83,
+        "y": 741.86
+      },
+      "neighbors": [
+        "territory-35",
+        "territory-37",
+        "territory-44",
+        "territory-46",
+        "territory-48",
+        "territory-56",
+        "territory-57",
+        "territory-58"
+      ],
+      "army": [
+        "territory-35",
+        "territory-37",
+        "territory-44",
+        "territory-46",
+        "territory-48",
+        "territory-56",
+        "territory-57"
+      ],
+      "fleet": []
+    },
+    "territory-53": {
+      "name": "Paris",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 371.32,
+        "y": 732.14
+      },
+      "neighbors": [
+        "territory-45",
+        "territory-51",
+        "territory-56",
+        "territory-61"
+      ],
+      "army": [
+        "territory-45",
+        "territory-51",
+        "territory-56",
+        "territory-61"
+      ],
+      "fleet": []
+    },
+    "territory-54": {
+      "name": "Sea of Azov",
+      "kind": "sea",
+      "access": "neutral-water",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1102.68,
+        "y": 758.75
+      },
+      "neighbors": [
+        "territory-49",
+        "territory-65"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-55": {
+      "name": "Vienna",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 662.48,
+        "y": 775.69
+      },
+      "neighbors": [
+        "territory-48",
+        "territory-50",
+        "territory-57",
+        "territory-59",
+        "territory-63"
+      ],
+      "army": [
+        "territory-48",
+        "territory-50",
+        "territory-57",
+        "territory-59",
+        "territory-63"
+      ],
+      "fleet": []
+    },
+    "territory-56": {
+      "name": "Burgundy",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 409.85,
+        "y": 801.93
+      },
+      "neighbors": [
+        "territory-43",
+        "territory-45",
+        "territory-46",
+        "territory-52",
+        "territory-53",
+        "territory-58",
+        "territory-61",
+        "territory-64"
+      ],
+      "army": [
+        "territory-43",
+        "territory-45",
+        "territory-46",
+        "territory-52",
+        "territory-53",
+        "territory-61",
+        "territory-64"
+      ],
+      "fleet": []
+    },
+    "territory-57": {
+      "name": "Tyrolia",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 578.13,
+        "y": 803.31
+      },
+      "neighbors": [
+        "territory-48",
+        "territory-52",
+        "territory-55",
+        "territory-58",
+        "territory-62",
+        "territory-63",
+        "territory-66"
+      ],
+      "army": [
+        "territory-48",
+        "territory-52",
+        "territory-55",
+        "territory-62",
+        "territory-63",
+        "territory-66"
+      ],
+      "fleet": []
+    },
+    "territory-58": {
+      "name": "Switzerland",
+      "kind": "land",
+      "access": "impassable",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 479.05,
+        "y": 799.93
+      },
+      "neighbors": [
+        "territory-52",
+        "territory-56",
+        "territory-57",
+        "territory-62",
+        "territory-64"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-59": {
+      "name": "Budapest",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 799.93,
+        "y": 814.86
+      },
+      "neighbors": [
+        "territory-50",
+        "territory-55",
+        "territory-60",
+        "territory-63",
+        "territory-69"
+      ],
+      "army": [
+        "territory-50",
+        "territory-55",
+        "territory-60",
+        "territory-63",
+        "territory-69"
+      ],
+      "fleet": []
+    },
+    "territory-6": {
+      "name": "St Petersburg",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 1154,
+        "y": 124.25
+      },
+      "neighbors": [
+        "territory-1",
+        "territory-11",
+        "territory-12",
+        "territory-22",
+        "territory-23",
+        "territory-5",
+        "territory-7",
+        "territory-8",
+        "territory-9"
+      ],
+      "army": [
+        "territory-22",
+        "territory-23",
+        "territory-5",
+        "territory-7"
+      ],
+      "fleet": [
+        "territory-1",
+        "territory-12",
+        "territory-22",
+        "territory-5",
+        "territory-7"
+      ]
+    },
+    "territory-60": {
+      "name": "Rumania",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 913.98,
+        "y": 846.37
+      },
+      "neighbors": [
+        "territory-42",
+        "territory-49",
+        "territory-50",
+        "territory-59",
+        "territory-65",
+        "territory-69",
+        "territory-72"
+      ],
+      "army": [
+        "territory-42",
+        "territory-49",
+        "territory-50",
+        "territory-59",
+        "territory-69",
+        "territory-72"
+      ],
+      "fleet": [
+        "territory-49",
+        "territory-65",
+        "territory-72"
+      ]
+    },
+    "territory-61": {
+      "name": "Gascony",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 320,
+        "y": 847.94
+      },
+      "neighbors": [
+        "territory-51",
+        "territory-53",
+        "territory-56",
+        "territory-64",
+        "territory-67",
+        "territory-75"
+      ],
+      "army": [
+        "territory-51",
+        "territory-53",
+        "territory-56",
+        "territory-64",
+        "territory-75"
+      ],
+      "fleet": [
+        "territory-51",
+        "territory-67",
+        "territory-75"
+      ]
+    },
+    "territory-62": {
+      "name": "Piedmont",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 486.93,
+        "y": 851.79
+      },
+      "neighbors": [
+        "territory-57",
+        "territory-58",
+        "territory-64",
+        "territory-66",
+        "territory-70",
+        "territory-77"
+      ],
+      "army": [
+        "territory-57",
+        "territory-64",
+        "territory-66",
+        "territory-70"
+      ],
+      "fleet": [
+        "territory-64",
+        "territory-70",
+        "territory-77"
+      ]
+    },
+    "territory-63": {
+      "name": "Trieste",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 686.54,
+        "y": 873.12
+      },
+      "neighbors": [
+        "territory-55",
+        "territory-57",
+        "territory-59",
+        "territory-66",
+        "territory-69",
+        "territory-71",
+        "territory-80"
+      ],
+      "army": [
+        "territory-55",
+        "territory-57",
+        "territory-59",
+        "territory-66",
+        "territory-69",
+        "territory-80"
+      ],
+      "fleet": [
+        "territory-66",
+        "territory-71",
+        "territory-80"
+      ]
+    },
+    "territory-64": {
+      "name": "Marseilles",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 424.82,
+        "y": 871.82
+      },
+      "neighbors": [
+        "territory-56",
+        "territory-58",
+        "territory-61",
+        "territory-62",
+        "territory-75",
+        "territory-77"
+      ],
+      "army": [
+        "territory-56",
+        "territory-61",
+        "territory-62",
+        "territory-75"
+      ],
+      "fleet": [
+        "territory-62",
+        "territory-75",
+        "territory-77"
+      ]
+    },
+    "territory-65": {
+      "name": "Black Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1002.17,
+        "y": 871.22
+      },
+      "neighbors": [
+        "territory-49",
+        "territory-54",
+        "territory-60",
+        "territory-72",
+        "territory-73",
+        "territory-74",
+        "territory-79",
+        "territory-82",
+        "territory-90"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-49",
+        "territory-60",
+        "territory-72",
+        "territory-73",
+        "territory-74",
+        "territory-79",
+        "territory-82",
+        "territory-90"
+      ]
+    },
+    "territory-66": {
+      "name": "Venice",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 554.41,
+        "y": 859.17
+      },
+      "neighbors": [
+        "territory-57",
+        "territory-62",
+        "territory-63",
+        "territory-70",
+        "territory-71",
+        "territory-78",
+        "territory-81"
+      ],
+      "army": [
+        "territory-57",
+        "territory-62",
+        "territory-63",
+        "territory-70",
+        "territory-78",
+        "territory-81"
+      ],
+      "fleet": [
+        "territory-63",
+        "territory-71",
+        "territory-81"
+      ]
+    },
+    "territory-67": {
+      "name": "Mid-Atlantic Ocean",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 97.33,
+        "y": 732.05
+      },
+      "neighbors": [
+        "territory-13",
+        "territory-33",
+        "territory-41",
+        "territory-51",
+        "territory-61",
+        "territory-75",
+        "territory-76",
+        "territory-92",
+        "territory-99"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-13",
+        "territory-33",
+        "territory-41",
+        "territory-51",
+        "territory-61",
+        "territory-75",
+        "territory-76",
+        "territory-92",
+        "territory-99"
+      ]
+    },
+    "territory-68": {
+      "name": "Eastern Caspian",
+      "kind": "sea",
+      "access": "neutral-water",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1336.11,
+        "y": 895.55
+      },
+      "neighbors": [
+        "territory-73"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-69": {
+      "name": "Serbia",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 770.72,
+        "y": 896.49
+      },
+      "neighbors": [
+        "territory-59",
+        "territory-60",
+        "territory-63",
+        "territory-72",
+        "territory-80",
+        "territory-89"
+      ],
+      "army": [
+        "territory-59",
+        "territory-60",
+        "territory-63",
+        "territory-72",
+        "territory-80",
+        "territory-89"
+      ],
+      "fleet": []
+    },
+    "territory-7": {
+      "name": "Norway",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 544.25,
+        "y": 364.3
+      },
+      "neighbors": [
+        "territory-1",
+        "territory-10",
+        "territory-19",
+        "territory-21",
+        "territory-3",
+        "territory-4",
+        "territory-5",
+        "territory-6"
+      ],
+      "army": [
+        "territory-10",
+        "territory-5",
+        "territory-6"
+      ],
+      "fleet": [
+        "territory-1",
+        "territory-10",
+        "territory-19",
+        "territory-21",
+        "territory-4",
+        "territory-6"
+      ]
+    },
+    "territory-70": {
+      "name": "Tuscany",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 543.25,
+        "y": 895.38
+      },
+      "neighbors": [
+        "territory-62",
+        "territory-66",
+        "territory-77",
+        "territory-78",
+        "territory-85"
+      ],
+      "army": [
+        "territory-62",
+        "territory-66",
+        "territory-78"
+      ],
+      "fleet": [
+        "territory-62",
+        "territory-77",
+        "territory-78",
+        "territory-85"
+      ]
+    },
+    "territory-71": {
+      "name": "Adriatic Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 692.05,
+        "y": 959.83
+      },
+      "neighbors": [
+        "territory-63",
+        "territory-66",
+        "territory-80",
+        "territory-81",
+        "territory-94"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-63",
+        "territory-66",
+        "territory-80",
+        "territory-81",
+        "territory-94"
+      ]
+    },
+    "territory-72": {
+      "name": "Bulgaria",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 870.33,
+        "y": 925.47
+      },
+      "neighbors": [
+        "territory-60",
+        "territory-65",
+        "territory-69",
+        "territory-79",
+        "territory-89",
+        "territory-90"
+      ],
+      "army": [
+        "territory-60",
+        "territory-69",
+        "territory-79",
+        "territory-89"
+      ],
+      "fleet": [
+        "territory-60",
+        "territory-65",
+        "territory-79",
+        "territory-89",
+        "territory-90"
+      ]
+    },
+    "territory-73": {
+      "name": "Armenia",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1283.22,
+        "y": 940.5
+      },
+      "neighbors": [
+        "territory-49",
+        "territory-65",
+        "territory-68",
+        "territory-74",
+        "territory-88",
+        "territory-93"
+      ],
+      "army": [
+        "territory-49",
+        "territory-74",
+        "territory-88",
+        "territory-93"
+      ],
+      "fleet": [
+        "territory-49",
+        "territory-65",
+        "territory-74"
+      ]
+    },
+    "territory-74": {
+      "name": "Ankara",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 1093.87,
+        "y": 950.03
+      },
+      "neighbors": [
+        "territory-65",
+        "territory-73",
+        "territory-82",
+        "territory-88"
+      ],
+      "army": [
+        "territory-73",
+        "territory-82",
+        "territory-88"
+      ],
+      "fleet": [
+        "territory-65",
+        "territory-73",
+        "territory-82"
+      ]
+    },
+    "territory-75": {
+      "name": "Spain",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 184.86,
+        "y": 980.16
+      },
+      "neighbors": [
+        "territory-61",
+        "territory-64",
+        "territory-67",
+        "territory-76",
+        "territory-77",
+        "territory-92"
+      ],
+      "army": [
+        "territory-61",
+        "territory-64",
+        "territory-76"
+      ],
+      "fleet": [
+        "territory-61",
+        "territory-64",
+        "territory-67",
+        "territory-76",
+        "territory-77",
+        "territory-92"
+      ]
+    },
+    "territory-76": {
+      "name": "Portugal",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 74.75,
+        "y": 958.83
+      },
+      "neighbors": [
+        "territory-67",
+        "territory-75"
+      ],
+      "army": [
+        "territory-75"
+      ],
+      "fleet": [
+        "territory-67",
+        "territory-75"
+      ]
+    },
+    "territory-77": {
+      "name": "Gulf of Lyon",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 404.39,
+        "y": 952.53
+      },
+      "neighbors": [
+        "territory-62",
+        "territory-64",
+        "territory-70",
+        "territory-75",
+        "territory-83",
+        "territory-84",
+        "territory-85",
+        "territory-92"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-62",
+        "territory-64",
+        "territory-70",
+        "territory-75",
+        "territory-85",
+        "territory-92"
+      ]
+    },
+    "territory-78": {
+      "name": "Rome",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 586.89,
+        "y": 960
+      },
+      "neighbors": [
+        "territory-66",
+        "territory-70",
+        "territory-81",
+        "territory-85",
+        "territory-87"
+      ],
+      "army": [
+        "territory-66",
+        "territory-70",
+        "territory-81",
+        "territory-87"
+      ],
+      "fleet": [
+        "territory-70",
+        "territory-85",
+        "territory-87"
+      ]
+    },
+    "territory-79": {
+      "name": "Thrace",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 924.71,
+        "y": 949.32
+      },
+      "neighbors": [
+        "territory-65",
+        "territory-72",
+        "territory-90"
+      ],
+      "army": [
+        "territory-72"
+      ],
+      "fleet": [
+        "territory-65",
+        "territory-72",
+        "territory-90"
+      ]
+    },
+    "territory-8": {
+      "name": "Lake Ladoga",
+      "kind": "sea",
+      "access": "neutral-water",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 930.75,
+        "y": 282.83
+      },
+      "neighbors": [
+        "territory-6",
+        "territory-9"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-80": {
+      "name": "Albania",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 758.38,
+        "y": 993.81
+      },
+      "neighbors": [
+        "territory-63",
+        "territory-69",
+        "territory-71",
+        "territory-89",
+        "territory-94"
+      ],
+      "army": [
+        "territory-63",
+        "territory-69",
+        "territory-89"
+      ],
+      "fleet": [
+        "territory-63",
+        "territory-71",
+        "territory-89",
+        "territory-94"
+      ]
+    },
+    "territory-81": {
+      "name": "Apulia",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 643.99,
+        "y": 972.54
+      },
+      "neighbors": [
+        "territory-66",
+        "territory-71",
+        "territory-78",
+        "territory-87",
+        "territory-94"
+      ],
+      "army": [
+        "territory-66",
+        "territory-78",
+        "territory-87"
+      ],
+      "fleet": [
+        "territory-66",
+        "territory-71",
+        "territory-87",
+        "territory-94"
+      ]
+    },
+    "territory-82": {
+      "name": "Constantinople",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 999.19,
+        "y": 992.4
+      },
+      "neighbors": [
+        "territory-65",
+        "territory-74",
+        "territory-88",
+        "territory-90"
+      ],
+      "army": [
+        "territory-74",
+        "territory-88"
+      ],
+      "fleet": [
+        "territory-65",
+        "territory-74",
+        "territory-88",
+        "territory-90"
+      ]
+    },
+    "territory-83": {
+      "name": "Corsica",
+      "kind": "land",
+      "access": "unnamed",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 344.64,
+        "y": 1008.55
+      },
+      "neighbors": [
+        "territory-77",
+        "territory-92"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-84": {
+      "name": "Sardinia",
+      "kind": "land",
+      "access": "unnamed",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 492.92,
+        "y": 999.82
+      },
+      "neighbors": [
+        "territory-77",
+        "territory-85",
+        "territory-92"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-85": {
+      "name": "Tyrrhenian Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 560.14,
+        "y": 1027.65
+      },
+      "neighbors": [
+        "territory-100",
+        "territory-70",
+        "territory-77",
+        "territory-78",
+        "territory-84",
+        "territory-87",
+        "territory-92",
+        "territory-94",
+        "territory-95"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-100",
+        "territory-70",
+        "territory-77",
+        "territory-78",
+        "territory-87",
+        "territory-92",
+        "territory-94"
+      ]
+    },
+    "territory-86": {
+      "name": "Aegean Islands",
+      "kind": "land",
+      "access": "unnamed",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 913.93,
+        "y": 1026.96
+      },
+      "neighbors": [
+        "territory-90"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-87": {
+      "name": "Naples",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 650.73,
+        "y": 1008.93
+      },
+      "neighbors": [
+        "territory-78",
+        "territory-81",
+        "territory-85",
+        "territory-94",
+        "territory-95"
+      ],
+      "army": [
+        "territory-78",
+        "territory-81"
+      ],
+      "fleet": [
+        "territory-78",
+        "territory-81",
+        "territory-85",
+        "territory-94"
+      ]
+    },
+    "territory-88": {
+      "name": "Smyrna",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 1090.01,
+        "y": 1046.88
+      },
+      "neighbors": [
+        "territory-73",
+        "territory-74",
+        "territory-82",
+        "territory-90",
+        "territory-93",
+        "territory-96"
+      ],
+      "army": [
+        "territory-73",
+        "territory-74",
+        "territory-82",
+        "territory-93"
+      ],
+      "fleet": [
+        "territory-82",
+        "territory-90",
+        "territory-93",
+        "territory-96"
+      ]
+    },
+    "territory-89": {
+      "name": "Greece",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 794.5,
+        "y": 1022.25
+      },
+      "neighbors": [
+        "territory-69",
+        "territory-72",
+        "territory-80",
+        "territory-90",
+        "territory-91",
+        "territory-94"
+      ],
+      "army": [
+        "territory-69",
+        "territory-72",
+        "territory-80"
+      ],
+      "fleet": [
+        "territory-72",
+        "territory-80",
+        "territory-90",
+        "territory-94"
+      ]
+    },
+    "territory-9": {
+      "name": "Lake Onega",
+      "kind": "sea",
+      "access": "neutral-water",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 931.85,
+        "y": 302.46
+      },
+      "neighbors": [
+        "territory-6",
+        "territory-8"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-90": {
+      "name": "Aegean Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 903.56,
+        "y": 1101.02
+      },
+      "neighbors": [
+        "territory-101",
+        "territory-65",
+        "territory-72",
+        "territory-79",
+        "territory-82",
+        "territory-86",
+        "territory-88",
+        "territory-89",
+        "territory-94",
+        "territory-96",
+        "territory-97"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-65",
+        "territory-72",
+        "territory-79",
+        "territory-82",
+        "territory-88",
+        "territory-89",
+        "territory-94",
+        "territory-96"
+      ]
+    },
+    "territory-91": {
+      "name": "Gulf of Athens",
+      "kind": "sea",
+      "access": "unnamed",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 829.42,
+        "y": 1069.06
+      },
+      "neighbors": [
+        "territory-89"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-92": {
+      "name": "Western Mediterranean",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 401.81,
+        "y": 1051.75
+      },
+      "neighbors": [
+        "territory-100",
+        "territory-67",
+        "territory-75",
+        "territory-77",
+        "territory-83",
+        "territory-84",
+        "territory-85",
+        "territory-99"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-100",
+        "territory-67",
+        "territory-75",
+        "territory-77",
+        "territory-85",
+        "territory-99"
+      ]
+    },
+    "territory-93": {
+      "name": "Syria",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1264.58,
+        "y": 1100.57
+      },
+      "neighbors": [
+        "territory-73",
+        "territory-88",
+        "territory-96"
+      ],
+      "army": [
+        "territory-73",
+        "territory-88"
+      ],
+      "fleet": [
+        "territory-88",
+        "territory-96"
+      ]
+    },
+    "territory-94": {
+      "name": "Ionian Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 726.88,
+        "y": 1122.93
+      },
+      "neighbors": [
+        "territory-100",
+        "territory-101",
+        "territory-71",
+        "territory-80",
+        "territory-81",
+        "territory-85",
+        "territory-87",
+        "territory-89",
+        "territory-90",
+        "territory-95",
+        "territory-96"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-100",
+        "territory-71",
+        "territory-80",
+        "territory-81",
+        "territory-85",
+        "territory-87",
+        "territory-89",
+        "territory-90",
+        "territory-96"
+      ]
+    },
+    "territory-95": {
+      "name": "Sicily",
+      "kind": "land",
+      "access": "unnamed",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 621.48,
+        "y": 1098.61
+      },
+      "neighbors": [
+        "territory-85",
+        "territory-87",
+        "territory-94"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-96": {
+      "name": "Eastern Mediterranean",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1041.81,
+        "y": 1146.49
+      },
+      "neighbors": [
+        "territory-101",
+        "territory-88",
+        "territory-90",
+        "territory-93",
+        "territory-94",
+        "territory-97",
+        "territory-98"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-88",
+        "territory-90",
+        "territory-93",
+        "territory-94"
+      ]
+    },
+    "territory-97": {
+      "name": "Rhodes",
+      "kind": "land",
+      "access": "unnamed",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 969.49,
+        "y": 1109.71
+      },
+      "neighbors": [
+        "territory-90",
+        "territory-96"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-98": {
+      "name": "Cyprus",
+      "kind": "land",
+      "access": "unnamed",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1108.65,
+        "y": 1118.1
+      },
+      "neighbors": [
+        "territory-96"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "territory-99": {
+      "name": "North Africa",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 349.84,
+        "y": 1146.33
+      },
+      "neighbors": [
+        "territory-100",
+        "territory-67",
+        "territory-92"
+      ],
+      "army": [
+        "territory-100"
+      ],
+      "fleet": [
+        "territory-100",
+        "territory-67",
+        "territory-92"
+      ]
+    }
+  },
+  "unions": [
+    {
+      "id": "territory-26",
+      "name": "Denmark",
+      "parts": [
+        "territory-26",
+        "territory-24",
+        "territory-30",
+        "territory-28"
+      ]
+    },
+    {
+      "id": "territory-82",
+      "name": "Constantinople",
+      "parts": [
+        "territory-79",
+        "territory-82"
+      ]
+    }
+  ]
+}

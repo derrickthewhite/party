@@ -8,6 +8,7 @@ require_once __DIR__ . '/routes/auth.php';
 require_once __DIR__ . '/routes/games.php';
 require_once __DIR__ . '/routes/messages.php';
 require_once __DIR__ . '/routes/actions.php';
+require_once __DIR__ . '/routes/admin.php';
 
 handle_cors_and_json_headers();
 
@@ -22,6 +23,10 @@ try {
     $prefix = $segments[0];
     if ($prefix === 'auth') {
         handle_auth_route($method, $segments);
+    }
+
+    if ($prefix === 'admin') {
+        handle_admin_route($method, $segments);
     }
 
     if ($prefix === 'games') {
