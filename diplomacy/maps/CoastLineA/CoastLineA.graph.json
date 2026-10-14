@@ -1,0 +1,1892 @@
+{
+  "source": "CoastLineA.svg",
+  "provinces": {
+    "territory-1": {
+      "name": "territory-1",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1901.43,
+        "y": 170.35
+      },
+      "neighbors": [
+        "territory-2",
+        "territory-5",
+        "territory-6",
+        "territory-7",
+        "territory-9"
+      ],
+      "army": [
+        "territory-2",
+        "territory-5",
+        "territory-6",
+        "territory-7",
+        "territory-9"
+      ],
+      "fleet": []
+    },
+    "territory-10": {
+      "name": "territory-10",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 3953.22,
+        "y": 1076.56
+      },
+      "neighbors": [
+        "territory-11",
+        "territory-12",
+        "territory-18",
+        "territory-2",
+        "territory-24"
+      ],
+      "army": [
+        "territory-11",
+        "territory-12",
+        "territory-18",
+        "territory-2",
+        "territory-24"
+      ],
+      "fleet": []
+    },
+    "territory-11": {
+      "name": "territory-11",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 4441.96,
+        "y": 1285.14
+      },
+      "neighbors": [
+        "territory-10",
+        "territory-15",
+        "territory-2",
+        "territory-24",
+        "territory-28",
+        "territory-3"
+      ],
+      "army": [
+        "territory-10",
+        "territory-15",
+        "territory-2",
+        "territory-24",
+        "territory-3"
+      ],
+      "fleet": [
+        "territory-15",
+        "territory-24",
+        "territory-28"
+      ]
+    },
+    "territory-12": {
+      "name": "territory-12",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 3229.7,
+        "y": 788.56
+      },
+      "neighbors": [
+        "territory-10",
+        "territory-17",
+        "territory-18",
+        "territory-2",
+        "territory-22",
+        "territory-6"
+      ],
+      "army": [
+        "territory-10",
+        "territory-17",
+        "territory-18",
+        "territory-2",
+        "territory-22",
+        "territory-6"
+      ],
+      "fleet": []
+    },
+    "territory-13": {
+      "name": "territory-13",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 7303.41,
+        "y": 903.17
+      },
+      "neighbors": [
+        "territory-14",
+        "territory-16",
+        "territory-20",
+        "territory-21",
+        "territory-4"
+      ],
+      "army": [
+        "territory-14",
+        "territory-16",
+        "territory-20",
+        "territory-21",
+        "territory-4"
+      ],
+      "fleet": []
+    },
+    "territory-14": {
+      "name": "territory-14",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 6456.89,
+        "y": 1119.11
+      },
+      "neighbors": [
+        "territory-13",
+        "territory-21",
+        "territory-25",
+        "territory-4",
+        "territory-8"
+      ],
+      "army": [
+        "territory-13",
+        "territory-21",
+        "territory-25",
+        "territory-4",
+        "territory-8"
+      ],
+      "fleet": []
+    },
+    "territory-15": {
+      "name": "territory-15",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 5152.05,
+        "y": 1232.55
+      },
+      "neighbors": [
+        "territory-11",
+        "territory-25",
+        "territory-28",
+        "territory-3",
+        "territory-8"
+      ],
+      "army": [
+        "territory-11",
+        "territory-25",
+        "territory-3",
+        "territory-8"
+      ],
+      "fleet": [
+        "territory-11",
+        "territory-25",
+        "territory-28"
+      ]
+    },
+    "territory-16": {
+      "name": "territory-16",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 8059.04,
+        "y": 1050.55
+      },
+      "neighbors": [
+        "territory-13",
+        "territory-20",
+        "territory-34",
+        "territory-4"
+      ],
+      "army": [
+        "territory-13",
+        "territory-20",
+        "territory-34",
+        "territory-4"
+      ],
+      "fleet": []
+    },
+    "territory-17": {
+      "name": "territory-17",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 2505.95,
+        "y": 1298.83
+      },
+      "neighbors": [
+        "territory-12",
+        "territory-19",
+        "territory-22",
+        "territory-26",
+        "territory-5",
+        "territory-6"
+      ],
+      "army": [
+        "territory-12",
+        "territory-19",
+        "territory-22",
+        "territory-26",
+        "territory-5",
+        "territory-6"
+      ],
+      "fleet": []
+    },
+    "territory-18": {
+      "name": "territory-18",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 3478.83,
+        "y": 1326.39
+      },
+      "neighbors": [
+        "territory-10",
+        "territory-12",
+        "territory-22",
+        "territory-24",
+        "territory-29"
+      ],
+      "army": [
+        "territory-10",
+        "territory-12",
+        "territory-22",
+        "territory-24",
+        "territory-29"
+      ],
+      "fleet": []
+    },
+    "territory-19": {
+      "name": "territory-19",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 1413.72,
+        "y": 1405.03
+      },
+      "neighbors": [
+        "territory-17",
+        "territory-23",
+        "territory-26",
+        "territory-32",
+        "territory-35",
+        "territory-5",
+        "territory-7",
+        "territory-9"
+      ],
+      "army": [
+        "territory-17",
+        "territory-23",
+        "territory-26",
+        "territory-32",
+        "territory-35",
+        "territory-5",
+        "territory-7",
+        "territory-9"
+      ],
+      "fleet": []
+    },
+    "territory-2": {
+      "name": "territory-2",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 3707.92,
+        "y": 306
+      },
+      "neighbors": [
+        "territory-1",
+        "territory-10",
+        "territory-11",
+        "territory-12",
+        "territory-3",
+        "territory-6"
+      ],
+      "army": [
+        "territory-1",
+        "territory-10",
+        "territory-11",
+        "territory-12",
+        "territory-3",
+        "territory-6"
+      ],
+      "fleet": []
+    },
+    "territory-20": {
+      "name": "territory-20",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 7730.71,
+        "y": 1499.04
+      },
+      "neighbors": [
+        "territory-13",
+        "territory-16",
+        "territory-21",
+        "territory-30",
+        "territory-34"
+      ],
+      "army": [
+        "territory-13",
+        "territory-16",
+        "territory-21",
+        "territory-30",
+        "territory-34"
+      ],
+      "fleet": []
+    },
+    "territory-21": {
+      "name": "territory-21",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 7195.56,
+        "y": 1376.22
+      },
+      "neighbors": [
+        "territory-13",
+        "territory-14",
+        "territory-20",
+        "territory-25",
+        "territory-27",
+        "territory-30",
+        "territory-36"
+      ],
+      "army": [
+        "territory-13",
+        "territory-14",
+        "territory-20",
+        "territory-25",
+        "territory-27",
+        "territory-30",
+        "territory-36"
+      ],
+      "fleet": []
+    },
+    "territory-22": {
+      "name": "territory-22",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 2835.08,
+        "y": 1605.91
+      },
+      "neighbors": [
+        "territory-12",
+        "territory-17",
+        "territory-18",
+        "territory-26",
+        "territory-29",
+        "territory-31"
+      ],
+      "army": [
+        "territory-12",
+        "territory-17",
+        "territory-18",
+        "territory-26",
+        "territory-29",
+        "territory-31"
+      ],
+      "fleet": []
+    },
+    "territory-23": {
+      "name": "territory-23",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 322.06,
+        "y": 1712.72
+      },
+      "neighbors": [
+        "territory-19",
+        "territory-32",
+        "territory-37",
+        "territory-9"
+      ],
+      "army": [
+        "territory-19",
+        "territory-32",
+        "territory-37",
+        "territory-9"
+      ],
+      "fleet": []
+    },
+    "territory-24": {
+      "name": "territory-24",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 3933.67,
+        "y": 1637.9
+      },
+      "neighbors": [
+        "territory-10",
+        "territory-11",
+        "territory-18",
+        "territory-28",
+        "territory-29"
+      ],
+      "army": [
+        "territory-10",
+        "territory-11",
+        "territory-18",
+        "territory-29"
+      ],
+      "fleet": [
+        "territory-11",
+        "territory-28",
+        "territory-29"
+      ]
+    },
+    "territory-25": {
+      "name": "territory-25",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 5858.44,
+        "y": 1653.75
+      },
+      "neighbors": [
+        "territory-14",
+        "territory-15",
+        "territory-21",
+        "territory-28",
+        "territory-33",
+        "territory-36",
+        "territory-39",
+        "territory-8"
+      ],
+      "army": [
+        "territory-14",
+        "territory-15",
+        "territory-21",
+        "territory-33",
+        "territory-36",
+        "territory-8"
+      ],
+      "fleet": [
+        "territory-15",
+        "territory-28",
+        "territory-33",
+        "territory-39"
+      ]
+    },
+    "territory-26": {
+      "name": "territory-26",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1785.78,
+        "y": 1930.78
+      },
+      "neighbors": [
+        "territory-17",
+        "territory-19",
+        "territory-22",
+        "territory-31",
+        "territory-35",
+        "territory-41"
+      ],
+      "army": [
+        "territory-17",
+        "territory-19",
+        "territory-22",
+        "territory-31",
+        "territory-35",
+        "territory-41"
+      ],
+      "fleet": []
+    },
+    "territory-27": {
+      "name": "territory-27",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 6993,
+        "y": 1927.71
+      },
+      "neighbors": [
+        "territory-21",
+        "territory-30",
+        "territory-36",
+        "territory-40"
+      ],
+      "army": [
+        "territory-21",
+        "territory-30",
+        "territory-36",
+        "territory-40"
+      ],
+      "fleet": []
+    },
+    "territory-28": {
+      "name": "territory-28",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 4537.35,
+        "y": 1852.09
+      },
+      "neighbors": [
+        "territory-11",
+        "territory-15",
+        "territory-24",
+        "territory-25",
+        "territory-29",
+        "territory-38",
+        "territory-39",
+        "territory-45"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-11",
+        "territory-15",
+        "territory-24",
+        "territory-25",
+        "territory-29",
+        "territory-38",
+        "territory-39",
+        "territory-45"
+      ]
+    },
+    "territory-29": {
+      "name": "territory-29",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 3199.77,
+        "y": 2245.07
+      },
+      "neighbors": [
+        "territory-18",
+        "territory-22",
+        "territory-24",
+        "territory-28",
+        "territory-31",
+        "territory-44",
+        "territory-45"
+      ],
+      "army": [
+        "territory-18",
+        "territory-22",
+        "territory-24",
+        "territory-31",
+        "territory-44",
+        "territory-45"
+      ],
+      "fleet": [
+        "territory-24",
+        "territory-28",
+        "territory-45"
+      ]
+    },
+    "territory-3": {
+      "name": "territory-3",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 5187.43,
+        "y": 337.46
+      },
+      "neighbors": [
+        "territory-11",
+        "territory-15",
+        "territory-2",
+        "territory-4",
+        "territory-8"
+      ],
+      "army": [
+        "territory-11",
+        "territory-15",
+        "territory-2",
+        "territory-4",
+        "territory-8"
+      ],
+      "fleet": []
+    },
+    "territory-30": {
+      "name": "territory-30",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 7623.67,
+        "y": 2082.94
+      },
+      "neighbors": [
+        "territory-20",
+        "territory-21",
+        "territory-27",
+        "territory-34",
+        "territory-40",
+        "territory-43"
+      ],
+      "army": [
+        "territory-20",
+        "territory-21",
+        "territory-27",
+        "territory-34",
+        "territory-40",
+        "territory-43"
+      ],
+      "fleet": []
+    },
+    "territory-31": {
+      "name": "territory-31",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 2296.55,
+        "y": 2148.9
+      },
+      "neighbors": [
+        "territory-22",
+        "territory-26",
+        "territory-29",
+        "territory-41",
+        "territory-44"
+      ],
+      "army": [
+        "territory-22",
+        "territory-26",
+        "territory-29",
+        "territory-41",
+        "territory-44"
+      ],
+      "fleet": []
+    },
+    "territory-32": {
+      "name": "territory-32",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 845.63,
+        "y": 2220.37
+      },
+      "neighbors": [
+        "territory-19",
+        "territory-23",
+        "territory-35",
+        "territory-37",
+        "territory-42"
+      ],
+      "army": [
+        "territory-19",
+        "territory-23",
+        "territory-35",
+        "territory-37",
+        "territory-42"
+      ],
+      "fleet": []
+    },
+    "territory-33": {
+      "name": "territory-33",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 5916.68,
+        "y": 2406.83
+      },
+      "neighbors": [
+        "territory-25",
+        "territory-36",
+        "territory-39",
+        "territory-46",
+        "territory-51"
+      ],
+      "army": [
+        "territory-25",
+        "territory-36",
+        "territory-46",
+        "territory-51"
+      ],
+      "fleet": [
+        "territory-25",
+        "territory-39",
+        "territory-51"
+      ]
+    },
+    "territory-34": {
+      "name": "territory-34",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 8081.6,
+        "y": 1860.95
+      },
+      "neighbors": [
+        "territory-16",
+        "territory-20",
+        "territory-30",
+        "territory-43",
+        "territory-50"
+      ],
+      "army": [
+        "territory-16",
+        "territory-20",
+        "territory-30",
+        "territory-43",
+        "territory-50"
+      ],
+      "fleet": []
+    },
+    "territory-35": {
+      "name": "territory-35",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1316.05,
+        "y": 2201.29
+      },
+      "neighbors": [
+        "territory-19",
+        "territory-26",
+        "territory-32",
+        "territory-41",
+        "territory-42"
+      ],
+      "army": [
+        "territory-19",
+        "territory-26",
+        "territory-32",
+        "territory-41",
+        "territory-42"
+      ],
+      "fleet": []
+    },
+    "territory-36": {
+      "name": "territory-36",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 6640.15,
+        "y": 2317.46
+      },
+      "neighbors": [
+        "territory-21",
+        "territory-25",
+        "territory-27",
+        "territory-33",
+        "territory-40",
+        "territory-46"
+      ],
+      "army": [
+        "territory-21",
+        "territory-25",
+        "territory-27",
+        "territory-33",
+        "territory-40",
+        "territory-46"
+      ],
+      "fleet": []
+    },
+    "territory-37": {
+      "name": "territory-37",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 339.24,
+        "y": 2578.32
+      },
+      "neighbors": [
+        "territory-23",
+        "territory-32",
+        "territory-42",
+        "territory-52"
+      ],
+      "army": [
+        "territory-23",
+        "territory-32",
+        "territory-42",
+        "territory-52"
+      ],
+      "fleet": []
+    },
+    "territory-38": {
+      "name": "territory-38",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 4504.88,
+        "y": 2468.76
+      },
+      "neighbors": [
+        "territory-28",
+        "territory-39",
+        "territory-45",
+        "territory-49"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-28",
+        "territory-39",
+        "territory-45",
+        "territory-49"
+      ]
+    },
+    "territory-39": {
+      "name": "territory-39",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 5208.1,
+        "y": 2542.45
+      },
+      "neighbors": [
+        "territory-25",
+        "territory-28",
+        "territory-33",
+        "territory-38",
+        "territory-49",
+        "territory-51"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-25",
+        "territory-28",
+        "territory-33",
+        "territory-38",
+        "territory-49",
+        "territory-51"
+      ]
+    },
+    "territory-4": {
+      "name": "territory-4",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 6862.31,
+        "y": 405.33
+      },
+      "neighbors": [
+        "territory-13",
+        "territory-14",
+        "territory-16",
+        "territory-3",
+        "territory-8"
+      ],
+      "army": [
+        "territory-13",
+        "territory-14",
+        "territory-16",
+        "territory-3",
+        "territory-8"
+      ],
+      "fleet": []
+    },
+    "territory-40": {
+      "name": "territory-40",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 7275.43,
+        "y": 2553.25
+      },
+      "neighbors": [
+        "territory-27",
+        "territory-30",
+        "territory-36",
+        "territory-43",
+        "territory-46",
+        "territory-47",
+        "territory-48"
+      ],
+      "army": [
+        "territory-27",
+        "territory-30",
+        "territory-36",
+        "territory-43",
+        "territory-46",
+        "territory-48"
+      ],
+      "fleet": [
+        "territory-46",
+        "territory-47",
+        "territory-48"
+      ]
+    },
+    "territory-41": {
+      "name": "territory-41",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1909.38,
+        "y": 2836.43
+      },
+      "neighbors": [
+        "territory-26",
+        "territory-31",
+        "territory-35",
+        "territory-42",
+        "territory-44",
+        "territory-54",
+        "territory-55"
+      ],
+      "army": [
+        "territory-26",
+        "territory-31",
+        "territory-35",
+        "territory-42",
+        "territory-44",
+        "territory-54",
+        "territory-55"
+      ],
+      "fleet": []
+    },
+    "territory-42": {
+      "name": "territory-42",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 963.29,
+        "y": 2795.81
+      },
+      "neighbors": [
+        "territory-32",
+        "territory-35",
+        "territory-37",
+        "territory-41",
+        "territory-52",
+        "territory-54"
+      ],
+      "army": [
+        "territory-32",
+        "territory-35",
+        "territory-37",
+        "territory-41",
+        "territory-52",
+        "territory-54"
+      ],
+      "fleet": []
+    },
+    "territory-43": {
+      "name": "territory-43",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 7827.71,
+        "y": 2812.61
+      },
+      "neighbors": [
+        "territory-30",
+        "territory-34",
+        "territory-40",
+        "territory-48",
+        "territory-50"
+      ],
+      "army": [
+        "territory-30",
+        "territory-34",
+        "territory-40",
+        "territory-48",
+        "territory-50"
+      ],
+      "fleet": []
+    },
+    "territory-44": {
+      "name": "territory-44",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 2696.33,
+        "y": 2939.58
+      },
+      "neighbors": [
+        "territory-29",
+        "territory-31",
+        "territory-41",
+        "territory-45",
+        "territory-55"
+      ],
+      "army": [
+        "territory-29",
+        "territory-31",
+        "territory-41",
+        "territory-45",
+        "territory-55"
+      ],
+      "fleet": []
+    },
+    "territory-45": {
+      "name": "territory-45",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 3973.76,
+        "y": 2889
+      },
+      "neighbors": [
+        "territory-28",
+        "territory-29",
+        "territory-38",
+        "territory-44",
+        "territory-49",
+        "territory-55",
+        "territory-58"
+      ],
+      "army": [
+        "territory-29",
+        "territory-44",
+        "territory-55"
+      ],
+      "fleet": [
+        "territory-28",
+        "territory-29",
+        "territory-38",
+        "territory-49",
+        "territory-55",
+        "territory-58"
+      ]
+    },
+    "territory-46": {
+      "name": "territory-46",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 6246.78,
+        "y": 3212.5
+      },
+      "neighbors": [
+        "territory-33",
+        "territory-36",
+        "territory-40",
+        "territory-47",
+        "territory-51",
+        "territory-53",
+        "territory-56"
+      ],
+      "army": [
+        "territory-33",
+        "territory-36",
+        "territory-40",
+        "territory-51",
+        "territory-53",
+        "territory-56"
+      ],
+      "fleet": [
+        "territory-40",
+        "territory-47",
+        "territory-53"
+      ]
+    },
+    "territory-47": {
+      "name": "territory-47",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 6639.74,
+        "y": 3023.9
+      },
+      "neighbors": [
+        "territory-40",
+        "territory-46",
+        "territory-48",
+        "territory-53"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-40",
+        "territory-46",
+        "territory-48",
+        "territory-53"
+      ]
+    },
+    "territory-48": {
+      "name": "territory-48",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 7285.09,
+        "y": 3068.57
+      },
+      "neighbors": [
+        "territory-40",
+        "territory-43",
+        "territory-47",
+        "territory-50",
+        "territory-53",
+        "territory-57"
+      ],
+      "army": [
+        "territory-40",
+        "territory-43",
+        "territory-50",
+        "territory-53",
+        "territory-57"
+      ],
+      "fleet": [
+        "territory-40",
+        "territory-47",
+        "territory-53"
+      ]
+    },
+    "territory-49": {
+      "name": "territory-49",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 5022.14,
+        "y": 3269.73
+      },
+      "neighbors": [
+        "territory-38",
+        "territory-39",
+        "territory-45",
+        "territory-51",
+        "territory-58",
+        "territory-60"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-38",
+        "territory-39",
+        "territory-45",
+        "territory-51",
+        "territory-58",
+        "territory-60"
+      ]
+    },
+    "territory-5": {
+      "name": "territory-5",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 2144.22,
+        "y": 796.56
+      },
+      "neighbors": [
+        "territory-1",
+        "territory-17",
+        "territory-19",
+        "territory-6",
+        "territory-7"
+      ],
+      "army": [
+        "territory-1",
+        "territory-17",
+        "territory-19",
+        "territory-6",
+        "territory-7"
+      ],
+      "fleet": []
+    },
+    "territory-50": {
+      "name": "territory-50",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 8078.86,
+        "y": 3298.99
+      },
+      "neighbors": [
+        "territory-34",
+        "territory-43",
+        "territory-48",
+        "territory-57"
+      ],
+      "army": [
+        "territory-34",
+        "territory-43",
+        "territory-48",
+        "territory-57"
+      ],
+      "fleet": []
+    },
+    "territory-51": {
+      "name": "territory-51",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 5674.25,
+        "y": 3434.54
+      },
+      "neighbors": [
+        "territory-33",
+        "territory-39",
+        "territory-46",
+        "territory-49",
+        "territory-56",
+        "territory-60",
+        "territory-63"
+      ],
+      "army": [
+        "territory-33",
+        "territory-46",
+        "territory-56"
+      ],
+      "fleet": [
+        "territory-33",
+        "territory-39",
+        "territory-49",
+        "territory-56",
+        "territory-60",
+        "territory-63"
+      ]
+    },
+    "territory-52": {
+      "name": "territory-52",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 376.14,
+        "y": 3309.93
+      },
+      "neighbors": [
+        "territory-37",
+        "territory-42",
+        "territory-54",
+        "territory-64"
+      ],
+      "army": [
+        "territory-37",
+        "territory-42",
+        "territory-54"
+      ],
+      "fleet": [
+        "territory-54",
+        "territory-64"
+      ]
+    },
+    "territory-53": {
+      "name": "territory-53",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 6849.86,
+        "y": 3378.42
+      },
+      "neighbors": [
+        "territory-46",
+        "territory-47",
+        "territory-48",
+        "territory-56",
+        "territory-57"
+      ],
+      "army": [
+        "territory-46",
+        "territory-48",
+        "territory-56",
+        "territory-57"
+      ],
+      "fleet": [
+        "territory-46",
+        "territory-47",
+        "territory-48"
+      ]
+    },
+    "territory-54": {
+      "name": "territory-54",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 1262.17,
+        "y": 3404.85
+      },
+      "neighbors": [
+        "territory-41",
+        "territory-42",
+        "territory-52",
+        "territory-55",
+        "territory-61",
+        "territory-64"
+      ],
+      "army": [
+        "territory-41",
+        "territory-42",
+        "territory-52",
+        "territory-55"
+      ],
+      "fleet": [
+        "territory-52",
+        "territory-55",
+        "territory-61",
+        "territory-64"
+      ]
+    },
+    "territory-55": {
+      "name": "territory-55",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 2745.56,
+        "y": 3557.28
+      },
+      "neighbors": [
+        "territory-41",
+        "territory-44",
+        "territory-45",
+        "territory-54",
+        "territory-58",
+        "territory-59",
+        "territory-61"
+      ],
+      "army": [
+        "territory-41",
+        "territory-44",
+        "territory-45",
+        "territory-54"
+      ],
+      "fleet": [
+        "territory-45",
+        "territory-54",
+        "territory-58",
+        "territory-59",
+        "territory-61"
+      ]
+    },
+    "territory-56": {
+      "name": "territory-56",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 6538.11,
+        "y": 3685.44
+      },
+      "neighbors": [
+        "territory-46",
+        "territory-51",
+        "territory-53",
+        "territory-57",
+        "territory-62",
+        "territory-63"
+      ],
+      "army": [
+        "territory-46",
+        "territory-51",
+        "territory-53",
+        "territory-57"
+      ],
+      "fleet": [
+        "territory-51",
+        "territory-57",
+        "territory-62",
+        "territory-63"
+      ]
+    },
+    "territory-57": {
+      "name": "territory-57",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 7649.22,
+        "y": 3726.81
+      },
+      "neighbors": [
+        "territory-48",
+        "territory-50",
+        "territory-53",
+        "territory-56",
+        "territory-62"
+      ],
+      "army": [
+        "territory-48",
+        "territory-50",
+        "territory-53",
+        "territory-56"
+      ],
+      "fleet": [
+        "territory-56",
+        "territory-62"
+      ]
+    },
+    "territory-58": {
+      "name": "territory-58",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 4006.92,
+        "y": 3853.34
+      },
+      "neighbors": [
+        "territory-45",
+        "territory-49",
+        "territory-55",
+        "territory-59",
+        "territory-60",
+        "territory-65"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-45",
+        "territory-49",
+        "territory-55",
+        "territory-59",
+        "territory-60",
+        "territory-65"
+      ]
+    },
+    "territory-59": {
+      "name": "territory-59",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 3252.17,
+        "y": 3990.33
+      },
+      "neighbors": [
+        "territory-55",
+        "territory-58",
+        "territory-61",
+        "territory-65"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-55",
+        "territory-58",
+        "territory-61",
+        "territory-65"
+      ]
+    },
+    "territory-6": {
+      "name": "territory-6",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 2543.98,
+        "y": 589.29
+      },
+      "neighbors": [
+        "territory-1",
+        "territory-12",
+        "territory-17",
+        "territory-2",
+        "territory-5"
+      ],
+      "army": [
+        "territory-1",
+        "territory-12",
+        "territory-17",
+        "territory-2",
+        "territory-5"
+      ],
+      "fleet": []
+    },
+    "territory-60": {
+      "name": "territory-60",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 5135.83,
+        "y": 3962.97
+      },
+      "neighbors": [
+        "territory-49",
+        "territory-51",
+        "territory-58",
+        "territory-63",
+        "territory-65"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-49",
+        "territory-51",
+        "territory-58",
+        "territory-63",
+        "territory-65"
+      ]
+    },
+    "territory-61": {
+      "name": "territory-61",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1754.5,
+        "y": 4171.36
+      },
+      "neighbors": [
+        "territory-54",
+        "territory-55",
+        "territory-59",
+        "territory-64",
+        "territory-65"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-54",
+        "territory-55",
+        "territory-59",
+        "territory-64",
+        "territory-65"
+      ]
+    },
+    "territory-62": {
+      "name": "territory-62",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 7132.24,
+        "y": 4193.66
+      },
+      "neighbors": [
+        "territory-56",
+        "territory-57",
+        "territory-63",
+        "territory-66"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-56",
+        "territory-57",
+        "territory-63",
+        "territory-66"
+      ]
+    },
+    "territory-63": {
+      "name": "territory-63",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 6111.78,
+        "y": 4174.74
+      },
+      "neighbors": [
+        "territory-51",
+        "territory-56",
+        "territory-60",
+        "territory-62",
+        "territory-65",
+        "territory-66"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-51",
+        "territory-56",
+        "territory-60",
+        "territory-62",
+        "territory-65",
+        "territory-66"
+      ]
+    },
+    "territory-64": {
+      "name": "territory-64",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 565.51,
+        "y": 4570.11
+      },
+      "neighbors": [
+        "territory-52",
+        "territory-54",
+        "territory-61",
+        "territory-65"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-52",
+        "territory-54",
+        "territory-61",
+        "territory-65"
+      ]
+    },
+    "territory-65": {
+      "name": "territory-65",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 4454.12,
+        "y": 4714.5
+      },
+      "neighbors": [
+        "territory-58",
+        "territory-59",
+        "territory-60",
+        "territory-61",
+        "territory-63",
+        "territory-64",
+        "territory-66"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-58",
+        "territory-59",
+        "territory-60",
+        "territory-61",
+        "territory-63",
+        "territory-64",
+        "territory-66"
+      ]
+    },
+    "territory-66": {
+      "name": "territory-66",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 6936.11,
+        "y": 4831.77
+      },
+      "neighbors": [
+        "territory-62",
+        "territory-63",
+        "territory-65"
+      ],
+      "army": [],
+      "fleet": [
+        "territory-62",
+        "territory-63",
+        "territory-65"
+      ]
+    },
+    "territory-7": {
+      "name": "territory-7",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 1715.61,
+        "y": 798.44
+      },
+      "neighbors": [
+        "territory-1",
+        "territory-19",
+        "territory-5",
+        "territory-9"
+      ],
+      "army": [
+        "territory-1",
+        "territory-19",
+        "territory-5",
+        "territory-9"
+      ],
+      "fleet": []
+    },
+    "territory-8": {
+      "name": "territory-8",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 5836.62,
+        "y": 761.07
+      },
+      "neighbors": [
+        "territory-14",
+        "territory-15",
+        "territory-25",
+        "territory-3",
+        "territory-4"
+      ],
+      "army": [
+        "territory-14",
+        "territory-15",
+        "territory-25",
+        "territory-3",
+        "territory-4"
+      ],
+      "fleet": []
+    },
+    "territory-9": {
+      "name": "territory-9",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 608.83,
+        "y": 610.29
+      },
+      "neighbors": [
+        "territory-1",
+        "territory-19",
+        "territory-23",
+        "territory-7"
+      ],
+      "army": [
+        "territory-1",
+        "territory-19",
+        "territory-23",
+        "territory-7"
+      ],
+      "fleet": []
+    }
+  }
+}

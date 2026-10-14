@@ -30,23 +30,35 @@ async function readChatSnapshot(page) {
 async function readDiplomacySnapshot(page) {
   return page.evaluate(() => {
     const activeScreen = document.querySelector('.screen:not(.hidden)');
+    const visible = (node) => {
+      if (!node) {
+        return false;
+      }
+      const style = window.getComputedStyle(node);
+      return style.display !== 'none' && style.visibility !== 'hidden';
+    };
     const endTurnButton = activeScreen.querySelector('[data-ref="endTurnBtn"]');
-    const emptyOrdersNode = activeScreen.querySelector('[data-ref="emptyOrdersNode"]');
-    const orders = Array.from(activeScreen.querySelectorAll('[data-ref="ordersList"] .message-item')).map((node) => ({
-      meta: (node.querySelector('small') || { textContent: '' }).textContent.trim(),
-      text: (node.querySelector('div') || { textContent: '' }).textContent.trim(),
-    }));
+    const submitBtn = activeScreen.querySelector('[data-ref="submitBtn"]');
+    const setupCard = activeScreen.querySelector('[data-ref="setupCard"]');
+    const playCard = activeScreen.querySelector('[data-ref="playCard"]');
+    const boardHost = activeScreen.querySelector('[data-ref="boardHost"]');
+    const historyPrevBtn = activeScreen.querySelector('[data-ref="historyPrevBtn"]');
+    const historyNextBtn = activeScreen.querySelector('[data-ref="historyNextBtn"]');
 
     return {
       subtitle: (activeScreen.querySelector('[data-ref="subtitle"]') || { textContent: '' }).textContent.trim(),
       modeInfo: (activeScreen.querySelector('[data-ref="modeInfo"]') || { textContent: '' }).textContent.trim(),
       progressText: (activeScreen.querySelector('[data-ref="progressText"]') || { textContent: '' }).textContent.trim(),
-      emptyOrdersText: emptyOrdersNode ? emptyOrdersNode.textContent.trim() : '',
-      emptyOrdersVisible: !!(emptyOrdersNode && window.getComputedStyle(emptyOrdersNode).display !== 'none'),
-      orders,
-      sendDisabled: !!(activeScreen.querySelector('[data-ref="sendOrderBtn"]') || {}).disabled,
-      endTurnVisible: !!(endTurnButton && window.getComputedStyle(endTurnButton).display !== 'none'),
+      setupVisible: visible(setupCard),
+      playVisible: visible(playCard),
+      boardPresent: !!(boardHost && boardHost.querySelector('.diplomacy-board, svg, canvas')),
+      sendDisabled: !!(submitBtn && submitBtn.disabled),
+      endTurnVisible: visible(endTurnButton),
       endTurnDisabled: !!(endTurnButton && endTurnButton.disabled),
+      historyPrevVisible: visible(historyPrevBtn),
+      historyNextVisible: visible(historyNextBtn),
+      historyPrevDisabled: !!(historyPrevBtn && historyPrevBtn.disabled),
+      historyNextDisabled: !!(historyNextBtn && historyNextBtn.disabled),
     };
   });
 }

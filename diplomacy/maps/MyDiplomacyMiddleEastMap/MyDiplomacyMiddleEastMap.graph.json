@@ -1,0 +1,1775 @@
+{
+  "source": "MyDiplomacyMiddleEastMap.svg",
+  "provinces": {
+    "abyssinia": {
+      "name": "Abyssinia",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1614.73,
+        "y": 3481.54
+      },
+      "neighbors": [
+        "adal",
+        "medri-bahri",
+        "sahara"
+      ],
+      "army": [
+        "adal",
+        "medri-bahri"
+      ],
+      "fleet": []
+    },
+    "adal": {
+      "name": "Adal",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 2066.54,
+        "y": 3613.08
+      },
+      "neighbors": [
+        "abyssinia",
+        "gulf-of-aden",
+        "medri-bahri",
+        "red-sea"
+      ],
+      "army": [
+        "abyssinia",
+        "medri-bahri"
+      ],
+      "fleet": [
+        "gulf-of-aden",
+        "medri-bahri",
+        "red-sea"
+      ]
+    },
+    "aden": {
+      "name": "Aden",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 2409.81,
+        "y": 3451.24
+      },
+      "neighbors": [
+        "gulf-of-aden",
+        "mecca",
+        "oman",
+        "red-sea",
+        "south-arabia"
+      ],
+      "army": [
+        "mecca",
+        "oman",
+        "south-arabia"
+      ],
+      "fleet": [
+        "gulf-of-aden",
+        "mecca",
+        "oman",
+        "red-sea"
+      ]
+    },
+    "aegean-island": {
+      "name": "Aegean Island",
+      "kind": "land",
+      "access": "unnamed",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 327.19,
+        "y": 734.25
+      },
+      "neighbors": [
+        "aegean-sea",
+        "greece"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "aegean-sea": {
+      "name": "Aegean Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 489.48,
+        "y": 960.66
+      },
+      "neighbors": [
+        "aegean-island",
+        "constantinople",
+        "crete",
+        "east-mediterranean",
+        "greece",
+        "izmir",
+        "lesbos",
+        "rhodes",
+        "sofia",
+        "west-mediterranean"
+      ],
+      "army": [],
+      "fleet": [
+        "constantinople",
+        "crete",
+        "east-mediterranean",
+        "greece",
+        "izmir",
+        "lesbos",
+        "rhodes",
+        "sofia",
+        "west-mediterranean"
+      ]
+    },
+    "ankara": {
+      "name": "Ankara",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 1362.06,
+        "y": 467.02
+      },
+      "neighbors": [
+        "armenia",
+        "black-sea",
+        "constantinople",
+        "konya"
+      ],
+      "army": [
+        "armenia",
+        "constantinople",
+        "konya"
+      ],
+      "fleet": [
+        "armenia",
+        "black-sea",
+        "constantinople"
+      ]
+    },
+    "arabian-sea": {
+      "name": "Arabian Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 4393.08,
+        "y": 3091.28
+      },
+      "neighbors": [
+        "balochistan",
+        "goa",
+        "gujarat",
+        "gulf-of-aden",
+        "hindustan",
+        "hormuz",
+        "kerman",
+        "mekran",
+        "oman",
+        "persian-gulf",
+        "sindh",
+        "socotra"
+      ],
+      "army": [],
+      "fleet": [
+        "balochistan",
+        "goa",
+        "gujarat",
+        "gulf-of-aden",
+        "hindustan",
+        "hormuz",
+        "kerman",
+        "mekran",
+        "oman",
+        "persian-gulf",
+        "sindh",
+        "socotra"
+      ]
+    },
+    "armenia": {
+      "name": "Armenia",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 2174.59,
+        "y": 654.44
+      },
+      "neighbors": [
+        "ankara",
+        "azerbaijan",
+        "black-sea",
+        "caspian-sea",
+        "konya",
+        "mesopotamia",
+        "sakartvelo",
+        "syria"
+      ],
+      "army": [
+        "ankara",
+        "azerbaijan",
+        "konya",
+        "mesopotamia",
+        "sakartvelo",
+        "syria"
+      ],
+      "fleet": [
+        "ankara",
+        "azerbaijan",
+        "black-sea",
+        "caspian-sea",
+        "sakartvelo"
+      ]
+    },
+    "azerbaijan": {
+      "name": "Azerbaijan",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 2608.94,
+        "y": 882.67
+      },
+      "neighbors": [
+        "armenia",
+        "caspian-sea",
+        "jibal",
+        "lorestan",
+        "mesopotamia"
+      ],
+      "army": [
+        "armenia",
+        "jibal",
+        "lorestan",
+        "mesopotamia"
+      ],
+      "fleet": [
+        "armenia",
+        "caspian-sea",
+        "jibal"
+      ]
+    },
+    "bahrain": {
+      "name": "Bahrain",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 3059.57,
+        "y": 2301.71
+      },
+      "neighbors": [
+        "persian-gulf",
+        "south-arabia"
+      ],
+      "army": [
+        "south-arabia"
+      ],
+      "fleet": [
+        "persian-gulf",
+        "south-arabia"
+      ]
+    },
+    "balkh": {
+      "name": "Balkh",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 4880.06,
+        "y": 913.96
+      },
+      "neighbors": [
+        "bukhara",
+        "kabul",
+        "kashmir",
+        "samakand"
+      ],
+      "army": [
+        "bukhara",
+        "kabul",
+        "kashmir",
+        "samakand"
+      ],
+      "fleet": []
+    },
+    "balochistan": {
+      "name": "Balochistan",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 4527.22,
+        "y": 2158.62
+      },
+      "neighbors": [
+        "arabian-sea",
+        "kabul",
+        "mekran",
+        "sindh"
+      ],
+      "army": [
+        "kabul",
+        "mekran",
+        "sindh"
+      ],
+      "fleet": [
+        "arabian-sea",
+        "mekran",
+        "sindh"
+      ]
+    },
+    "black-sea": {
+      "name": "Black Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1761.25,
+        "y": 204
+      },
+      "neighbors": [
+        "ankara",
+        "armenia",
+        "constantinople",
+        "sakartvelo",
+        "sofia"
+      ],
+      "army": [],
+      "fleet": [
+        "ankara",
+        "armenia",
+        "constantinople",
+        "sakartvelo",
+        "sofia"
+      ]
+    },
+    "bukhara": {
+      "name": "Bukhara",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 4303.39,
+        "y": 755.33
+      },
+      "neighbors": [
+        "balkh",
+        "kabul",
+        "khorasan",
+        "khwarezm",
+        "samakand",
+        "turan"
+      ],
+      "army": [
+        "balkh",
+        "kabul",
+        "khorasan",
+        "khwarezm",
+        "samakand",
+        "turan"
+      ],
+      "fleet": []
+    },
+    "caspian-sea": {
+      "name": "Caspian Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 3141.02,
+        "y": 784.87
+      },
+      "neighbors": [
+        "armenia",
+        "azerbaijan",
+        "jibal",
+        "khorasan",
+        "khwarezm",
+        "sakartvelo"
+      ],
+      "army": [],
+      "fleet": [
+        "armenia",
+        "azerbaijan",
+        "jibal",
+        "khorasan",
+        "khwarezm",
+        "sakartvelo"
+      ]
+    },
+    "constantinople": {
+      "name": "Constantinople",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 982.05,
+        "y": 505.67
+      },
+      "neighbors": [
+        "aegean-sea",
+        "ankara",
+        "black-sea",
+        "izmir",
+        "konya",
+        "sofia"
+      ],
+      "army": [
+        "ankara",
+        "izmir",
+        "konya",
+        "sofia"
+      ],
+      "fleet": [
+        "aegean-sea",
+        "ankara",
+        "black-sea",
+        "izmir",
+        "sofia"
+      ]
+    },
+    "crete": {
+      "name": "Crete",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 431,
+        "y": 1160.77
+      },
+      "neighbors": [
+        "aegean-sea",
+        "east-mediterranean",
+        "west-mediterranean"
+      ],
+      "army": [],
+      "fleet": [
+        "aegean-sea",
+        "east-mediterranean",
+        "west-mediterranean"
+      ]
+    },
+    "cyprus": {
+      "name": "Cyprus",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1256.43,
+        "y": 1179.4
+      },
+      "neighbors": [
+        "east-mediterranean"
+      ],
+      "army": [],
+      "fleet": [
+        "east-mediterranean"
+      ]
+    },
+    "east-mediterranean": {
+      "name": "East Mediterranean",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 839.34,
+        "y": 1337.42
+      },
+      "neighbors": [
+        "aegean-sea",
+        "crete",
+        "cyprus",
+        "izmir",
+        "konya",
+        "libya",
+        "lower-egypt",
+        "palestine",
+        "rhodes",
+        "syria",
+        "west-mediterranean"
+      ],
+      "army": [],
+      "fleet": [
+        "aegean-sea",
+        "crete",
+        "cyprus",
+        "izmir",
+        "konya",
+        "libya",
+        "lower-egypt",
+        "palestine",
+        "rhodes",
+        "syria",
+        "west-mediterranean"
+      ]
+    },
+    "fars": {
+      "name": "Fars",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 3229,
+        "y": 1849.17
+      },
+      "neighbors": [
+        "jibal",
+        "kerman",
+        "khorasan",
+        "lorestan",
+        "persian-gulf"
+      ],
+      "army": [
+        "jibal",
+        "kerman",
+        "khorasan",
+        "lorestan"
+      ],
+      "fleet": [
+        "kerman",
+        "lorestan",
+        "persian-gulf"
+      ]
+    },
+    "goa": {
+      "name": "Goa",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 5440.25,
+        "y": 3464.83
+      },
+      "neighbors": [
+        "arabian-sea",
+        "hindustan"
+      ],
+      "army": [
+        "hindustan"
+      ],
+      "fleet": [
+        "arabian-sea",
+        "hindustan"
+      ]
+    },
+    "greece": {
+      "name": "Greece",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 122.29,
+        "y": 643.43
+      },
+      "neighbors": [
+        "aegean-island",
+        "aegean-sea",
+        "sofia",
+        "west-mediterranean"
+      ],
+      "army": [
+        "sofia"
+      ],
+      "fleet": [
+        "aegean-sea",
+        "sofia",
+        "west-mediterranean"
+      ]
+    },
+    "gujarat": {
+      "name": "Gujarat",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 5103.95,
+        "y": 2542.8
+      },
+      "neighbors": [
+        "arabian-sea",
+        "hindustan",
+        "rajputana",
+        "sindh"
+      ],
+      "army": [
+        "hindustan",
+        "rajputana",
+        "sindh"
+      ],
+      "fleet": [
+        "arabian-sea",
+        "hindustan",
+        "sindh"
+      ]
+    },
+    "gulf-of-aden": {
+      "name": "Gulf of Aden",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 2943.92,
+        "y": 3582.67
+      },
+      "neighbors": [
+        "adal",
+        "aden",
+        "arabian-sea",
+        "oman",
+        "red-sea"
+      ],
+      "army": [],
+      "fleet": [
+        "adal",
+        "aden",
+        "arabian-sea",
+        "oman",
+        "red-sea"
+      ]
+    },
+    "hindustan": {
+      "name": "Hindustan",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 5364.75,
+        "y": 3026.99
+      },
+      "neighbors": [
+        "arabian-sea",
+        "goa",
+        "gujarat",
+        "rajputana"
+      ],
+      "army": [
+        "goa",
+        "gujarat",
+        "rajputana"
+      ],
+      "fleet": [
+        "arabian-sea",
+        "goa",
+        "gujarat"
+      ]
+    },
+    "hormuz": {
+      "name": "Hormuz",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 3507.5,
+        "y": 2394.04
+      },
+      "neighbors": [
+        "arabian-sea",
+        "oman",
+        "persian-gulf",
+        "south-arabia"
+      ],
+      "army": [
+        "oman",
+        "south-arabia"
+      ],
+      "fleet": [
+        "arabian-sea",
+        "oman",
+        "persian-gulf",
+        "south-arabia"
+      ]
+    },
+    "izmir": {
+      "name": "Izmir",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 817.31,
+        "y": 757.1
+      },
+      "neighbors": [
+        "aegean-sea",
+        "constantinople",
+        "east-mediterranean",
+        "konya",
+        "lesbos"
+      ],
+      "army": [
+        "constantinople",
+        "konya",
+        "lesbos"
+      ],
+      "fleet": [
+        "aegean-sea",
+        "constantinople",
+        "east-mediterranean",
+        "konya",
+        "lesbos"
+      ]
+    },
+    "jibal": {
+      "name": "Jibal",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 3208.29,
+        "y": 1251.35
+      },
+      "neighbors": [
+        "azerbaijan",
+        "caspian-sea",
+        "fars",
+        "khorasan",
+        "lorestan"
+      ],
+      "army": [
+        "azerbaijan",
+        "fars",
+        "khorasan",
+        "lorestan"
+      ],
+      "fleet": [
+        "azerbaijan",
+        "caspian-sea",
+        "khorasan"
+      ]
+    },
+    "kabul": {
+      "name": "Kabul",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 4327.32,
+        "y": 1600.87
+      },
+      "neighbors": [
+        "balkh",
+        "balochistan",
+        "bukhara",
+        "kashmir",
+        "kerman",
+        "khorasan",
+        "mekran",
+        "panjab",
+        "sindh"
+      ],
+      "army": [
+        "balkh",
+        "balochistan",
+        "bukhara",
+        "kashmir",
+        "kerman",
+        "khorasan",
+        "mekran",
+        "panjab",
+        "sindh"
+      ],
+      "fleet": []
+    },
+    "kashmir": {
+      "name": "Kashmir",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 5312.58,
+        "y": 1136.62
+      },
+      "neighbors": [
+        "balkh",
+        "kabul",
+        "panjab",
+        "samakand",
+        "turan"
+      ],
+      "army": [
+        "balkh",
+        "kabul",
+        "panjab",
+        "samakand",
+        "turan"
+      ],
+      "fleet": []
+    },
+    "kerman": {
+      "name": "Kerman",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 3671.73,
+        "y": 1843.93
+      },
+      "neighbors": [
+        "arabian-sea",
+        "fars",
+        "kabul",
+        "khorasan",
+        "mekran",
+        "persian-gulf"
+      ],
+      "army": [
+        "fars",
+        "kabul",
+        "khorasan",
+        "mekran"
+      ],
+      "fleet": [
+        "arabian-sea",
+        "fars",
+        "mekran",
+        "persian-gulf"
+      ]
+    },
+    "khorasan": {
+      "name": "Khorasan",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 3748.63,
+        "y": 1157.6
+      },
+      "neighbors": [
+        "bukhara",
+        "caspian-sea",
+        "fars",
+        "jibal",
+        "kabul",
+        "kerman",
+        "khwarezm"
+      ],
+      "army": [
+        "bukhara",
+        "fars",
+        "jibal",
+        "kabul",
+        "kerman",
+        "khwarezm"
+      ],
+      "fleet": [
+        "caspian-sea",
+        "jibal",
+        "khwarezm"
+      ]
+    },
+    "khwarezm": {
+      "name": "Khwarezm",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 3748.95,
+        "y": 408.27
+      },
+      "neighbors": [
+        "bukhara",
+        "caspian-sea",
+        "khorasan"
+      ],
+      "army": [
+        "bukhara",
+        "khorasan"
+      ],
+      "fleet": [
+        "caspian-sea",
+        "khorasan"
+      ]
+    },
+    "konya": {
+      "name": "Konya",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1241.61,
+        "y": 833.23
+      },
+      "neighbors": [
+        "ankara",
+        "armenia",
+        "constantinople",
+        "east-mediterranean",
+        "izmir",
+        "syria"
+      ],
+      "army": [
+        "ankara",
+        "armenia",
+        "constantinople",
+        "izmir",
+        "syria"
+      ],
+      "fleet": [
+        "east-mediterranean",
+        "izmir",
+        "syria"
+      ]
+    },
+    "lesbos": {
+      "name": "Lesbos",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 550.25,
+        "y": 653.44
+      },
+      "neighbors": [
+        "aegean-sea",
+        "izmir"
+      ],
+      "army": [
+        "izmir"
+      ],
+      "fleet": [
+        "aegean-sea",
+        "izmir"
+      ]
+    },
+    "libya": {
+      "name": "Libya",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 194.95,
+        "y": 1695.25
+      },
+      "neighbors": [
+        "east-mediterranean",
+        "lower-egypt",
+        "sahara",
+        "west-mediterranean"
+      ],
+      "army": [
+        "lower-egypt"
+      ],
+      "fleet": [
+        "east-mediterranean",
+        "lower-egypt",
+        "west-mediterranean"
+      ]
+    },
+    "lorestan": {
+      "name": "Lorestan",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 2669.56,
+        "y": 1336.28
+      },
+      "neighbors": [
+        "azerbaijan",
+        "fars",
+        "jibal",
+        "mesopotamia",
+        "persian-gulf"
+      ],
+      "army": [
+        "azerbaijan",
+        "fars",
+        "jibal",
+        "mesopotamia"
+      ],
+      "fleet": [
+        "fars",
+        "mesopotamia",
+        "persian-gulf"
+      ]
+    },
+    "lower-egypt": {
+      "name": "Lower Egypt",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 984.44,
+        "y": 1835.31
+      },
+      "neighbors": [
+        "east-mediterranean",
+        "libya",
+        "palestine",
+        "red-sea",
+        "sahara",
+        "tabuk",
+        "upper-egypt"
+      ],
+      "army": [
+        "libya",
+        "palestine",
+        "tabuk",
+        "upper-egypt"
+      ],
+      "fleet": [
+        "east-mediterranean",
+        "libya",
+        "palestine",
+        "red-sea",
+        "tabuk",
+        "upper-egypt"
+      ]
+    },
+    "mecca": {
+      "name": "Mecca",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 2000.33,
+        "y": 2706.67
+      },
+      "neighbors": [
+        "aden",
+        "north-arabia",
+        "red-sea",
+        "south-arabia",
+        "tabuk"
+      ],
+      "army": [
+        "aden",
+        "north-arabia",
+        "south-arabia",
+        "tabuk"
+      ],
+      "fleet": [
+        "aden",
+        "red-sea",
+        "tabuk"
+      ]
+    },
+    "medri-bahri": {
+      "name": "Medri Bahri",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1493.98,
+        "y": 2814.46
+      },
+      "neighbors": [
+        "abyssinia",
+        "adal",
+        "red-sea",
+        "sahara",
+        "upper-egypt"
+      ],
+      "army": [
+        "abyssinia",
+        "adal",
+        "upper-egypt"
+      ],
+      "fleet": [
+        "adal",
+        "red-sea",
+        "upper-egypt"
+      ]
+    },
+    "mekran": {
+      "name": "Mekran",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 3990.95,
+        "y": 2111.39
+      },
+      "neighbors": [
+        "arabian-sea",
+        "balochistan",
+        "kabul",
+        "kerman"
+      ],
+      "army": [
+        "balochistan",
+        "kabul",
+        "kerman"
+      ],
+      "fleet": [
+        "arabian-sea",
+        "balochistan",
+        "kerman"
+      ]
+    },
+    "mesopotamia": {
+      "name": "Mesopotamia",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 2295.11,
+        "y": 1261.25
+      },
+      "neighbors": [
+        "armenia",
+        "azerbaijan",
+        "lorestan",
+        "north-arabia",
+        "persian-gulf",
+        "syria"
+      ],
+      "army": [
+        "armenia",
+        "azerbaijan",
+        "lorestan",
+        "north-arabia",
+        "syria"
+      ],
+      "fleet": [
+        "lorestan",
+        "north-arabia",
+        "persian-gulf"
+      ]
+    },
+    "north-arabia": {
+      "name": "North Arabia",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 2097.75,
+        "y": 1924.02
+      },
+      "neighbors": [
+        "mecca",
+        "mesopotamia",
+        "palestine",
+        "persian-gulf",
+        "south-arabia",
+        "syria",
+        "tabuk"
+      ],
+      "army": [
+        "mecca",
+        "mesopotamia",
+        "palestine",
+        "south-arabia",
+        "syria",
+        "tabuk"
+      ],
+      "fleet": [
+        "mesopotamia",
+        "persian-gulf",
+        "south-arabia"
+      ]
+    },
+    "oman": {
+      "name": "Oman",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 3536.11,
+        "y": 2713.5
+      },
+      "neighbors": [
+        "aden",
+        "arabian-sea",
+        "gulf-of-aden",
+        "hormuz",
+        "south-arabia"
+      ],
+      "army": [
+        "aden",
+        "hormuz",
+        "south-arabia"
+      ],
+      "fleet": [
+        "aden",
+        "arabian-sea",
+        "gulf-of-aden",
+        "hormuz"
+      ]
+    },
+    "palestine": {
+      "name": "Palestine",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1519.14,
+        "y": 1589.52
+      },
+      "neighbors": [
+        "east-mediterranean",
+        "lower-egypt",
+        "north-arabia",
+        "syria",
+        "tabuk"
+      ],
+      "army": [
+        "lower-egypt",
+        "north-arabia",
+        "syria",
+        "tabuk"
+      ],
+      "fleet": [
+        "east-mediterranean",
+        "lower-egypt",
+        "syria"
+      ]
+    },
+    "panjab": {
+      "name": "Panjab",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 5211.72,
+        "y": 1632.7
+      },
+      "neighbors": [
+        "kabul",
+        "kashmir",
+        "rajputana",
+        "sindh"
+      ],
+      "army": [
+        "kabul",
+        "kashmir",
+        "rajputana",
+        "sindh"
+      ],
+      "fleet": []
+    },
+    "persian-gulf": {
+      "name": "Persian Gulf",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 3252.75,
+        "y": 2284.98
+      },
+      "neighbors": [
+        "arabian-sea",
+        "bahrain",
+        "fars",
+        "hormuz",
+        "kerman",
+        "lorestan",
+        "mesopotamia",
+        "north-arabia",
+        "south-arabia"
+      ],
+      "army": [],
+      "fleet": [
+        "arabian-sea",
+        "bahrain",
+        "fars",
+        "hormuz",
+        "kerman",
+        "lorestan",
+        "mesopotamia",
+        "north-arabia",
+        "south-arabia"
+      ]
+    },
+    "rajputana": {
+      "name": "Rajputana",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 5294.85,
+        "y": 2256.64
+      },
+      "neighbors": [
+        "gujarat",
+        "hindustan",
+        "panjab",
+        "sindh"
+      ],
+      "army": [
+        "gujarat",
+        "hindustan",
+        "panjab",
+        "sindh"
+      ],
+      "fleet": []
+    },
+    "red-sea": {
+      "name": "Red Sea",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 2009.88,
+        "y": 3224.67
+      },
+      "neighbors": [
+        "adal",
+        "aden",
+        "gulf-of-aden",
+        "lower-egypt",
+        "mecca",
+        "medri-bahri",
+        "tabuk",
+        "upper-egypt"
+      ],
+      "army": [],
+      "fleet": [
+        "adal",
+        "aden",
+        "gulf-of-aden",
+        "lower-egypt",
+        "mecca",
+        "medri-bahri",
+        "tabuk",
+        "upper-egypt"
+      ]
+    },
+    "rhodes": {
+      "name": "Rhodes",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 722.51,
+        "y": 1038.22
+      },
+      "neighbors": [
+        "aegean-sea",
+        "east-mediterranean"
+      ],
+      "army": [],
+      "fleet": [
+        "aegean-sea",
+        "east-mediterranean"
+      ]
+    },
+    "sahara": {
+      "name": "Sahara",
+      "kind": "land",
+      "access": "impassable",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 581.14,
+        "y": 3149.06
+      },
+      "neighbors": [
+        "abyssinia",
+        "libya",
+        "lower-egypt",
+        "medri-bahri",
+        "upper-egypt"
+      ],
+      "army": [],
+      "fleet": []
+    },
+    "sakartvelo": {
+      "name": "Sakartvelo",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 2471.24,
+        "y": 195.26
+      },
+      "neighbors": [
+        "armenia",
+        "black-sea",
+        "caspian-sea"
+      ],
+      "army": [
+        "armenia"
+      ],
+      "fleet": [
+        "armenia",
+        "black-sea",
+        "caspian-sea"
+      ]
+    },
+    "samakand": {
+      "name": "Samakand",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 4782.65,
+        "y": 504.22
+      },
+      "neighbors": [
+        "balkh",
+        "bukhara",
+        "kashmir",
+        "turan"
+      ],
+      "army": [
+        "balkh",
+        "bukhara",
+        "kashmir",
+        "turan"
+      ],
+      "fleet": []
+    },
+    "sindh": {
+      "name": "Sindh",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 4921.02,
+        "y": 2123.33
+      },
+      "neighbors": [
+        "arabian-sea",
+        "balochistan",
+        "gujarat",
+        "kabul",
+        "panjab",
+        "rajputana"
+      ],
+      "army": [
+        "balochistan",
+        "gujarat",
+        "kabul",
+        "panjab",
+        "rajputana"
+      ],
+      "fleet": [
+        "arabian-sea",
+        "balochistan",
+        "gujarat"
+      ]
+    },
+    "socotra": {
+      "name": "Socotra",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 3337.43,
+        "y": 3664.49
+      },
+      "neighbors": [
+        "arabian-sea"
+      ],
+      "army": [],
+      "fleet": [
+        "arabian-sea"
+      ]
+    },
+    "sofia": {
+      "name": "Sofia",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 311.4,
+        "y": 219.43
+      },
+      "neighbors": [
+        "aegean-sea",
+        "black-sea",
+        "constantinople",
+        "greece"
+      ],
+      "army": [
+        "constantinople",
+        "greece"
+      ],
+      "fleet": [
+        "aegean-sea",
+        "black-sea",
+        "constantinople",
+        "greece"
+      ]
+    },
+    "south-arabia": {
+      "name": "South Arabia",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 2650.13,
+        "y": 2670.96
+      },
+      "neighbors": [
+        "aden",
+        "bahrain",
+        "hormuz",
+        "mecca",
+        "north-arabia",
+        "oman",
+        "persian-gulf"
+      ],
+      "army": [
+        "aden",
+        "bahrain",
+        "hormuz",
+        "mecca",
+        "north-arabia",
+        "oman"
+      ],
+      "fleet": [
+        "bahrain",
+        "hormuz",
+        "north-arabia",
+        "persian-gulf"
+      ]
+    },
+    "syria": {
+      "name": "Syria",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 1840.32,
+        "y": 1006
+      },
+      "neighbors": [
+        "armenia",
+        "east-mediterranean",
+        "konya",
+        "mesopotamia",
+        "north-arabia",
+        "palestine"
+      ],
+      "army": [
+        "armenia",
+        "konya",
+        "mesopotamia",
+        "north-arabia",
+        "palestine"
+      ],
+      "fleet": [
+        "east-mediterranean",
+        "konya",
+        "palestine"
+      ]
+    },
+    "tabuk": {
+      "name": "Tabuk",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 1659.19,
+        "y": 2063.77
+      },
+      "neighbors": [
+        "lower-egypt",
+        "mecca",
+        "north-arabia",
+        "palestine",
+        "red-sea"
+      ],
+      "army": [
+        "lower-egypt",
+        "mecca",
+        "north-arabia",
+        "palestine"
+      ],
+      "fleet": [
+        "lower-egypt",
+        "mecca",
+        "red-sea"
+      ]
+    },
+    "turan": {
+      "name": "Turan",
+      "kind": "land",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 5281.06,
+        "y": 206.35
+      },
+      "neighbors": [
+        "bukhara",
+        "kashmir",
+        "samakand"
+      ],
+      "army": [
+        "bukhara",
+        "kashmir",
+        "samakand"
+      ],
+      "fleet": []
+    },
+    "upper-egypt": {
+      "name": "Upper Egypt",
+      "kind": "land",
+      "access": "open",
+      "coastal": true,
+      "supplyCenter": true,
+      "supplyCenters": 1,
+      "center": {
+        "x": 1183.34,
+        "y": 2468.14
+      },
+      "neighbors": [
+        "lower-egypt",
+        "medri-bahri",
+        "red-sea",
+        "sahara"
+      ],
+      "army": [
+        "lower-egypt",
+        "medri-bahri"
+      ],
+      "fleet": [
+        "lower-egypt",
+        "medri-bahri",
+        "red-sea"
+      ]
+    },
+    "west-mediterranean": {
+      "name": "West Mediterranean",
+      "kind": "sea",
+      "access": "open",
+      "coastal": false,
+      "supplyCenter": false,
+      "supplyCenters": 0,
+      "center": {
+        "x": 167.41,
+        "y": 1256.11
+      },
+      "neighbors": [
+        "aegean-sea",
+        "crete",
+        "east-mediterranean",
+        "greece",
+        "libya"
+      ],
+      "army": [],
+      "fleet": [
+        "aegean-sea",
+        "crete",
+        "east-mediterranean",
+        "greece",
+        "libya"
+      ]
+    }
+  }
+}

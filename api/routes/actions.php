@@ -5,6 +5,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../lib/game_access.php';
 require_once __DIR__ . '/../lib/game_handlers.php';
 require_once __DIR__ . '/../lib/game_types.php';
+require_once __DIR__ . '/../lib/diplomacy.php';
 require_once __DIR__ . '/../lib/rumble.php';
 
 function handle_actions_route(string $method, array $segments): void
@@ -21,6 +22,26 @@ function handle_actions_route(string $method, array $segments): void
         }
 
         error_response('Method not allowed.', 405);
+    }
+
+    if (count($segments) === 4 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'actions' && $segments[3] === 'diplomacy-order') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+
+        $user = require_user();
+        $role = game_require_member_or_403((int)$user['id'], (int)$segments[1]);
+        if ($role === 'observer') {
+            error_response('Observers cannot submit actions.', 403);
+        }
+        $body = json_input();
+        $actionType = trim((string)($body['action_type'] ?? 'order'));
+        $payload = $body['payload'] ?? $body;
+        if (!is_array($payload)) {
+            error_response('Action payload must be an object.', 422);
+        }
+        diplomacy_submit((int)$segments[1], (int)$user['id'], $actionType, $payload);
+        success_response(['created' => true], 201);
     }
 
     if (count($segments) === 4 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'actions' && $segments[3] === 'reveal') {

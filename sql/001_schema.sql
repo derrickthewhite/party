@@ -56,6 +56,9 @@ CREATE TABLE IF NOT EXISTS `games` (
   `status` ENUM('open', 'in_progress', 'closed') NOT NULL DEFAULT 'open',
   `mafia_setup_mode` ENUM('auto','custom') NOT NULL DEFAULT 'auto',
   `mafia_setup_mafia_count` INT NULL DEFAULT NULL,
+  `diplomacy_map_key` VARCHAR(80) NOT NULL DEFAULT 'EuropeDiploMap',
+  `diplomacy_nation_mode` ENUM('pick', 'random') NOT NULL DEFAULT 'pick',
+  `diplomacy_home_centers` JSON NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
@@ -75,6 +78,8 @@ CREATE TABLE IF NOT EXISTS `game_members` (
   `user_id` BIGINT UNSIGNED NOT NULL,
   `role` ENUM('owner', 'player', 'observer') NOT NULL DEFAULT 'player',
   `icon_key` VARCHAR(64) NULL DEFAULT NULL,
+  `diplomacy_chosen_power` VARCHAR(64) NULL DEFAULT NULL,
+  `diplomacy_assigned_power` VARCHAR(64) NULL DEFAULT NULL,
   `joined_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`game_id`, `user_id`),
   KEY `idx_game_members_user` (`user_id`),
@@ -162,6 +167,23 @@ CREATE TABLE IF NOT EXISTS `game_actions` (
     ON DELETE CASCADE ON UPDATE CASCADE,
   CONSTRAINT `fk_game_actions_user`
     FOREIGN KEY (`user_id`) REFERENCES `users`(`id`)
+    ON DELETE CASCADE ON UPDATE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE IF NOT EXISTS `diplomacy_phase_snapshots` (
+  `id` BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+  `game_id` BIGINT UNSIGNED NOT NULL,
+  `year` INT UNSIGNED NOT NULL,
+  `phase` VARCHAR(40) NOT NULL,
+  `position` JSON NOT NULL,
+  `orders` JSON NULL,
+  `resolution` JSON NULL,
+  `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `uniq_diplomacy_snapshot_phase` (`game_id`, `year`, `phase`),
+  KEY `idx_diplomacy_snapshots_game` (`game_id`, `year`),
+  CONSTRAINT `fk_diplomacy_snapshots_game`
+    FOREIGN KEY (`game_id`) REFERENCES `games`(`id`)
     ON DELETE CASCADE ON UPDATE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

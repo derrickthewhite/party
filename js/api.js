@@ -70,6 +70,17 @@ function createApiModule() {
 			icon_key: iconKey,
 		}),
 		setGameSettings: (gameId, settings) => request('/games/' + encodeURIComponent(gameId) + '/settings', 'POST', settings),
+		setDiplomacyPower: (gameId, power) => request('/games/' + encodeURIComponent(gameId) + '/diplomacy-power', 'POST', {
+			power: power,
+		}),
+		diplomacySnapshot: (gameId, year, phase) => request(
+			'/games/' + encodeURIComponent(gameId) + '/diplomacy-snapshot?year=' + encodeURIComponent(year) + '&phase=' + encodeURIComponent(phase),
+			'GET'
+		),
+		submitDiplomacyOrder: (gameId, actionType, payload) => request('/games/' + encodeURIComponent(gameId) + '/actions/diplomacy-order', 'POST', {
+			action_type: actionType,
+			payload: payload || {},
+		}),
 		startGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/start', 'POST'),
 		endGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/end', 'POST'),
 		deleteGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/delete', 'POST'),

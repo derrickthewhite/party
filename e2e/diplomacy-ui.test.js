@@ -10,63 +10,74 @@ const {
   endGame,
   getGameDetail,
   joinGame,
-  listActions,
   observeGame,
-  revealActions,
-  sendAction,
   startGame,
   uniqueLabel,
 } = require('./support/game-fixtures');
 const { phaseHeadingForGame } = require('./support/surface-expectations');
 const { readDiplomacySnapshot } = require('./support/surface-snapshots');
 
+async function submitEmptyOrders(session, game) {
+  const detail = await getGameDetail(session, game.id);
+  const power = detail.diplomacy && detail.diplomacy.my_power;
+  const map = detail.diplomacy && detail.diplomacy.position && detail.diplomacy.position.map;
+  const response = await session.client.post(`/api/games/${game.id}/actions/diplomacy-order`, {
+    json: {
+      action_type: 'order',
+      payload: {
+        kind: 'diplomacy-orders',
+        map,
+        power,
+        orders: [],
+      },
+    },
+  });
+  expect(response.status).toBeGreaterThanOrEqual(200);
+  expect(response.status).toBeLessThan(300);
+}
+
+async function waitForDiplomacyBoard(page) {
+  await page.waitForFunction(() => {
+    const activeScreen = document.querySelector('.screen:not(.hidden)');
+    const host = activeScreen && activeScreen.querySelector('[data-ref="boardHost"]');
+    return !!(host && host.querySelector('.diplomacy-board, svg, canvas'));
+  }, { timeout: 15000 });
+}
+
 describe('diplomacy presentation coverage', () => {
-  test('diplomacy screen reflects submission progress and revealed orders from the server', async () => {
+  test('diplomacy screen reflects setup, then live board progress after start', async () => {
     const owner = await createSession('dip-owner');
     const player = await createSession('dip-player');
     const game = await createGame(owner, 'diplomacy', uniqueLabel('dip-game'));
 
     await joinGame(player, game.id);
-    await startGame(owner, game.id);
-
-    await sendAction(owner, game.id, 'order', { text: 'Fleet to North Sea' });
-    let detail = await getGameDetail(player, game.id);
 
     const ownerPage = await openAuthenticatedPage(owner, { screen: 'game', game: game.id }, { viewport: { width: 390, height: 900 } });
-    const playerPage = await openAuthenticatedPage(player, { screen: 'game', game: game.id }, { viewport: { width: 390, height: 900 } });
-
     try {
+      let detail = await getGameDetail(owner, game.id);
       await waitForActiveHeading(ownerPage, phaseHeadingForGame(detail, 'Diplomacy'));
-      await waitForActiveHeading(playerPage, phaseHeadingForGame(detail, 'Diplomacy'));
       await assertNoHorizontalOverflow(ownerPage);
 
       let snapshot = await readDiplomacySnapshot(ownerPage);
-      expect(snapshot.progressText).toBe(
-        `Round ${detail.diplomacy_order_progress.round_number} orders submitted: ${detail.diplomacy_order_progress.submitted_count}/${detail.diplomacy_order_progress.participant_count}`
-      );
+      expect(snapshot.setupVisible).toBe(true);
+      expect(snapshot.playVisible).toBe(false);
+
+      await startGame(owner, game.id);
+      await submitEmptyOrders(owner, game);
+      detail = await getGameDetail(player, game.id);
+      await reloadPage(ownerPage, phaseHeadingForGame(detail, 'Diplomacy'));
+      await waitForDiplomacyBoard(ownerPage);
+      snapshot = await readDiplomacySnapshot(ownerPage);
+      expect(snapshot.playVisible).toBe(true);
+      expect(snapshot.setupVisible).toBe(false);
+      expect(snapshot.boardPresent).toBe(true);
+      expect(snapshot.historyPrevVisible).toBe(true);
+      expect(snapshot.historyNextVisible).toBe(true);
+      expect(snapshot.progressText).toContain(`${detail.diplomacy.progress.submitted_count}/${detail.diplomacy.progress.required_count}`);
       expect(snapshot.endTurnVisible).toBe(true);
       expect(snapshot.endTurnDisabled).toBe(false);
-      expect(snapshot.emptyOrdersVisible).toBe(true);
-
-      await revealActions(owner, game.id);
-      detail = await getGameDetail(player, game.id);
-      const actions = await listActions(player, game.id);
-      await reloadPage(ownerPage, phaseHeadingForGame(detail, 'Diplomacy'));
-      snapshot = await readDiplomacySnapshot(ownerPage);
-
-      expect(snapshot.progressText).toBe(
-        `Round ${detail.diplomacy_order_progress.round_number} orders submitted: ${detail.diplomacy_order_progress.submitted_count}/${detail.diplomacy_order_progress.participant_count}`
-      );
-      expect(snapshot.emptyOrdersVisible).toBe(false);
-      expect(snapshot.orders).toEqual(
-        actions.filter((entry) => entry.action_type === 'order' && entry.revealed_at).map((entry) => ({
-          meta: `Round ${entry.round_number} - ${entry.user.username}`,
-          text: entry.payload.text,
-        }))
-      );
     } finally {
       await ownerPage.close();
-      await playerPage.close();
     }
   });
 
@@ -87,18 +98,18 @@ describe('diplomacy presentation coverage', () => {
       let snapshot = await readDiplomacySnapshot(ownerPage);
       expect(snapshot.subtitle).toContain('Status: open');
       expect(snapshot.modeInfo).toBe('Game has not started yet: chat is enabled, game actions are disabled.');
-      expect(snapshot.sendDisabled).toBe(true);
-      expect(snapshot.endTurnVisible).toBe(true);
-      expect(snapshot.endTurnDisabled).toBe(true);
-      expect(snapshot.emptyOrdersText).toBe('No completed rounds yet.');
+      expect(snapshot.setupVisible).toBe(true);
 
       await startGame(owner, game.id);
       const observerDetail = await getGameDetail(observer, game.id);
       const observerPage = await openAuthenticatedPage(observer, { screen: 'game', game: game.id }, { viewport: { width: 1280, height: 900 } });
       try {
         await waitForActiveHeading(observerPage, phaseHeadingForGame(observerDetail, 'Diplomacy'));
+        await waitForDiplomacyBoard(observerPage);
         snapshot = await readDiplomacySnapshot(observerPage);
         expect(snapshot.modeInfo).toBe('Observer mode: you can read chat and state, but cannot chat or submit actions.');
+        expect(snapshot.playVisible).toBe(true);
+        expect(snapshot.boardPresent).toBe(true);
         expect(snapshot.sendDisabled).toBe(true);
         expect(snapshot.endTurnVisible).toBe(false);
       } finally {

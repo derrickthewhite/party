@@ -92,13 +92,17 @@ Lifecycle rules:
 
 - `GET /api/games/{id}/actions?since_id=0`
 - `POST /api/games/{id}/actions` — body: `{ "action_type": "...", "payload": { ... } }`
-- `POST /api/games/{id}/actions/reveal` (diplomacy owner force reveal)
+- `POST /api/games/{id}/actions/reveal` (diplomacy owner force resolve)
+- `POST /api/games/{id}/actions/diplomacy-order` — body: `{ "action_type": "order|retreat|adjust", "payload": { ... } }`
+- `POST /api/games/{id}/diplomacy-power` — body: `{ "power": "england|random" }` (open games)
+- `GET /api/games/{id}/diplomacy-snapshot?year=1901&phase=spring_orders`
 - `POST /api/games/{id}/actions/rumble-order` — body: `{ "attacks": { "<target_user_id>": <amount>, ... } }`
 - `POST /api/games/{id}/actions/rumble-order/cancel`
 
 Notes:
 - observers can read but cannot chat or submit actions
-- diplomacy orders stay hidden until reveal
+- diplomacy orders stay hidden until the phase resolves
+- diplomacy setup happens while the game is `open`; play uses `spring_orders`, `spring_retreats`, `fall_orders`, `fall_retreats`, and `builds`
 
 ## SQL Workflow
 
@@ -116,6 +120,7 @@ Notes:
 - `sql/018_rumble_ability_catalog_tables.sql` — add rumble ability catalog
 - `sql/010_cleanup_messages.sql` — clean chat only
 - `sql/011_cleanup_inactive_games.sql` — remove closed games and related data
+- `sql/027_add_diplomacy.sql` — diplomacy maps, nation assignment, and phase snapshots
 - `sql/099_full_reset.sql` — full rebuild/reset
 
 ## Hosting & Deployment

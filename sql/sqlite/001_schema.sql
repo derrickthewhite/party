@@ -43,6 +43,9 @@ CREATE TABLE IF NOT EXISTS games (
   game_type TEXT NOT NULL DEFAULT 'chat',
   mafia_setup_mode TEXT NOT NULL DEFAULT 'auto' CHECK(mafia_setup_mode IN ('auto', 'custom')),
   mafia_setup_mafia_count INTEGER NULL,
+  diplomacy_map_key TEXT NOT NULL DEFAULT 'EuropeDiploMap',
+  diplomacy_nation_mode TEXT NOT NULL DEFAULT 'pick' CHECK(diplomacy_nation_mode IN ('pick', 'random')),
+  diplomacy_home_centers TEXT NULL,
   status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'in_progress', 'closed')),
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -55,6 +58,8 @@ CREATE TABLE IF NOT EXISTS game_members (
   user_id INTEGER NOT NULL,
   role TEXT NOT NULL DEFAULT 'player' CHECK(role IN ('owner', 'player', 'observer')),
   icon_key TEXT NULL,
+  diplomacy_chosen_power TEXT NULL,
+  diplomacy_assigned_power TEXT NULL,
   joined_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (game_id, user_id),
   FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE ON UPDATE CASCADE,
@@ -108,6 +113,19 @@ CREATE TABLE IF NOT EXISTS game_actions (
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE ON UPDATE CASCADE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS diplomacy_phase_snapshots (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  game_id INTEGER NOT NULL,
+  year INTEGER NOT NULL,
+  phase TEXT NOT NULL,
+  position TEXT NOT NULL,
+  orders TEXT NULL,
+  resolution TEXT NULL,
+  created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE (game_id, year, phase),
+  FOREIGN KEY (game_id) REFERENCES games(id) ON DELETE CASCADE ON UPDATE CASCADE
 );
 
 CREATE TABLE IF NOT EXISTS game_roles (

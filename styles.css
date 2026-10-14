@@ -1466,6 +1466,73 @@ button:disabled {
   text-align: left;
 }
 
+.diplomacy-board-host {
+  min-height: 420px;
+  height: min(70vh, 640px);
+  margin: 12px 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.diplomacy-resolution {
+  white-space: pre-wrap;
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--muted);
+  margin: 0;
+}
+
+.diplomacy-setup-card label,
+.diplomacy-play-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.diplomacy-turn-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.diplomacy-turn-nav-caption {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.diplomacy-turn-nav-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.diplomacy-turn-nav-controls select {
+  min-width: 0;
+  flex: 1;
+}
+
+.diplomacy-turn-nav-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  flex: 0 0 auto;
+  line-height: 1;
+}
+
+.diplomacy-turn-nav-btn svg {
+  width: 18px;
+  height: 18px;
+  display: block;
+}
+
 @media (max-width: 720px) {
   .admin-layout {
     grid-template-columns: 1fr;

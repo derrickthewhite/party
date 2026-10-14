@@ -76,6 +76,20 @@ function handle_games_route(string $method, array $segments): void
         games_update_settings((int)$segments[1]);
     }
 
+    if (count($segments) === 3 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'diplomacy-power') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+        games_set_diplomacy_power((int)$segments[1]);
+    }
+
+    if (count($segments) === 3 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'diplomacy-snapshot') {
+        if ($method !== 'GET') {
+            error_response('Method not allowed.', 405);
+        }
+        games_diplomacy_snapshot((int)$segments[1]);
+    }
+
     if (count($segments) === 2 && $segments[0] === 'games' && ctype_digit($segments[1])) {
         if ($method !== 'GET') {
             error_response('Method not allowed.', 405);
@@ -194,7 +208,7 @@ function games_members_by_game(array $gameIds): array
 
     $placeholders = implode(',', array_fill(0, count($gameIds), '?'));
     $stmt = db()->prepare(
-        'SELECT gm.game_id, gm.user_id, gm.role, u.username, ' . game_member_icon_select_sql('gm', 'icon_key') . ' '
+        'SELECT gm.game_id, gm.user_id, gm.role, gm.diplomacy_chosen_power, gm.diplomacy_assigned_power, u.username, ' . game_member_icon_select_sql('gm', 'icon_key') . ' '
         . 'FROM game_members gm '
         . 'JOIN users u ON u.id = gm.user_id '
         . 'WHERE gm.game_id IN (' . $placeholders . ') '
@@ -215,6 +229,8 @@ function games_members_by_game(array $gameIds): array
             'username' => (string)$row['username'],
             'role' => (string)$row['role'],
             'icon_key' => game_normalize_icon_key($row['icon_key'] ?? null),
+            'diplomacy_chosen_power' => $row['diplomacy_chosen_power'] !== null ? (string)$row['diplomacy_chosen_power'] : null,
+            'diplomacy_assigned_power' => $row['diplomacy_assigned_power'] !== null ? (string)$row['diplomacy_assigned_power'] : null,
         ];
     }
 
@@ -376,6 +392,10 @@ function games_start(int $gameId): void
 
     if ((string)$game['status'] !== 'open') {
         error_response('Only open games can be started.', 409);
+    }
+
+    if (normalize_game_type((string)$game['game_type']) === 'diplomacy') {
+        diplomacy_validate_can_start($gameId);
     }
 
     $pdo = db();
@@ -574,6 +594,11 @@ function games_update_settings(int $gameId): void
     }
 
     $body = json_input();
+    if (normalize_game_type((string)$game['game_type']) === 'diplomacy') {
+        diplomacy_update_settings($gameId, $body);
+        games_detail($gameId);
+    }
+
     $mode = isset($body['mafia_setup_mode']) ? trim((string)$body['mafia_setup_mode']) : 'auto';
     $countRaw = $body['mafia_setup_mafia_count'] ?? null;
 
@@ -601,6 +626,48 @@ function games_update_settings(int $gameId): void
 
     // Return the refreshed full game detail so the client can update UI.
     games_detail($gameId);
+}
+
+function games_set_diplomacy_power(int $gameId): void
+{
+    $user = require_user();
+    $role = game_require_member_or_403((int)$user['id'], $gameId);
+    if ($role === 'observer') {
+        error_response('Observers cannot choose a nation.', 403);
+    }
+
+    $body = json_input();
+    diplomacy_set_chosen_power($gameId, (int)$user['id'], $body['power'] ?? 'random');
+    games_detail($gameId);
+}
+
+function games_diplomacy_snapshot(int $gameId): void
+{
+    $user = require_user();
+    game_require_member_or_403((int)$user['id'], $gameId);
+
+    $year = isset($_GET['year']) && ctype_digit((string)$_GET['year']) ? (int)$_GET['year'] : 0;
+    $phase = trim((string)($_GET['phase'] ?? ''));
+    if ($year < 1 || $phase === '') {
+        error_response('year and phase are required.', 422);
+    }
+
+    $snapshot = diplomacy_snapshot_for_history($gameId, $year, $phase);
+    if ($snapshot === null) {
+        error_response('Snapshot not found.', 404);
+    }
+
+    success_response([
+        'snapshot' => [
+            'year' => $snapshot['year'],
+            'phase' => $snapshot['phase'],
+            'label' => diplomacy_phase_label($snapshot['phase'], $snapshot['year']),
+            'mode' => diplomacy_phase_mode($snapshot['phase']),
+            'position' => $snapshot['position'],
+            'orders' => $snapshot['orders'],
+            'resolution' => $snapshot['resolution'],
+        ],
+    ]);
 }
 
 function games_detail(int $gameId): void
@@ -681,6 +748,7 @@ function games_detail(int $gameId): void
                 'permissions' => $permissions,
                 'mafia_state' => $detailPayload['mafia_state'],
                 'diplomacy_order_progress' => $detailPayload['diplomacy_order_progress'],
+                'diplomacy' => $detailPayload['diplomacy'] ?? null,
                 'rumble_turn_progress' => $detailPayload['rumble_turn_progress'],
                 'final_standings' => $detailPayload['final_standings'],
             ],

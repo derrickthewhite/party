@@ -29,7 +29,7 @@ function default_phase_for_game_type(string $gameType): string
         return 'start';
     }
     if ($type === 'diplomacy') {
-        return 'orders';
+        return 'setup';
     }
     if ($type === 'rumble') {
         return 'bidding';

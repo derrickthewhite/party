@@ -12,6 +12,7 @@ function game_detail_payload_defaults(): array
     return [
         'mafia_state' => null,
         'diplomacy_order_progress' => null,
+        'diplomacy' => null,
         'rumble_turn_progress' => null,
         'final_standings' => null,
     ];
@@ -32,6 +33,7 @@ function game_handler_registry(): array
             'build_detail_payload' => 'mafia_game_build_detail_payload',
         ],
         'diplomacy' => [
+            'on_start' => 'diplomacy_game_on_start',
             'build_detail_payload' => 'diplomacy_game_build_detail_payload',
         ],
         'rumble' => [
@@ -64,8 +66,11 @@ function game_action_row_is_visible(string $gameType, array $row): bool
 {
     $type = normalize_game_type($gameType);
 
-    if ($type === 'diplomacy' && (string)($row['action_type'] ?? '') === 'order' && ($row['revealed_at'] ?? null) === null) {
-        return false;
+    if ($type === 'diplomacy') {
+        $actionType = (string)($row['action_type'] ?? '');
+        if (in_array($actionType, ['order', 'retreat', 'adjust'], true) && ($row['revealed_at'] ?? null) === null) {
+            return false;
+        }
     }
 
     if ($type === 'mafia' && ($row['revealed_at'] ?? null) === null) {
@@ -81,6 +86,10 @@ function game_action_validate_generic_create(string $gameType, string $actionTyp
 
     if ($type === 'rumble' && $actionType === 'order') {
         error_response('Use the rumble order endpoint for order submission.', 409);
+    }
+
+    if ($type === 'diplomacy' && in_array($actionType, ['order', 'retreat', 'adjust'], true)) {
+        error_response('Use the diplomacy order endpoint for order submission.', 409);
     }
 
     if ($type === 'mafia') {
