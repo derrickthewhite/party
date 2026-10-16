@@ -1,3 +1,5 @@
+const fs = require('fs');
+const path = require('path');
 const { createApiClient } = require('./support/api-client');
 const { registerAndSignIn } = require('./support/auth');
 const { setUserAdmin } = require('./support/admin');
@@ -128,4 +130,138 @@ test('unauthenticated admin routes return 401', async () => {
   const client = createApiClient(getServerInfo().baseURL);
   const response = await client.get('/api/admin/rooms');
   expect(response.status).toBe(401);
+});
+
+test('admin can manage player icon tags, names, hide, and upload', async () => {
+  const { baseURL } = getServerInfo();
+  const admin = await createAdmin();
+
+  const listResponse = await admin.client.get('/api/admin/player-icons');
+  expect(listResponse.status).toBe(200);
+  const icons = listResponse.body.data.icons;
+  const tags = listResponse.body.data.tags;
+  expect(icons.length).toBeGreaterThan(300);
+  expect(tags.map((tag) => tag.name)).toEqual(expect.arrayContaining([
+    'Humans',
+    'Animals',
+    'Classic',
+    'Psi Wars',
+  ]));
+
+  const target = icons.find((icon) => icon.key === 'AmberHardHat.svg') || icons[0];
+  const rename = await admin.client.post('/api/admin/player-icons/icon', {
+    json: {
+      icon_key: target.key,
+      display_name: 'Hard Hat Captain',
+      hidden: target.hidden ? 1 : 0,
+      auto_assign: target.auto_assign ? 1 : 0,
+      tag_ids: (target.tags || []).map((tag) => tag.id),
+    },
+  });
+  expect(rename.status).toBe(200);
+  const renamed = rename.body.data.icons.find((icon) => icon.key === target.key);
+  expect(renamed.label).toBe('Hard Hat Captain');
+  expect(renamed.filename).toBe(target.key);
+
+  const createTag = await admin.client.post('/api/admin/player-icons/tags', {
+    json: { name: 'Test Pack' },
+  });
+  expect(createTag.status).toBe(200);
+  const createdTag = createTag.body.data.tags.find((tag) => tag.name === 'Test Pack');
+  expect(createdTag).toEqual(expect.objectContaining({ name: 'Test Pack' }));
+
+  const assign = await admin.client.post('/api/admin/player-icons/bulk', {
+    json: {
+      icon_keys: [target.key],
+      add_tag_id: createdTag.id,
+    },
+  });
+  expect(assign.status).toBe(200);
+  const assigned = assign.body.data.icons.find((icon) => icon.key === target.key);
+  expect(assigned.tags.map((tag) => tag.name)).toContain('Test Pack');
+
+  const hide = await admin.client.post('/api/admin/player-icons/icon', {
+    json: {
+      icon_key: target.key,
+      hidden: 1,
+    },
+  });
+  expect(hide.status).toBe(200);
+
+  const game = await admin.client.post('/api/games', {
+    json: { title: `icon-catalog-${Date.now().toString(36)}`, game_type: 'chat' },
+  });
+  expect(game.status).toBe(201);
+  const detailResponse = await admin.client.get(`/api/games/${game.body.data.game.id}`);
+  expect(detailResponse.status).toBe(200);
+  const catalog = detailResponse.body.data.game.icon_catalog;
+  expect(catalog[0]).toEqual(expect.objectContaining({
+    key: expect.any(String),
+    label: expect.any(String),
+    tags: expect.any(Array),
+  }));
+  expect(catalog.some((entry) => entry.key === target.key)).toBe(false);
+
+  const uploadName = `UploadTestHead-${Date.now().toString(36)}.svg`;
+  const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 8 8"><circle cx="4" cy="4" r="3"/></svg>');
+  const formData = new FormData();
+  formData.append('file', new File([svg], uploadName, { type: 'image/svg+xml' }));
+  const upload = await admin.client.post('/api/admin/player-icons/upload', { formData });
+  expect(upload.status).toBe(201);
+  expect(upload.body.data.icon_key).toBe(uploadName);
+  expect(upload.body.data.icons.some((icon) => icon.key === uploadName)).toBe(true);
+
+  const deleteTag = await admin.client.delete(`/api/admin/player-icons/tags/${createdTag.id}`);
+  expect(deleteTag.status).toBe(200);
+  expect(deleteTag.body.data.tags.some((tag) => tag.name === 'Test Pack')).toBe(false);
+
+  await admin.client.post('/api/admin/player-icons/icon', {
+    json: {
+      icon_key: target.key,
+      display_name: target.label,
+      hidden: target.hidden ? 1 : 0,
+      auto_assign: target.auto_assign ? 1 : 0,
+      tag_ids: (target.tags || []).map((tag) => tag.id),
+    },
+  });
+
+  const uploadedPath = path.join(getServerInfo().rootDir, 'assets', 'PlayerIcons', uploadName);
+  if (fs.existsSync(uploadedPath)) {
+    fs.unlinkSync(uploadedPath);
+  }
+});
+
+test('hidden player icons stay on members who already have them', async () => {
+  const { baseURL } = getServerInfo();
+  const admin = await createAdmin();
+  const createResponse = await admin.client.post('/api/games', {
+    json: { title: `keep-hidden-icon-${Date.now().toString(36)}`, game_type: 'chat' },
+  });
+  expect(createResponse.status).toBe(201);
+  const gameId = createResponse.body.data.game.id;
+  const createdDetail = await admin.client.get(`/api/games/${gameId}`);
+  expect(createdDetail.status).toBe(200);
+  const member = createdDetail.body.data.game.members[0];
+  expect(member.icon_key).toEqual(expect.any(String));
+
+  const hide = await admin.client.post('/api/admin/player-icons/icon', {
+    json: {
+      icon_key: member.icon_key,
+      hidden: 1,
+    },
+  });
+  expect(hide.status).toBe(200);
+
+  const detail = await admin.client.get(`/api/games/${gameId}`);
+  expect(detail.status).toBe(200);
+  const refreshed = detail.body.data.game.members.find((entry) => entry.username === admin.credentials.username);
+  expect(refreshed.icon_key).toBe(member.icon_key);
+  expect(detail.body.data.game.icon_catalog.some((entry) => entry.key === member.icon_key)).toBe(false);
+
+  await admin.client.post('/api/admin/player-icons/icon', {
+    json: {
+      icon_key: member.icon_key,
+      hidden: 0,
+    },
+  });
 });

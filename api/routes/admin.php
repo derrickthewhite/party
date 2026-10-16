@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require_once __DIR__ . '/../lib/auth.php';
+require_once __DIR__ . '/../lib/player_icons.php';
 require_once __DIR__ . '/../lib/rooms.php';
 
 function handle_admin_route(string $method, array $segments): void
@@ -79,6 +80,46 @@ function handle_admin_route(string $method, array $segments): void
         && $method === 'POST'
     ) {
         admin_users_set_admin((int)$segments[2]);
+    }
+
+    if (count($segments) === 2 && $segments[1] === 'player-icons' && $method === 'GET') {
+        admin_player_icons_list();
+    }
+
+    if (count($segments) === 3 && $segments[1] === 'player-icons' && $segments[2] === 'upload' && $method === 'POST') {
+        admin_player_icons_upload();
+    }
+
+    if (count($segments) === 3 && $segments[1] === 'player-icons' && $segments[2] === 'bulk' && $method === 'POST') {
+        admin_player_icons_bulk();
+    }
+
+    if (count($segments) === 3 && $segments[1] === 'player-icons' && $segments[2] === 'icon' && $method === 'POST') {
+        admin_player_icons_update();
+    }
+
+    if (count($segments) === 3 && $segments[1] === 'player-icons' && $segments[2] === 'tags' && $method === 'POST') {
+        admin_player_icon_tags_create();
+    }
+
+    if (
+        count($segments) === 4
+        && $segments[1] === 'player-icons'
+        && $segments[2] === 'tags'
+        && ctype_digit($segments[3])
+        && $method === 'POST'
+    ) {
+        admin_player_icon_tags_update((int)$segments[3]);
+    }
+
+    if (
+        count($segments) === 4
+        && $segments[1] === 'player-icons'
+        && $segments[2] === 'tags'
+        && ctype_digit($segments[3])
+        && $method === 'DELETE'
+    ) {
+        admin_player_icon_tags_delete((int)$segments[3]);
     }
 
     error_response('Not found.', 404);
@@ -378,4 +419,82 @@ function admin_users_set_admin(int $userId): void
         'user_id' => $userId,
         'is_admin' => $wantAdmin,
     ]);
+}
+
+function admin_player_icons_list(): void
+{
+    require_admin();
+    player_icons_require_catalog();
+    success_response(player_icon_admin_payload());
+}
+
+function admin_player_icons_update(): void
+{
+    require_admin();
+    player_icons_require_catalog();
+    $body = json_input();
+    $iconKey = trim((string)($body['icon_key'] ?? ''));
+    if ($iconKey === '') {
+        error_response('An icon_key is required.', 422);
+    }
+
+    player_icon_update($iconKey, $body);
+    success_response(player_icon_admin_payload());
+}
+
+function admin_player_icons_bulk(): void
+{
+    require_admin();
+    player_icons_require_catalog();
+    $body = json_input();
+    $iconKeys = $body['icon_keys'] ?? [];
+    if (!is_array($iconKeys)) {
+        error_response('icon_keys must be an array.', 422);
+    }
+
+    $updated = player_icon_bulk_update($iconKeys, $body);
+    $payload = player_icon_admin_payload();
+    $payload['updated'] = $updated;
+    success_response($payload);
+}
+
+function admin_player_icon_tags_create(): void
+{
+    require_admin();
+    player_icons_require_catalog();
+    $body = json_input();
+    player_icon_create_tag((string)($body['name'] ?? ''));
+    success_response(player_icon_admin_payload());
+}
+
+function admin_player_icon_tags_update(int $tagId): void
+{
+    require_admin();
+    player_icons_require_catalog();
+    $body = json_input();
+    player_icon_rename_tag($tagId, (string)($body['name'] ?? ''));
+    success_response(player_icon_admin_payload());
+}
+
+function admin_player_icon_tags_delete(int $tagId): void
+{
+    require_admin();
+    player_icons_require_catalog();
+    player_icon_delete_tag($tagId);
+    success_response(player_icon_admin_payload());
+}
+
+function admin_player_icons_upload(): void
+{
+    require_admin();
+    player_icons_require_catalog();
+    $file = $_FILES['file'] ?? null;
+    if (!is_array($file)) {
+        error_response('An SVG file is required.', 422);
+    }
+
+    $iconKey = player_icon_upload($file);
+    $payload = player_icon_admin_payload();
+    $payload['icon_key'] = $iconKey;
+    success_response($payload, 201);
 }

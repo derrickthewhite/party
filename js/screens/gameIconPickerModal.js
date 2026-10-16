@@ -1,11 +1,9 @@
 import { collectRefs, createNodeFromHtml } from './dom.js';
 import {
-	isPlayerIconAnimal,
-	isPlayerIconHuman,
+	catalogIconEntry,
 	normalizePlayerIconKey,
-	playerIconGroupLabel,
 	playerIconLabel,
-	playerIconThemeKey,
+	rememberPlayerIconCatalog,
 	setPlayerIconImage,
 } from '../playerIcons.js';
 
@@ -25,65 +23,74 @@ const ICON_PICKER_MODAL_HTML = `
 	</div>
 `;
 
-const ICON_GROUP_ORDER = new Map([
-	['classic', 0],
-	['humans', 1],
-	['animals', 2],
-	['monster', 3],
-	['fantasy', 4],
-	['alien', 5],
-	['science-fiction', 6],
-]);
+function visibleCatalogEntries(iconCatalog) {
+	const seen = new Set();
+	const entries = [];
+	(Array.isArray(iconCatalog) ? iconCatalog : []).forEach(function eachEntry(entry) {
+		const item = catalogIconEntry(entry);
+		if (!item || item.hidden || seen.has(item.key)) {
+			return;
+		}
+		seen.add(item.key);
+		entries.push(item);
+	});
+	return entries;
+}
+
+function tagKey(tag) {
+	if (tag && tag.id != null && String(tag.id) !== '') {
+		return 'tag-' + String(tag.id);
+	}
+	if (tag && typeof tag.name === 'string' && tag.name.trim()) {
+		return 'tag-name-' + tag.name.trim().toLowerCase();
+	}
+	return '';
+}
 
 function buildIconGroups(iconCatalog) {
-	const availableIcons = Array.isArray(iconCatalog) ? iconCatalog.slice() : [];
-	const iconGroupsByKey = new Map();
+	const icons = visibleCatalogEntries(iconCatalog);
+	rememberPlayerIconCatalog(icons);
+	const groups = [{
+		key: 'all',
+		label: 'All',
+		sortOrder: -1,
+		icons: icons.slice(),
+	}];
+	const groupsByKey = new Map();
 
-	availableIcons.forEach(function eachIcon(iconKey) {
-		const normalized = normalizePlayerIconKey(iconKey) || '';
-		let folderKey = '';
-		if (normalized) {
-			const lastSlashIndex = normalized.lastIndexOf('/');
-			folderKey = lastSlashIndex === -1 ? '' : normalized.slice(0, lastSlashIndex);
-		}
-
-		function addToGroup(key) {
-			if (!iconGroupsByKey.has(key)) {
-				iconGroupsByKey.set(key, {
+	icons.forEach(function eachIcon(icon) {
+		(Array.isArray(icon.tags) ? icon.tags : []).forEach(function eachTag(tag) {
+			const key = tagKey(tag);
+			if (!key) {
+				return;
+			}
+			if (!groupsByKey.has(key)) {
+				groupsByKey.set(key, {
 					key,
-					label: playerIconGroupLabel(key),
+					label: String(tag && tag.name ? tag.name : 'Tag'),
+					sortOrder: Number(tag && tag.sort_order) || 0,
 					icons: [],
 				});
 			}
-			iconGroupsByKey.get(key).icons.push(iconKey);
-		}
-
-		addToGroup(folderKey);
-		if (isPlayerIconAnimal(iconKey)) {
-			addToGroup('animals');
-		}
-		if (isPlayerIconHuman(iconKey)) {
-			addToGroup('humans');
-		}
-		const themeKey = playerIconThemeKey(iconKey);
-		if (themeKey) {
-			addToGroup(themeKey);
-		}
+			groupsByKey.get(key).icons.push(icon);
+		});
 	});
 
-	return Array.from(iconGroupsByKey.values()).sort(function compareIconGroups(left, right) {
-		const leftOrder = ICON_GROUP_ORDER.has(String(left.key || '').toLowerCase())
-			? ICON_GROUP_ORDER.get(String(left.key || '').toLowerCase())
-			: Number.MAX_SAFE_INTEGER;
-		const rightOrder = ICON_GROUP_ORDER.has(String(right.key || '').toLowerCase())
-			? ICON_GROUP_ORDER.get(String(right.key || '').toLowerCase())
-			: Number.MAX_SAFE_INTEGER;
-		if (leftOrder !== rightOrder) {
-			return leftOrder - rightOrder;
-		}
+	Array.from(groupsByKey.values())
+		.filter(function hasIcons(group) {
+			return group.icons.length > 0;
+		})
+		.sort(function compareGroups(left, right) {
+			if (left.sortOrder !== right.sortOrder) {
+				return left.sortOrder - right.sortOrder;
+			}
+			return left.label.localeCompare(right.label);
+		})
+		.forEach(function eachGroup(group) {
+			groups.push(group);
+		});
 
-		return left.label.localeCompare(right.label);
-	});
+	return groups;
 }
 
 export function showGameIconPickerModal(options) {
@@ -91,8 +98,8 @@ export function showGameIconPickerModal(options) {
 	const normalizedCurrentIconKey = normalizePlayerIconKey(config.currentIconKey);
 	const tabGroups = buildIconGroups(config.iconCatalog);
 	let activeGroupKey = tabGroups.find(function hasCurrentSelection(group) {
-		return group.icons.some(function isCurrentIcon(iconKey) {
-			return normalizePlayerIconKey(iconKey) === normalizedCurrentIconKey;
+		return group.icons.some(function isCurrentIcon(icon) {
+			return icon.key === normalizedCurrentIconKey;
 		});
 	})?.key || (tabGroups[0] ? tabGroups[0].key : '');
 	const priorFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
@@ -168,23 +175,23 @@ export function showGameIconPickerModal(options) {
 				tabButton.tabIndex = isActive ? 0 : -1;
 			});
 
-			iconOptionsForActiveGroup().forEach(function eachIcon(iconKey) {
-				const iconTitle = playerIconLabel(iconKey);
+			iconOptionsForActiveGroup().forEach(function eachIcon(icon) {
+				const iconTitle = icon.label || playerIconLabel(icon.key);
 				const option = document.createElement('button');
 				option.type = 'button';
 				option.className = 'mafia-icon-option';
-				option.classList.toggle('is-selected', normalizePlayerIconKey(iconKey) === normalizedCurrentIconKey);
+				option.classList.toggle('is-selected', icon.key === normalizedCurrentIconKey);
 				option.title = iconTitle;
 				option.setAttribute('aria-label', iconTitle);
 
-				const icon = document.createElement('img');
-				icon.className = 'player-icon mafia-icon-option-image';
-				icon.setAttribute('aria-hidden', 'true');
-				setPlayerIconImage(icon, iconKey, 'Player');
+				const image = document.createElement('img');
+				image.className = 'player-icon mafia-icon-option-image';
+				image.setAttribute('aria-hidden', 'true');
+				setPlayerIconImage(image, icon.key, 'Player');
 
-				option.appendChild(icon);
+				option.appendChild(image);
 				option.addEventListener('click', function onSelect() {
-					close(iconKey);
+					close(icon.key);
 				});
 				grid.appendChild(option);
 			});

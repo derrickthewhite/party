@@ -1533,8 +1533,136 @@ button:disabled {
   display: block;
 }
 
+.admin-icons-toolbar,
+.admin-icons-filters,
+.admin-icons-bulk {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: end;
+  margin-top: 12px;
+}
+
+.admin-icons-upload {
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.admin-icons-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.admin-icons-tag-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: #fff;
+}
+
+.admin-icons-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+  gap: 16px;
+  align-items: start;
+  margin-top: 16px;
+}
+
+.admin-icons-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+.admin-icons-card {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 10px;
+  text-align: center;
+  cursor: pointer;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.admin-icons-card.is-editing,
+.admin-icons-card.is-selected {
+  border-color: var(--accent);
+}
+
+.admin-icons-card.is-hidden-icon {
+  opacity: 0.55;
+}
+
+.admin-icons-card input[type="checkbox"] {
+  width: auto;
+  justify-self: start;
+}
+
+.admin-icons-card-image {
+  width: 64px;
+  height: 64px;
+}
+
+.admin-icons-card small {
+  color: var(--muted);
+  word-break: break-word;
+}
+
+.admin-icons-edit {
+  position: sticky;
+  top: 16px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.admin-icons-edit-form {
+  display: grid;
+  gap: 10px;
+}
+
+.admin-icons-edit-image {
+  width: 96px;
+  height: 96px;
+  justify-self: center;
+}
+
+.admin-icons-filename {
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+  word-break: break-word;
+}
+
+.admin-icons-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.admin-icons-check input[type="checkbox"] {
+  width: auto;
+}
+
+.admin-icons-edit-tags {
+  display: grid;
+  gap: 6px;
+}
+
 @media (max-width: 720px) {
-  .admin-layout {
+  .admin-layout,
+  .admin-icons-layout {
     grid-template-columns: 1fr;
   }
 }

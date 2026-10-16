@@ -27,7 +27,7 @@ class ApiClient {
     const response = await fetch(`${this.baseURL}${pathname}`, {
       method,
       headers,
-      body: options.json ? JSON.stringify(options.json) : undefined,
+      body: options.json ? JSON.stringify(options.json) : (options.formData || undefined),
     });
 
     this.updateCookies(response);

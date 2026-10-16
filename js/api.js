@@ -3,13 +3,15 @@ function createApiModule() {
 	const API_BASE = new URL('../api', import.meta.url).toString().replace(/\/$/, '');
 
 	async function request(path, method, payload) {
+		const isForm = typeof FormData !== 'undefined' && payload instanceof FormData;
+		const headers = isForm ? {} : {
+			'Content-Type': 'application/json',
+		};
 		const response = await fetch(API_BASE + path, {
 			method: method || 'GET',
 			credentials: 'include',
-			headers: {
-				'Content-Type': 'application/json',
-			},
-			body: payload ? JSON.stringify(payload) : undefined,
+			headers: headers,
+			body: payload == null ? undefined : (isForm ? payload : JSON.stringify(payload)),
 		});
 
 		let data;
@@ -63,6 +65,17 @@ function createApiModule() {
 		}),
 		adminDeleteUser: (userId) => request('/admin/users/' + encodeURIComponent(userId), 'DELETE'),
 		adminDeleteRoom: (roomId) => request('/admin/rooms/' + encodeURIComponent(roomId), 'DELETE'),
+		adminListPlayerIcons: () => request('/admin/player-icons', 'GET'),
+		adminUpdatePlayerIcon: (payload) => request('/admin/player-icons/icon', 'POST', payload),
+		adminBulkPlayerIcons: (payload) => request('/admin/player-icons/bulk', 'POST', payload),
+		adminCreatePlayerIconTag: (name) => request('/admin/player-icons/tags', 'POST', { name }),
+		adminRenamePlayerIconTag: (tagId, name) => request('/admin/player-icons/tags/' + encodeURIComponent(tagId), 'POST', { name }),
+		adminDeletePlayerIconTag: (tagId) => request('/admin/player-icons/tags/' + encodeURIComponent(tagId), 'DELETE'),
+		adminUploadPlayerIcon: (file) => {
+			const form = new FormData();
+			form.append('file', file);
+			return request('/admin/player-icons/upload', 'POST', form);
+		},
 		joinGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/join', 'POST'),
 		observeGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/observe', 'POST'),
 		leaveGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/leave', 'POST'),

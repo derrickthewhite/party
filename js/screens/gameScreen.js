@@ -1,7 +1,7 @@
 import { collectRefs, createNodeFromHtml, setStatus, showConfirmModal } from './dom.js';
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
 import { createGameParticipantsSidebarController } from './gameParticipantsSidebar.js';
-import { pickRandomPlayerIconKey, setPlayerIconImage } from '../playerIcons.js';
+import { pickRandomPlayerIconKey, rememberPlayerIconCatalog, setPlayerIconImage } from '../playerIcons.js';
 import { collectGameInfoIcons, setGameInfoIconNode } from '../gameStateIcons.js';
 import { showGameIconPickerModal } from './gameIconPickerModal.js';
 import { bindPlayerIconPreview } from './playerIconPreviewModal.js';
@@ -374,6 +374,7 @@ export function createBaseGameScreen(deps, options) {
 	});
 
 	function setGame(game) {
+		rememberPlayerIconCatalog(game && game.icon_catalog);
 		const user = state.state.user || {};
 		userLabel.textContent = user.username ? 'Signed in as: ' + user.username : '';
 		title.textContent = game ? game.title + (config.titleSuffix ? ' (' + config.titleSuffix + ')' : '') : (config.title || 'Game');

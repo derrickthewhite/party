@@ -12,6 +12,7 @@ export function createAdminUsersRoomsScreen(deps) {
 			<div class="row">
 				<h2>Users &amp; Rooms</h2>
 				<div data-ref="headingSpacer"></div>
+				<button type="button" data-ref="playerIconsBtn">Player icons</button>
 				<button class="link" data-ref="back">Back to lobby</button>
 			</div>
 			<p class="top-user-label" data-ref="userLabel"></p>
@@ -95,6 +96,10 @@ export function createAdminUsersRoomsScreen(deps) {
 
 	refs.back.addEventListener('click', function onBack() {
 		navigateToScreen('landing');
+	});
+
+	refs.playerIconsBtn.addEventListener('click', function onPlayerIcons() {
+		navigateToScreen('admin-icons');
 	});
 
 	refs.createRoomBtn.addEventListener('click', async function onCreateRoom() {

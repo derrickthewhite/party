@@ -1,7 +1,7 @@
 import { cloneTemplateNode, collectRefs, createNodeFromHtml, createTemplate } from './dom.js';
 import { createBaseGameScreen } from './gameScreen.js';
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
-import { pickRandomPlayerIconKey, setPlayerIconImage } from '../playerIcons.js';
+import { pickRandomPlayerIconKey, rememberPlayerIconCatalog, setPlayerIconImage } from '../playerIcons.js';
 import { buttonIconUrl } from '../buttonIcons.js';
 import { ensureActionTypeIcon } from './gameActionButtons.js';
 import { collectGameInfoIcons, setGameInfoIconNode } from '../gameStateIcons.js';
@@ -663,6 +663,7 @@ export function createMafiaGameScreen(deps) {
 		serverSnapshot.finalStandings = Array.isArray(game && game.final_standings) ? game.final_standings.slice() : null;
 		serverSnapshot.status = String((game && game.status) || 'open');
 		serverSnapshot.iconCatalog = Array.isArray(game && game.icon_catalog) ? game.icon_catalog.slice() : [];
+		rememberPlayerIconCatalog(serverSnapshot.iconCatalog);
 		serverSnapshot.setupPlayerCount = Number(mafiaState.setup_player_count || 0);
 		serverSnapshot.setupMafiaCount = Number(mafiaState.setup_mafia_count || 0);
 		serverSnapshot.mafiaSetupMode = String(mafiaState.mafia_setup_mode || 'auto');

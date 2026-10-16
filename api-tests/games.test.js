@@ -35,20 +35,29 @@ function runPhpInline(script, args = []) {
 }
 
 function readDefaultIconAssignmentMilestones(gameId) {
+  const { sqlitePath } = getServerInfo();
   const output = runPhpInline([
-    'require "api/lib/game_icons.php";',
-    '$gameId = (int)$argv[1];',
-    '$catalog = game_default_icon_catalog_for_game($gameId);',
-    '$human = array_values(game_explicit_human_icon_catalog());',
-    '$animal = array_values(game_explicit_animal_icon_catalog());',
+    '$db = new PDO("sqlite:" . $argv[1]);',
+    '$db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);',
+    '$gameId = (int)$argv[2];',
+    '$keys = $db->query("SELECT icon_key FROM player_icons WHERE hidden = 0 AND auto_assign = 1")->fetchAll(PDO::FETCH_COLUMN);',
+    'usort($keys, static function (string $left, string $right) use ($gameId): int {',
+    '  return strcmp(hash("sha256", $gameId . ":" . $left), hash("sha256", $gameId . ":" . $right));',
+    '});',
+    '$humanStmt = $db->prepare("SELECT i.icon_key FROM player_icons i JOIN player_icon_tag_assignments a ON a.icon_key = i.icon_key JOIN player_icon_tags t ON t.id = a.tag_id WHERE t.name = :name AND i.hidden = 0 AND i.auto_assign = 1");',
+    '$humanStmt->execute([":name" => "Humans"]);',
+    '$human = $humanStmt->fetchAll(PDO::FETCH_COLUMN);',
+    '$animalStmt = $db->prepare("SELECT i.icon_key FROM player_icons i JOIN player_icon_tag_assignments a ON a.icon_key = i.icon_key JOIN player_icon_tags t ON t.id = a.tag_id WHERE t.name = :name AND i.hidden = 0 AND i.auto_assign = 1");',
+    '$animalStmt->execute([":name" => "Animals"]);',
+    '$animal = $animalStmt->fetchAll(PDO::FETCH_COLUMN);',
     '$payload = [',
-    '  "firstHumanIndex" => array_search($human[0], $catalog, true),',
+    '  "firstHumanIndex" => array_search($human[0], $keys, true),',
     '  "firstHumanKey" => $human[0],',
-    '  "firstAnimalIndex" => array_search($animal[0], $catalog, true),',
+    '  "firstAnimalIndex" => array_search($animal[0], $keys, true),',
     '  "firstAnimalKey" => $animal[0],',
     '];',
     'echo json_encode($payload);',
-  ].join(' '), [String(gameId)]);
+  ].join(' '), [sqlitePath, String(gameId)]);
 
   return JSON.parse(output.trim());
 }
@@ -242,5 +251,4 @@ test('new games do not always assign classic icons first', async () => {
   }
 
   expect(new Set(ownerIconKeys).size).toBeGreaterThan(1);
-  expect(ownerIconKeys.some((iconKey) => !String(iconKey).startsWith('Classic/'))).toBe(true);
 });

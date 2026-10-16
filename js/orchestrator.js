@@ -4,6 +4,7 @@ import { state } from './state.js';
 import { createChatGameScreen } from './screens/chatGameScreen.js';
 import { createDiplomacyGameScreen } from './screens/diplomacyGameScreen.js';
 import { createAdminUsersRoomsScreen } from './screens/adminUsersRoomsScreen.js';
+import { createAdminPlayerIconsScreen } from './screens/adminPlayerIconsScreen.js';
 import { createLandingScreen } from './screens/landingScreen.js';
 import { createMafiaGameScreen } from './screens/mafiaGameScreen.js';
 import { createRumbleGameScreen } from './screens/rumbleGameScreen.js';
@@ -21,6 +22,7 @@ export function initializePartyApp() {
 	let landingScreen;
 	let gameScreens;
 	let adminScreenVisible = false;
+	let adminIconsScreenVisible = false;
 
 	function normalizedGameType(game) {
 		const raw = String((game && game.game_type) || 'chat').toLowerCase();
@@ -146,6 +148,11 @@ export function initializePartyApp() {
 		state,
 		navigateToScreen,
 	});
+	const adminIconsScreen = createAdminPlayerIconsScreen({
+		api,
+		state,
+		navigateToScreen,
+	});
 	gameScreens = {
 		chat: createChatGameScreen({ api, state, chat, refreshGames }),
 		stub: createStubGameScreen({ api, state, chat, refreshGames }),
@@ -159,6 +166,7 @@ export function initializePartyApp() {
 	app.appendChild(signinScreen.root);
 	app.appendChild(landingScreen.root);
 	app.appendChild(adminScreen.root);
+	app.appendChild(adminIconsScreen.root);
 	Object.values(gameScreens).forEach(function eachScreen(screen) {
 		app.appendChild(screen.root);
 	});
@@ -176,6 +184,14 @@ export function initializePartyApp() {
 			});
 		}
 		adminScreenVisible = showAdmin;
+		const showAdminIcons = current.screen === 'admin-icons';
+		toggleScreen(adminIconsScreen.root, showAdminIcons);
+		if (showAdminIcons && !adminIconsScreenVisible) {
+			adminIconsScreen.load().catch(function onAdminIconsLoadError(err) {
+				adminIconsScreen.setStatus(err && err.message ? err.message : 'Unable to load player icons.', 'error');
+			});
+		}
+		adminIconsScreenVisible = showAdminIcons;
 
 		Object.entries(gameScreens).forEach(function eachEntry(entry) {
 			const type = entry[0];
@@ -215,9 +231,9 @@ export function initializePartyApp() {
 			// and if it's a game route, open that game
 			if (initialRoute.screen === 'game' && currentGameId) {
 				await openGame(currentGameId);
-			} else if (initialRoute.screen === 'admin') {
+			} else if (initialRoute.screen === 'admin' || initialRoute.screen === 'admin-icons') {
 				if (result.user && Number(result.user.is_admin) === 1) {
-					state.setScreen('admin');
+					state.setScreen(initialRoute.screen);
 				} else {
 					state.setScreen('landing');
 				}
@@ -230,7 +246,7 @@ export function initializePartyApp() {
 			const publicScreens = { welcome: true, signup: true, signin: true };
 			if (publicScreens[initialRoute.screen]) {
 				state.setScreen(initialRoute.screen);
-			} else if (initialRoute.screen === 'game' || initialRoute.screen === 'landing' || initialRoute.screen === 'admin') {
+			} else if (initialRoute.screen === 'game' || initialRoute.screen === 'landing' || initialRoute.screen === 'admin' || initialRoute.screen === 'admin-icons') {
 				state.setScreen('signin');
 			} else {
 				state.setScreen('welcome');
