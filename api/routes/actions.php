@@ -44,6 +44,21 @@ function handle_actions_route(string $method, array $segments): void
         success_response(['created' => true], 201);
     }
 
+    if (count($segments) === 4 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'actions' && $segments[3] === 'diplomacy-ready') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+
+        $user = require_user();
+        $role = game_require_member_or_403((int)$user['id'], (int)$segments[1]);
+        if ($role === 'observer') {
+            error_response('Observers cannot submit actions.', 403);
+        }
+        $body = json_input();
+        diplomacy_set_ready((int)$segments[1], (int)$user['id'], !empty($body['ready']));
+        success_response(['ready' => !empty($body['ready'])]);
+    }
+
     if (count($segments) === 4 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'actions' && $segments[3] === 'reveal') {
         if ($method !== 'POST') {
             error_response('Method not allowed.', 405);

@@ -88,7 +88,7 @@ function game_action_validate_generic_create(string $gameType, string $actionTyp
         error_response('Use the rumble order endpoint for order submission.', 409);
     }
 
-    if ($type === 'diplomacy' && in_array($actionType, ['order', 'retreat', 'adjust'], true)) {
+    if ($type === 'diplomacy' && in_array($actionType, ['order', 'retreat', 'adjust', 'ready'], true)) {
         error_response('Use the diplomacy order endpoint for order submission.', 409);
     }
 

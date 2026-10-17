@@ -1475,6 +1475,86 @@ button:disabled {
   overflow: hidden;
 }
 
+.diplomacy-swatch {
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  display: inline-block;
+  flex: 0 0 auto;
+}
+
+.diplomacy-power-row,
+.diplomacy-assign-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 0;
+}
+
+.diplomacy-power-copy {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  flex: 1;
+}
+
+.diplomacy-assign-row label,
+.diplomacy-inline-control {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.diplomacy-assign-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: flex-end;
+  margin: 8px 0;
+}
+
+.diplomacy-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  align-self: end;
+}
+
+.diplomacy-timer-text:empty {
+  display: none;
+}
+
+.diplomacy-focus-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 30;
+  background: var(--bg-1);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+}
+
+.diplomacy-focus-layer[hidden] {
+  display: none !important;
+}
+
+.diplomacy-focus-board {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.diplomacy-focus-layer .diplomacy-board-host {
+  flex: 1;
+  height: auto;
+  min-height: 0;
+  margin: 0;
+}
+
 .diplomacy-resolution {
   white-space: pre-wrap;
   font-family: inherit;
