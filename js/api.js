@@ -94,6 +94,9 @@ function createApiModule() {
 			action_type: actionType,
 			payload: payload || {},
 		}),
+		setDiplomacyReady: (gameId, ready) => request('/games/' + encodeURIComponent(gameId) + '/actions/diplomacy-ready', 'POST', {
+			ready: !!ready,
+		}),
 		startGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/start', 'POST'),
 		endGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/end', 'POST'),
 		deleteGame: (gameId) => request('/games/' + encodeURIComponent(gameId) + '/delete', 'POST'),

@@ -129,4 +129,75 @@ describe('diplomacy presentation coverage', () => {
       await ownerPage.close();
     }
   });
+
+  test('setup assignment, ready, and board focus stay on the host screen', async () => {
+    const owner = await createSession('dip-host-owner');
+    const game = await createGame(owner, 'diplomacy', uniqueLabel('dip-host'));
+    const ownerPage = await openAuthenticatedPage(owner, { screen: 'game', game: game.id }, { viewport: { width: 390, height: 900 } });
+    try {
+      const detailBefore = await getGameDetail(owner, game.id);
+      await waitForActiveHeading(ownerPage, phaseHeadingForGame(detailBefore, 'Diplomacy'));
+      await ownerPage.waitForSelector('[data-ref="timerMinutes"]');
+      await ownerPage.select('[data-ref="nationModeSelect"]', 'assign_all');
+      await ownerPage.waitForFunction(() => {
+        const active = document.querySelector('.screen:not(.hidden)');
+        const list = active && active.querySelector('[data-ref="assignAllList"]');
+        const swatch = list && list.querySelector('.diplomacy-swatch');
+        const disorder = list && Array.from(list.querySelectorAll('option')).some((option) => option.textContent === 'Civil disorder');
+        return !!(swatch && disorder && swatch.style.backgroundColor && swatch.style.backgroundColor !== 'transparent');
+      });
+      await assertNoHorizontalOverflow(ownerPage);
+
+      await startGame(owner, game.id);
+      const live = await getGameDetail(owner, game.id);
+      await reloadPage(ownerPage, phaseHeadingForGame(live, 'Diplomacy'));
+      await waitForDiplomacyBoard(ownerPage);
+      await ownerPage.waitForFunction(() => {
+        const active = document.querySelector('.screen:not(.hidden)');
+        const progress = active && active.querySelector('[data-ref="progressText"]');
+        const roster = active && active.querySelector('[data-ref="powersList"]');
+        const submit = active && active.querySelector('[data-ref="submitBtn"]');
+        return !!(progress && progress.textContent.includes('Ready')
+          && roster && roster.textContent.includes('supply center')
+          && roster.textContent.includes('No orders')
+          && submit && !submit.disabled);
+      });
+
+      await ownerPage.click('[data-ref="submitBtn"]');
+      await ownerPage.waitForFunction(() => {
+        const active = document.querySelector('.screen:not(.hidden)');
+        const status = active && active.querySelector('[data-ref="status"]');
+        const progress = active && active.querySelector('[data-ref="progressText"]');
+        const title = active && active.querySelector('[data-ref="phaseTitle"]');
+        return !!(status && status.textContent.includes('Orders submitted')
+          && progress && progress.textContent.includes('Submitted 1/1')
+          && progress.textContent.includes('Ready 0/1')
+          && title && title.textContent.includes('Spring orders'));
+      });
+
+      await ownerPage.click('[data-ref="readyBtn"]');
+      await ownerPage.waitForFunction(() => {
+        const active = document.querySelector('.screen:not(.hidden)');
+        const title = active && active.querySelector('[data-ref="phaseTitle"]');
+        return !!(title && title.textContent.includes('Fall orders'));
+      });
+
+      await ownerPage.click('[data-ref="focusBtn"]');
+      await ownerPage.waitForFunction(() => {
+        const layer = document.querySelector('[data-ref="focusLayer"]');
+        const host = document.querySelector('[data-ref="boardHost"]');
+        return !!(layer && !layer.hidden && host && layer.contains(host) && host.querySelector('svg, canvas'));
+      });
+      await ownerPage.click('[data-ref="focusCloseBtn"]');
+      await ownerPage.waitForFunction(() => {
+        const layer = document.querySelector('[data-ref="focusLayer"]');
+        const slot = document.querySelector('[data-ref="boardSlot"]');
+        const host = document.querySelector('[data-ref="boardHost"]');
+        return !!(layer && layer.hidden && slot && host && slot.contains(host));
+      });
+      await assertNoHorizontalOverflow(ownerPage);
+    } finally {
+      await ownerPage.close();
+    }
+  });
 });
