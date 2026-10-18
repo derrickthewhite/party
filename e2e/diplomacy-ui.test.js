@@ -1,3 +1,7 @@
+const fs = require('fs');
+const path = require('path');
+const { spawnSync } = require('child_process');
+const { getServerInfo } = require('../api-tests/support/server-runtime');
 const {
   assertNoHorizontalOverflow,
   openAuthenticatedPage,
@@ -196,6 +200,128 @@ describe('diplomacy presentation coverage', () => {
         return !!(layer && layer.hidden && slot && host && slot.contains(host));
       });
       await assertNoHorizontalOverflow(ownerPage);
+    } finally {
+      await ownerPage.close();
+    }
+  });
+
+  test('a builds phase stays on the board for a nation with nothing to build', async () => {
+    const owner = await createSession('dip-build-owner');
+    const game = await createGame(owner, 'diplomacy', uniqueLabel('dip-build'));
+    const open = await getGameDetail(owner, game.id);
+    const ownerId = open.members.find((member) => member.username === owner.credentials.username).id;
+    const assignments = {};
+    open.diplomacy.powers.forEach((power) => {
+      assignments[power.id] = null;
+    });
+    assignments.england = ownerId;
+    assignments.france = ownerId;
+    const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
+      json: {
+        diplomacy_map_key: 'EuropeDiploMap',
+        diplomacy_nation_mode: 'assign_all',
+        diplomacy_assignments: assignments,
+      },
+    });
+    expect(saved.status).toBe(200);
+    await startGame(owner, game.id);
+
+    const { rootDir } = getServerInfo();
+    const bundledPhp = path.join(rootDir, 'runtime', 'php', 'windows', 'php.exe');
+    const phpBin = process.env.PARTY_PHP_BIN || (fs.existsSync(bundledPhp) ? bundledPhp : 'php');
+    const script = [
+      'require "api/lib/diplomacy.php";',
+      '$gameId = (int)$argv[1];',
+      '$loaded = diplomacy_load_map("EuropeDiploMap");',
+      '$graph = $loaded["graph"];',
+      '$position = $loaded["start"];',
+      '$homes = diplomacy_home_centers_from_start($graph, $position);',
+      '$removed = false;',
+      '$units = [];',
+      'foreach ($position["units"] as $unit) {',
+      '  if (!$removed && ($unit["power"] ?? "") === "england" && in_array($unit["province"], $homes["england"] ?? [], true)) {',
+      '    $removed = true;',
+      '    continue;',
+      '  }',
+      '  $units[] = $unit;',
+      '}',
+      'if (!$removed) { fwrite(STDERR, "england has no home unit\\n"); exit(1); }',
+      '$position["units"] = array_values($units);',
+      'diplomacy_write_snapshot($gameId, 1901, "builds", $position, null, null);',
+      'db()->prepare("UPDATE game_state SET phase = :phase, current_round = 1901 WHERE game_id = :id")->execute(["phase" => "builds", "id" => $gameId]);',
+      'echo "ok";',
+    ].join('');
+    const result = spawnSync(phpBin, ['-r', script, String(game.id)], {
+      cwd: rootDir,
+      encoding: 'utf8',
+      env: process.env,
+    });
+    if (result.status !== 0) {
+      throw new Error((result.stderr || result.stdout || `php exited ${result.status}`).trim());
+    }
+
+    const live = await getGameDetail(owner, game.id);
+    const offer = live.diplomacy.adjustments.find((entry) => entry.power === 'england').builds[0];
+    const ownerPage = await openAuthenticatedPage(owner, { screen: 'game', game: game.id }, { viewport: { width: 390, height: 900 } });
+    try {
+      await waitForActiveHeading(ownerPage, phaseHeadingForGame(live, 'Diplomacy'));
+      await waitForDiplomacyBoard(ownerPage);
+      await ownerPage.waitForFunction(() => {
+        const active = document.querySelector('.screen:not(.hidden)');
+        const title = active && active.querySelector('[data-ref="phaseTitle"]');
+        const submit = active && active.querySelector('[data-ref="submitBtn"]');
+        const status = active && active.querySelector('[data-ref="status"]');
+        const bad = status && /Unable to load|No adjustment/i.test(status.textContent);
+        return !!(title && title.textContent.includes('Builds') && submit && !submit.disabled && !bad);
+      });
+
+      await ownerPage.select('[data-ref="activePowerSelect"]', 'france');
+      await ownerPage.waitForFunction(() => {
+        const active = document.querySelector('.screen:not(.hidden)');
+        const submit = active && active.querySelector('[data-ref="submitBtn"]');
+        const status = active && active.querySelector('[data-ref="status"]');
+        const host = active && active.querySelector('[data-ref="boardHost"]');
+        const bad = status && /Unable to load|No adjustment/i.test(status.textContent);
+        return !!(submit && submit.disabled && host && host.querySelector('svg, canvas') && !bad);
+      });
+
+      const accepted = await owner.client.post(`/api/games/${game.id}/actions/diplomacy-order`, {
+        json: {
+          action_type: 'adjust',
+          payload: {
+            kind: 'diplomacy-adjustments',
+            map: live.diplomacy.position.map,
+            power: 'england',
+            orders: [{ action: 'build', province: offer.province, unit: offer.unit }],
+          },
+        },
+      });
+      expect(accepted.status).toBe(201);
+      const ready = await owner.client.post(`/api/games/${game.id}/actions/diplomacy-ready`, {
+        json: { ready: true },
+      });
+      expect(ready.status).toBe(200);
+
+      const advanced = await getGameDetail(owner, game.id);
+      await reloadPage(ownerPage, phaseHeadingForGame(advanced, 'Diplomacy'));
+      await waitForDiplomacyBoard(ownerPage);
+      await ownerPage.waitForFunction(() => {
+        const select = document.querySelector('[data-ref="historySelect"]');
+        return !!(select && Array.from(select.options).some((option) => option.value === '1901:builds'));
+      });
+      await ownerPage.select('[data-ref="historySelect"]', '1901:builds');
+      await ownerPage.waitForFunction(() => {
+        const active = document.querySelector('.screen:not(.hidden)');
+        const title = active && active.querySelector('[data-ref="phaseTitle"]');
+        const progress = active && active.querySelector('[data-ref="progressText"]');
+        const status = active && active.querySelector('[data-ref="status"]');
+        const host = active && active.querySelector('[data-ref="boardHost"]');
+        const bad = status && /Unable to load|No adjustment/i.test(status.textContent);
+        return !!(title && title.textContent.includes('Builds')
+          && progress && progress.textContent.includes('Resolved turn')
+          && host && host.querySelector('svg, canvas')
+          && !bad);
+      });
     } finally {
       await ownerPage.close();
     }

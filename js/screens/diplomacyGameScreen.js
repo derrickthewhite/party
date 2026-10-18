@@ -29,6 +29,76 @@ function emptyOrdersDoc(mode, map, power) {
 	};
 }
 
+function adjustmentEntry(adjustments, power) {
+	const list = Array.isArray(adjustments) ? adjustments : [];
+	const id = String(power || '');
+	if (!id) {
+		return null;
+	}
+	for (let i = 0; i < list.length; i += 1) {
+		if (list[i] && String(list[i].power || '') === id) {
+			return list[i];
+		}
+	}
+	return null;
+}
+
+function orderMatchesAdjustment(entry, order) {
+	if (!entry || !order) {
+		return false;
+	}
+	const province = String(order.province || '');
+	if (order.action === 'build') {
+		return (entry.builds || []).some(function eachSite(site) {
+			return !!(site && String(site.province || '') === province && site.unit === order.unit);
+		});
+	}
+	if (order.action === 'disband') {
+		return (entry.disbands || []).some(function eachId(id) {
+			return String(id) === province;
+		});
+	}
+	return false;
+}
+
+function documentsForBoard(doc, adjustments) {
+	if (!doc) {
+		return [];
+	}
+	if (doc.kind !== 'diplomacy-adjustments') {
+		return [doc];
+	}
+	if (doc.power) {
+		return adjustmentEntry(adjustments, doc.power) ? [doc] : [];
+	}
+	const orders = Array.isArray(doc.orders) ? doc.orders : [];
+	const used = new Set();
+	const docs = [];
+	(Array.isArray(adjustments) ? adjustments : []).forEach(function eachEntry(entry) {
+		if (!entry || !entry.power) {
+			return;
+		}
+		const mine = [];
+		orders.forEach(function eachOrder(order, index) {
+			if (used.has(index) || !orderMatchesAdjustment(entry, order)) {
+				return;
+			}
+			used.add(index);
+			mine.push(order);
+		});
+		if (!mine.length) {
+			return;
+		}
+		docs.push({
+			kind: 'diplomacy-adjustments',
+			map: doc.map || '',
+			power: entry.power,
+			orders: mine,
+		});
+	});
+	return docs;
+}
+
 export function createDiplomacyGameScreen(deps) {
 	const panel = createNodeFromHtml(`
 		<div class="card diplomacy-panel">
@@ -675,15 +745,29 @@ export function createDiplomacyGameScreen(deps) {
 			: 'The timer has run out. It does not end the phase.';
 	}
 
+	function viewedHistoryLabel() {
+		if (isLiveView()) {
+			return '';
+		}
+		const match = historyEntries().find(function each(item) {
+			return item.value === historyView;
+		});
+		return match ? match.label : '';
+	}
+
 	function reconcilePlayChrome() {
 		const data = dip();
 		const perms = serverSnapshot.permissions || {};
 		const progress = data.progress || {};
-		refs.phaseTitle.textContent = data.phase_label || 'Diplomacy';
-		refs.focusTitle.textContent = data.phase_label || 'Diplomacy';
-		refs.progressText.textContent = (data.phase_label || 'Phase')
-			+ ' · Submitted ' + Number(progress.submitted_count || 0) + '/' + Number(progress.required_count || 0)
-			+ ' · Ready ' + Number(progress.ready_count || 0) + '/' + Number(progress.required_count || 0);
+		const pastLabel = viewedHistoryLabel();
+		const title = pastLabel || data.phase_label || 'Diplomacy';
+		refs.phaseTitle.textContent = title;
+		refs.focusTitle.textContent = title;
+		refs.progressText.textContent = pastLabel
+			? 'Resolved turn'
+			: ((data.phase_label || 'Phase')
+				+ ' · Submitted ' + Number(progress.submitted_count || 0) + '/' + Number(progress.required_count || 0)
+				+ ' · Ready ' + Number(progress.ready_count || 0) + '/' + Number(progress.required_count || 0));
 		const names = viewerPowers().map(powerName);
 		refs.powerText.textContent = names.length ? ('You are ' + names.join(', ') + '.') : 'You do not have a nation.';
 		const powers = viewerPowers();
@@ -695,7 +779,8 @@ export function createDiplomacyGameScreen(deps) {
 			return { value: powerId, label: powerName(powerId) };
 		}), localDraft.activePower);
 		const canAct = isLiveView() && !!perms.can_act && powers.length > 0 && String(serverSnapshot.status || '') === 'in_progress';
-		refs.submitBtn.disabled = !canAct;
+		const powerCanOrder = currentMode() !== 'build' || !!adjustmentEntry(data.adjustments, localDraft.activePower);
+		refs.submitBtn.disabled = !canAct || !powerCanOrder;
 		refs.submitBtn.style.display = perms.can_act ? '' : 'none';
 		const showReady = canAct && !!data.viewer_required;
 		refs.readyBtn.style.display = showReady ? '' : 'none';
@@ -729,6 +814,15 @@ export function createDiplomacyGameScreen(deps) {
 			return dip().my_orders;
 		}
 		return emptyOrdersDoc(currentMode(), positionMap(), power);
+	}
+
+	function importOrders(doc, adjustments) {
+		if (!boardApi || !doc) {
+			return;
+		}
+		documentsForBoard(doc, adjustments).forEach(function each(item) {
+			boardApi.importDocument(item);
+		});
 	}
 
 	function clearMountedOrders(targetMode) {
@@ -770,7 +864,9 @@ export function createDiplomacyGameScreen(deps) {
 		if (!localDraft.activePower || powers.indexOf(localDraft.activePower) === -1) {
 			localDraft.activePower = powers[0] || data.my_power || '';
 		}
-		const canWrite = !!perms.can_act && !!localDraft.activePower && String(serverSnapshot.status || '') === 'in_progress';
+		const adjustments = Array.isArray(data.adjustments) ? data.adjustments : [];
+		const powerCanOrder = currentMode() !== 'build' || !!adjustmentEntry(adjustments, localDraft.activePower);
+		const canWrite = !!perms.can_act && !!localDraft.activePower && powerCanOrder && String(serverSnapshot.status || '') === 'in_progress';
 		applyingBoard = true;
 		try {
 			const key = phaseKey(data.year, data.phase);
@@ -783,16 +879,13 @@ export function createDiplomacyGameScreen(deps) {
 			boardApi.setPlayingAs(localDraft.activePower || '');
 			boardApi.setOrderScope('mine');
 			boardApi.setRetreats(Array.isArray(data.retreats) ? data.retreats : []);
-			boardApi.setAdjustments(Array.isArray(data.adjustments) ? data.adjustments : []);
+			boardApi.setAdjustments(adjustments);
 			boardApi.setMode(currentMode());
 			boardApi.setReadOnly(!canWrite);
 			if (data.position) {
 				boardApi.setPosition(data.position);
 			}
-			const doc = ordersDocFor(localDraft.activePower);
-			if (doc) {
-				boardApi.importDocument(doc);
-			}
+			importOrders(ordersDocFor(localDraft.activePower), adjustments);
 			if (data.display_resolution) {
 				boardApi.setResolution(data.display_resolution);
 			} else {
@@ -1092,6 +1185,7 @@ export function createDiplomacyGameScreen(deps) {
 		}
 		localDraft.activePower = next;
 		applyBoardFromLive();
+		reconcilePlayChrome();
 	});
 
 	refs.submitBtn.addEventListener('click', async function onSubmit() {
@@ -1183,15 +1277,16 @@ export function createDiplomacyGameScreen(deps) {
 				applyingBoard = true;
 				boardApi.setReadOnly(true);
 				const resolution = snapshot.resolution || {};
+				const adjustments = Array.isArray(resolution.adjustments) ? resolution.adjustments : [];
 				clearMountedOrders(snapshot.mode || 'orders');
 				boardApi.setRetreats(Array.isArray(resolution.retreats) ? resolution.retreats : []);
-				boardApi.setAdjustments(Array.isArray(resolution.adjustments) ? resolution.adjustments : []);
+				boardApi.setAdjustments(adjustments);
 				boardApi.setMode(snapshot.mode || 'orders');
 				if (snapshot.position) {
 					boardApi.setPosition(snapshot.position);
 				}
 				if (snapshot.orders) {
-					boardApi.importDocument(snapshot.orders);
+					importOrders(snapshot.orders, adjustments);
 				}
 				if (snapshot.resolution) {
 					boardApi.setResolution(snapshot.resolution);

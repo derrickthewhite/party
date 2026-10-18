@@ -376,6 +376,151 @@ test('assign evenly pairs factions to players and can give one player two nation
   expect(ownerGame.diplomacy.powers.find((power) => power.id === 'italy').civil_disorder).toBe(true);
 });
 
+test('assign all can start when there are more players than nations', async () => {
+  const owner = await session('dip-extra-owner');
+  const game = await createDiplomacyGame(owner);
+  const players = await Promise.all([0, 1, 2, 3, 4, 5, 6].map((index) => session(`dip-extra-${index}`)));
+  for (const member of players) {
+    const joined = await member.client.post(`/api/games/${game.id}/join`);
+    expect(joined.status).toBe(200);
+  }
+  const open = await detail(owner.client, game.id);
+  const ids = [owner, ...players].map((person) => memberId(open, person));
+  const assignments = {};
+  open.diplomacy.powers.forEach((power, index) => {
+    assignments[power.id] = ids[index];
+  });
+  const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
+    json: {
+      diplomacy_map_key: 'EuropeDiploMap',
+      diplomacy_nation_mode: 'assign_all',
+      diplomacy_assignments: assignments,
+    },
+  });
+  expect(saved.status).toBe(200);
+  const started = await owner.client.post(`/api/games/${game.id}/start`);
+  expect(started.status).toBe(200);
+  const live = await detail(owner.client, game.id);
+  const seated = live.diplomacy.powers
+    .map((power) => (power.assigned_to ? power.assigned_to.user_id : null))
+    .filter((id) => id !== null);
+  expect(seated).not.toContain(ids[ids.length - 1]);
+  expect(live.diplomacy.powers.every((power) => power.assigned_to)).toBe(true);
+});
+
+test('builds are offered per nation and history keeps a combined adjustment document', async () => {
+  const fs = require('fs');
+  const path = require('path');
+  const { spawnSync } = require('child_process');
+  const owner = await session('dip-build-owner');
+  const game = await createDiplomacyGame(owner);
+  const open = await detail(owner.client, game.id);
+  const ownerId = memberId(open, owner);
+  const assignments = {};
+  open.diplomacy.powers.forEach((power) => {
+    assignments[power.id] = null;
+  });
+  assignments.england = ownerId;
+  assignments.france = ownerId;
+  const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
+    json: {
+      diplomacy_map_key: 'EuropeDiploMap',
+      diplomacy_nation_mode: 'assign_all',
+      diplomacy_assignments: assignments,
+    },
+  });
+  expect(saved.status).toBe(200);
+  const started = await owner.client.post(`/api/games/${game.id}/start`);
+  expect(started.status).toBe(200);
+
+  const { rootDir } = getServerInfo();
+  const bundledPhp = path.join(rootDir, 'runtime', 'php', 'windows', 'php.exe');
+  const phpBin = process.env.PARTY_PHP_BIN || (fs.existsSync(bundledPhp) ? bundledPhp : 'php');
+  const script = [
+    'require "api/lib/diplomacy.php";',
+    '$gameId = (int)$argv[1];',
+    '$loaded = diplomacy_load_map("EuropeDiploMap");',
+    '$graph = $loaded["graph"];',
+    '$position = $loaded["start"];',
+    '$homes = diplomacy_home_centers_from_start($graph, $position);',
+    '$removed = false;',
+    '$units = [];',
+    'foreach ($position["units"] as $unit) {',
+    '  if (!$removed && ($unit["power"] ?? "") === "england" && in_array($unit["province"], $homes["england"] ?? [], true)) {',
+    '    $removed = true;',
+    '    continue;',
+    '  }',
+    '  $units[] = $unit;',
+    '}',
+    'if (!$removed) { fwrite(STDERR, "england has no home unit\\n"); exit(1); }',
+    '$position["units"] = array_values($units);',
+    'diplomacy_write_snapshot($gameId, 1901, "builds", $position, null, null);',
+    'db()->prepare("UPDATE game_state SET phase = :phase, current_round = 1901 WHERE game_id = :id")->execute(["phase" => "builds", "id" => $gameId]);',
+    'echo "ok";',
+  ].join('');
+  const result = spawnSync(phpBin, ['-r', script, String(game.id)], {
+    cwd: rootDir,
+    encoding: 'utf8',
+    env: process.env,
+  });
+  if (result.status !== 0) {
+    throw new Error((result.stderr || result.stdout || `php exited ${result.status}`).trim());
+  }
+
+  const live = await detail(owner.client, game.id);
+  expect(live.phase).toBe('builds');
+  expect(live.diplomacy.mode).toBe('build');
+  expect(live.diplomacy.map.key).toBe('EuropeDiploMap');
+  expect(live.diplomacy.map.graph_url).toContain('EuropeDiploMap.graph.json');
+  expect(live.diplomacy.my_powers.slice().sort()).toEqual(['england', 'france']);
+  const englandAdj = live.diplomacy.adjustments.find((entry) => entry.power === 'england');
+  expect(englandAdj).toBeTruthy();
+  expect(englandAdj.builds.length).toBeGreaterThan(0);
+  expect(live.diplomacy.adjustments.some((entry) => entry.power === 'france')).toBe(false);
+  const offer = englandAdj.builds[0];
+  const map = live.diplomacy.position.map;
+
+  const rejected = await owner.client.post(`/api/games/${game.id}/actions/diplomacy-order`, {
+    json: {
+      action_type: 'adjust',
+      payload: {
+        kind: 'diplomacy-adjustments',
+        map,
+        power: 'france',
+        orders: [],
+      },
+    },
+  });
+  expect(rejected.status).toBe(422);
+
+  const accepted = await owner.client.post(`/api/games/${game.id}/actions/diplomacy-order`, {
+    json: {
+      action_type: 'adjust',
+      payload: {
+        kind: 'diplomacy-adjustments',
+        map,
+        power: 'england',
+        orders: [{ action: 'build', province: offer.province, unit: offer.unit }],
+      },
+    },
+  });
+  expect(accepted.status).toBe(201);
+  await markReady(owner.client, game.id);
+  const advanced = await detail(owner.client, game.id);
+  expect(advanced.phase).toBe('spring_orders');
+  expect(advanced.current_round).toBe(1902);
+
+  const snap = await owner.client.get('/api/games/' + game.id + '/diplomacy-snapshot?year=1901&phase=builds');
+  expect(snap.status).toBe(200);
+  expect(snap.body.data.snapshot.mode).toBe('build');
+  expect(snap.body.data.snapshot.orders.kind).toBe('diplomacy-adjustments');
+  expect(snap.body.data.snapshot.orders.power).toBe('');
+  expect(snap.body.data.snapshot.orders.orders).toEqual([
+    { action: 'build', province: offer.province, unit: offer.unit },
+  ]);
+  expect(snap.body.data.snapshot.resolution.adjustments.some((entry) => entry.power === 'england')).toBe(true);
+});
+
 test('a phase timer shortcuts only when that option is on', async () => {
   const fs = require('fs');
   const path = require('path');

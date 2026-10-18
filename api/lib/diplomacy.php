@@ -415,7 +415,8 @@ function diplomacy_validate_can_start(int $gameId): void
     if (count($players) < 1) {
         error_response('Diplomacy needs at least one player.', 409);
     }
-    if (count($players) > (int)$entry['power_count']) {
+    $nationMode = (string)($game['diplomacy_nation_mode'] ?? 'pick');
+    if (!in_array($nationMode, ['assign_all', 'one_each', 'even'], true) && count($players) > (int)$entry['power_count']) {
         error_response('Too many players for this map.', 409);
     }
 }
@@ -1504,23 +1505,7 @@ function diplomacy_game_build_detail_payload(int $gameId, array $game, array $us
         }
     }
     $myOrders = ($myPower && $myPower !== 'random' && isset($myOrdersByPower[$myPower])) ? $myOrdersByPower[$myPower] : null;
-
-    $viewerRetreats = [];
-    foreach ($choices['retreats'] as $entry) {
-        if ($myPower && ($entry['power'] ?? null) === $myPower) {
-            $viewerRetreats[] = $entry;
-        } elseif ($myPower === null) {
-            $viewerRetreats[] = $entry;
-        }
-    }
-    $viewerAdjustments = [];
-    foreach ($choices['adjustments'] as $entry) {
-        if ($myPower && ($entry['power'] ?? null) === $myPower) {
-            $viewerAdjustments[] = $entry;
-        } elseif ($myPower === null) {
-            $viewerAdjustments[] = $entry;
-        }
-    }
+    $mapEntry = $entry;
 
     $displayResolution = null;
     if ($snapshot && diplomacy_phase_mode($phase) === 'retreat') {
@@ -1530,7 +1515,7 @@ function diplomacy_game_build_detail_payload(int $gameId, array $game, array $us
 
     $diplomacy = [
         'map_key' => $mapKey,
-        'map' => $entry,
+        'map' => $mapEntry,
         'maps' => diplomacy_list_maps(),
         'nation_mode' => (string)($row['diplomacy_nation_mode'] ?? 'pick'),
         'year' => $year,
