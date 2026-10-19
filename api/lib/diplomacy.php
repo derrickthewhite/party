@@ -14,7 +14,7 @@ function diplomacy_starting_year(): int
 function diplomacy_game_row(int $gameId): ?array
 {
     $stmt = db()->prepare(
-        'SELECT g.id, g.owner_user_id, g.title, g.game_type, g.status, g.diplomacy_map_key, g.diplomacy_nation_mode, '
+        'SELECT g.id, g.owner_user_id, g.title, g.game_type, g.status, g.diplomacy_map_key, g.diplomacy_nation_mode, g.diplomacy_nation_count, '
         . 'g.diplomacy_home_centers, g.diplomacy_assignments, g.diplomacy_timer_minutes, g.diplomacy_timer_shortcut, '
         . 'g.diplomacy_phase_deadline, gs.phase, gs.current_round, gs.winner_summary '
         . 'FROM games g '
@@ -44,7 +44,74 @@ function diplomacy_player_members(int $gameId): array
 
 function diplomacy_nation_modes(): array
 {
-    return ['pick', 'random', 'assign_all', 'one_each', 'even'];
+    return ['pick', 'random', 'owner'];
+}
+
+function diplomacy_nation_counts(): array
+{
+    return ['single', 'even', 'all'];
+}
+
+function diplomacy_nation_count_from_row(?array $row): string
+{
+    $count = (string)($row['diplomacy_nation_count'] ?? 'single');
+    return in_array($count, diplomacy_nation_counts(), true) ? $count : 'single';
+}
+
+function diplomacy_stored_assignment_value($raw)
+{
+    if ($raw === null || $raw === '' || $raw === 'open') {
+        return null;
+    }
+    if ($raw === 'civil') {
+        return 'civil';
+    }
+    if (is_int($raw) || (is_string($raw) && ctype_digit($raw))) {
+        return (int)$raw;
+    }
+    return null;
+}
+
+function diplomacy_assignment_state_from_body($raw)
+{
+    if ($raw === null || $raw === '' || $raw === 'open') {
+        return null;
+    }
+    if ($raw === 'civil') {
+        return 'civil';
+    }
+    if (is_int($raw) || (is_string($raw) && ctype_digit((string)$raw))) {
+        return (int)$raw;
+    }
+    error_response('Assignment is invalid.', 422);
+}
+
+function diplomacy_assignments_for_powers(array $stored, array $powerIds): array
+{
+    $out = [];
+    foreach ($powerIds as $powerId) {
+        $out[$powerId] = array_key_exists($powerId, $stored)
+            ? diplomacy_stored_assignment_value($stored[$powerId])
+            : null;
+    }
+    return $out;
+}
+
+function diplomacy_nation_quota(string $count, array $powerIds, array $assignments, int $playerCount): int
+{
+    if ($count === 'all' || $playerCount < 1) {
+        return 0;
+    }
+    if ($count === 'single') {
+        return 1;
+    }
+    $available = 0;
+    foreach ($powerIds as $powerId) {
+        if (($assignments[$powerId] ?? null) !== 'civil') {
+            $available++;
+        }
+    }
+    return intdiv($available, $playerCount);
 }
 
 function diplomacy_assignments_from_row(?array $row): array
@@ -75,10 +142,11 @@ function diplomacy_player_power_map(int $gameId): array
         if ($assignments !== []) {
             $map = [];
             foreach ($assignments as $powerId => $userId) {
-                if ($userId === null || $userId === '') {
+                $value = diplomacy_stored_assignment_value($userId);
+                if (!is_int($value)) {
                     continue;
                 }
-                $map[(string)$powerId] = (int)$userId;
+                $map[(string)$powerId] = $value;
             }
             return $map;
         }
@@ -287,34 +355,31 @@ function diplomacy_update_settings(int $gameId, array $body): void
     if (!diplomacy_map_exists($mapKey)) {
         error_response('Unknown diplomacy map.', 422);
     }
-    $minutes = diplomacy_timer_minutes_from_body($body);
+    $nationCount = trim((string)($body['diplomacy_nation_count'] ?? 'single'));
+    if (!in_array($nationCount, diplomacy_nation_counts(), true)) {
+        error_response('Invalid diplomacy_nation_count.', 422);
+    }
     $shortcut = !empty($body['diplomacy_timer_shortcut']) ? 1 : 0;
+    $minutes = $shortcut === 1 ? diplomacy_timer_minutes_from_body($body) : null;
 
     $entry = diplomacy_map_catalog_entry($mapKey);
     $powerIds = [];
     foreach ((array)($entry['powers'] ?? []) as $power) {
         $powerIds[] = (string)$power['id'];
     }
-    $assignmentsJson = null;
-    if (in_array($nationMode, ['assign_all', 'one_each', 'even'], true)) {
-        $parsed = diplomacy_parse_assignments(
-            $nationMode,
-            $body['diplomacy_assignments'] ?? [],
-            $powerIds,
-            diplomacy_active_player_ids($gameId)
-        );
-        $assignmentsJson = json_encode(diplomacy_complete_assignments($parsed, $powerIds), JSON_UNESCAPED_UNICODE);
-    }
+    $game = diplomacy_game_row($gameId);
+    $assignments = diplomacy_assignments_for_powers(diplomacy_assignments_from_row($game), $powerIds);
 
     $stmt = db()->prepare(
         'UPDATE games SET diplomacy_map_key = :map_key, diplomacy_nation_mode = :nation_mode, '
-        . 'diplomacy_assignments = :assignments, diplomacy_timer_minutes = :timer_minutes, '
-        . 'diplomacy_timer_shortcut = :timer_shortcut WHERE id = :id'
+        . 'diplomacy_nation_count = :nation_count, diplomacy_assignments = :assignments, '
+        . 'diplomacy_timer_minutes = :timer_minutes, diplomacy_timer_shortcut = :timer_shortcut WHERE id = :id'
     );
     $stmt->execute([
         'map_key' => $mapKey,
         'nation_mode' => $nationMode,
-        'assignments' => $assignmentsJson,
+        'nation_count' => $nationCount,
+        'assignments' => json_encode($assignments, JSON_UNESCAPED_UNICODE),
         'timer_minutes' => $minutes,
         'timer_shortcut' => $shortcut,
         'id' => $gameId,
@@ -415,10 +480,7 @@ function diplomacy_validate_can_start(int $gameId): void
     if (count($players) < 1) {
         error_response('Diplomacy needs at least one player.', 409);
     }
-    $nationMode = (string)($game['diplomacy_nation_mode'] ?? 'pick');
-    if (!in_array($nationMode, ['assign_all', 'one_each', 'even'], true) && count($players) > (int)$entry['power_count']) {
-        error_response('Too many players for this map.', 409);
-    }
+    unset($entry);
 }
 
 function diplomacy_seeded_shuffle(array $items, int $gameId, string $context): array
@@ -434,6 +496,197 @@ function diplomacy_seeded_shuffle(array $items, int $gameId, string $context): a
     return $items;
 }
 
+function diplomacy_running_timer_minutes(?array $game): ?int
+{
+    if ($game === null || (int)($game['diplomacy_timer_shortcut'] ?? 0) !== 1) {
+        return null;
+    }
+    $minutes = $game['diplomacy_timer_minutes'] ?? null;
+    if ($minutes === null || $minutes === '') {
+        return null;
+    }
+    return (int)$minutes;
+}
+
+function diplomacy_count_assigned(array $assignments, int $userId): int
+{
+    $count = 0;
+    foreach ($assignments as $value) {
+        if ($value === $userId) {
+            $count += 1;
+        }
+    }
+    return $count;
+}
+
+function diplomacy_resolve_start_assignments(string $mode, string $count, array $assignments, array $powerIds, array $playerIds, int $gameId): array
+{
+    $players = array_fill_keys($playerIds, true);
+    $complete = [];
+    foreach ($powerIds as $powerId) {
+        $value = $assignments[$powerId] ?? null;
+        if (is_int($value) && isset($players[$value])) {
+            $complete[$powerId] = $value;
+        } elseif ($value === 'civil') {
+            $complete[$powerId] = 'civil';
+        } else {
+            $complete[$powerId] = null;
+        }
+    }
+
+    if ($count === 'all') {
+        if ($mode === 'random' && $playerIds !== []) {
+            $open = [];
+            foreach ($powerIds as $powerId) {
+                if ($complete[$powerId] === null) {
+                    $open[] = $powerId;
+                }
+            }
+            $open = diplomacy_seeded_shuffle($open, $gameId, 'assign-open');
+            $order = diplomacy_seeded_shuffle($playerIds, $gameId, 'assign-players');
+            $held = array_fill_keys($playerIds, 0);
+            foreach ($complete as $value) {
+                if (is_int($value) && isset($held[$value])) {
+                    $held[$value] += 1;
+                }
+            }
+            $rank = array_flip($order);
+            foreach ($open as $powerId) {
+                $best = null;
+                $bestCount = null;
+                $bestRank = null;
+                foreach ($playerIds as $playerId) {
+                    $heldCount = $held[$playerId];
+                    $playerRank = $rank[$playerId];
+                    if ($best === null || $heldCount < $bestCount || ($heldCount === $bestCount && $playerRank < $bestRank)) {
+                        $best = $playerId;
+                        $bestCount = $heldCount;
+                        $bestRank = $playerRank;
+                    }
+                }
+                if ($best === null) {
+                    break;
+                }
+                $complete[$powerId] = $best;
+                $held[$best] += 1;
+            }
+        }
+        foreach ($powerIds as $powerId) {
+            if (!is_int($complete[$powerId])) {
+                $complete[$powerId] = null;
+            }
+        }
+        return $complete;
+    }
+
+    $quota = diplomacy_nation_quota($count, $powerIds, $complete, count($playerIds));
+    $held = array_fill_keys($playerIds, 0);
+    $open = [];
+    $civil = [];
+    foreach ($powerIds as $powerId) {
+        $value = $complete[$powerId];
+        if (is_int($value) && isset($held[$value])) {
+            $held[$value] += 1;
+        } elseif ($value === 'civil') {
+            $civil[] = $powerId;
+        } else {
+            $open[] = $powerId;
+        }
+    }
+    $open = diplomacy_seeded_shuffle($open, $gameId, 'fill-open');
+    $civil = diplomacy_seeded_shuffle($civil, $gameId, 'fill-civil');
+    $order = diplomacy_seeded_shuffle($playerIds, $gameId, 'fill-players');
+    $fillFrom = function (array &$pool) use (&$complete, &$held, $order, $quota): void {
+        foreach ($order as $playerId) {
+            while (($held[$playerId] ?? 0) < $quota && $pool !== []) {
+                $powerId = array_shift($pool);
+                $complete[$powerId] = $playerId;
+                $held[$playerId] += 1;
+            }
+        }
+    };
+    $fillFrom($open);
+    $fillFrom($civil);
+    foreach ($powerIds as $powerId) {
+        if (!is_int($complete[$powerId])) {
+            $complete[$powerId] = null;
+        }
+    }
+    return $complete;
+}
+
+function diplomacy_apply_assignment_updates(int $gameId, int $userId, bool $isManager, array $updates): void
+{
+    $game = diplomacy_game_row($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+    if ((string)$game['status'] !== 'open') {
+        error_response('Nation selection is only available while the game is open.', 409);
+    }
+    if (!$isManager && (string)($game['diplomacy_nation_mode'] ?? 'pick') !== 'pick') {
+        error_response('Nation selection is only available when players pick nations.', 409);
+    }
+    if (!array_is_list($updates)) {
+        error_response('Updates are required.', 422);
+    }
+
+    $entry = diplomacy_map_catalog_entry((string)($game['diplomacy_map_key'] ?? diplomacy_default_map_key()));
+    if ($entry === null) {
+        error_response('Unknown diplomacy map.', 422);
+    }
+    $powerIds = [];
+    foreach ((array)($entry['powers'] ?? []) as $power) {
+        $powerIds[] = (string)$power['id'];
+    }
+    $known = array_fill_keys($powerIds, true);
+    $playerIds = diplomacy_active_player_ids($gameId);
+    $playerSet = array_fill_keys($playerIds, true);
+    $current = diplomacy_assignments_for_powers(diplomacy_assignments_from_row($game), $powerIds);
+    $working = $current;
+    $before = diplomacy_count_assigned($current, $userId);
+
+    foreach ($updates as $update) {
+        if (!is_array($update)) {
+            error_response('Assignment is invalid.', 422);
+        }
+        $powerId = trim((string)($update['power'] ?? ''));
+        if (!isset($known[$powerId])) {
+            error_response('Unknown power.', 422);
+        }
+        $next = diplomacy_assignment_state_from_body($update['state'] ?? null);
+        if (!$isManager) {
+            $held = $working[$powerId];
+            if ($held !== null && $held !== $userId) {
+                error_response('That nation is not open.', 409);
+            }
+            if ($next === 'civil' || (is_int($next) && $next !== $userId)) {
+                error_response('You can only set a nation to yourself or open.', 403);
+            }
+        } elseif (is_int($next) && !isset($playerSet[$next])) {
+            error_response('Assignment player is not in this game.', 422);
+        }
+        $working[$powerId] = $next;
+    }
+
+    if (!$isManager) {
+        $nationCount = diplomacy_nation_count_from_row($game);
+        if ($nationCount !== 'all') {
+            $quota = diplomacy_nation_quota($nationCount, $powerIds, $current, count($playerIds));
+            $after = diplomacy_count_assigned($working, $userId);
+            if ($after > max($quota, $before)) {
+                error_response('You already have the right number of nations.', 409);
+            }
+        }
+    }
+
+    $stmt = db()->prepare('UPDATE games SET diplomacy_assignments = :assignments WHERE id = :id');
+    $stmt->execute([
+        'assignments' => json_encode($working, JSON_UNESCAPED_UNICODE),
+        'id' => $gameId,
+    ]);
+}
+
 function diplomacy_game_on_start(int $gameId, int $actorUserId): void
 {
     unset($actorUserId);
@@ -447,6 +700,7 @@ function diplomacy_game_on_start(int $gameId, int $actorUserId): void
     }
 
     $nationMode = (string)($game['diplomacy_nation_mode'] ?? 'pick');
+    $nationCount = diplomacy_nation_count_from_row($game);
     $players = [];
     foreach (diplomacy_player_members($gameId) as $row) {
         if ((int)($row['is_active'] ?? 1) === 1) {
@@ -458,42 +712,8 @@ function diplomacy_game_on_start(int $gameId, int $actorUserId): void
         $playerIds[] = (int)$player['user_id'];
     }
 
-    $assigned = [];
-    if (in_array($nationMode, ['assign_all', 'one_each', 'even'], true)) {
-        $saved = diplomacy_assignments_from_row($game);
-        $assigned = diplomacy_parse_assignments($nationMode, $saved, $powers, $playerIds);
-        diplomacy_assert_start_assignments($nationMode, $assigned, $powers, $playerIds);
-    } else {
-        $remainingPlayers = [];
-        if ($nationMode === 'pick') {
-            foreach ($players as $player) {
-                $chosen = strtolower(trim((string)($player['diplomacy_chosen_power'] ?? '')));
-                if ($chosen !== '' && $chosen !== 'random' && in_array($chosen, $powers, true) && !isset($assigned[$chosen])) {
-                    $assigned[$chosen] = (int)$player['user_id'];
-                } else {
-                    $remainingPlayers[] = $player;
-                }
-            }
-        } else {
-            $remainingPlayers = $players;
-        }
-
-        $remainingPowers = [];
-        foreach ($powers as $powerId) {
-            if (!isset($assigned[$powerId])) {
-                $remainingPowers[] = $powerId;
-            }
-        }
-        $remainingPowers = diplomacy_seeded_shuffle($remainingPowers, $gameId, 'powers');
-        foreach ($remainingPlayers as $index => $player) {
-            if (!isset($remainingPowers[$index])) {
-                error_response('Too many players for this map.', 409);
-            }
-            $assigned[$remainingPowers[$index]] = (int)$player['user_id'];
-        }
-    }
-
-    $assigned = diplomacy_complete_assignments($assigned, $powers);
+    $saved = diplomacy_assignments_for_powers(diplomacy_assignments_from_row($game), $powers);
+    $assigned = diplomacy_resolve_start_assignments($nationMode, $nationCount, $saved, $powers, $playerIds, $gameId);
     diplomacy_freeze_assignments($gameId, $players, $assigned);
 
     $pdo = db();
@@ -516,8 +736,7 @@ function diplomacy_game_on_start(int $gameId, int $actorUserId): void
     ]);
 
     diplomacy_write_snapshot($gameId, $year, $phase, $loaded['start'], null, null);
-    $minutes = $game['diplomacy_timer_minutes'] ?? null;
-    diplomacy_set_phase_deadline($gameId, $minutes === null || $minutes === '' ? null : (int)$minutes);
+    diplomacy_set_phase_deadline($gameId, diplomacy_running_timer_minutes($game));
 }
 
 function diplomacy_write_snapshot(int $gameId, int $year, string $phase, array $position, ?array $orders, ?array $resolution): void
@@ -1214,8 +1433,7 @@ function diplomacy_resolve_current_phase(int $gameId): int
                 'game_id' => $gameId,
             ]);
             diplomacy_write_snapshot($gameId, $nextYear, $nextPhase, $nextPosition, null, null);
-            $minutes = $game['diplomacy_timer_minutes'] ?? null;
-            diplomacy_set_phase_deadline($gameId, $minutes === null || $minutes === '' ? null : (int)$minutes);
+            diplomacy_set_phase_deadline($gameId, diplomacy_running_timer_minutes($game));
         }
 
         if ($startedTx) {
@@ -1343,6 +1561,16 @@ function diplomacy_game_build_detail_payload(int $gameId, array $game, array $us
         $memberById[(int)$member['user_id']] = $member;
     }
     $assignmentMap = diplomacy_assignments_from_row($row);
+    $setupOpen = $status === 'open';
+    $catalogPowerIds = [];
+    foreach ((array)$entry['powers'] as $power) {
+        $catalogPowerIds[] = (string)$power['id'];
+    }
+    $storedAssignments = diplomacy_assignments_for_powers($assignmentMap, $catalogPowerIds);
+    $useAssignmentColumn = !$setupOpen && $assignmentMap === [];
+    $activePlayerCount = count(diplomacy_active_player_ids($gameId));
+    $nationCount = diplomacy_nation_count_from_row($row);
+    $nationQuota = diplomacy_nation_quota($nationCount, $catalogPowerIds, $storedAssignments, $activePlayerCount);
     $myPower = null;
     $myPowers = [];
     $powers = [];
@@ -1400,15 +1628,24 @@ function diplomacy_game_build_detail_payload(int $gameId, array $game, array $us
         $claimedBy = null;
         $assignedTo = null;
         $assignedUserId = null;
-        if (array_key_exists($powerId, $assignmentMap)) {
-            $rawAssigned = $assignmentMap[$powerId];
-            $assignedUserId = ($rawAssigned === null || $rawAssigned === '') ? null : (int)$rawAssigned;
-        } else {
+        $availability = 'open';
+        if ($useAssignmentColumn) {
             foreach ($members as $member) {
                 if ((string)($member['diplomacy_assigned_power'] ?? '') === $powerId) {
                     $assignedUserId = (int)$member['user_id'];
                     break;
                 }
+            }
+            $availability = $assignedUserId === null ? 'civil' : 'assigned';
+        } else {
+            $stored = $storedAssignments[$powerId] ?? null;
+            if (!$setupOpen && !is_int($stored)) {
+                $availability = 'civil';
+            } elseif ($stored === 'civil') {
+                $availability = 'civil';
+            } elseif (is_int($stored)) {
+                $availability = 'assigned';
+                $assignedUserId = $stored;
             }
         }
         if ($assignedUserId !== null && isset($memberById[$assignedUserId])) {
@@ -1435,7 +1672,8 @@ function diplomacy_game_build_detail_payload(int $gameId, array $game, array $us
             'color' => $power['color'],
             'chosen_by' => $claimedBy,
             'assigned_to' => $assignedTo,
-            'civil_disorder' => $status !== 'open' && $assignedTo === null,
+            'availability' => $availability,
+            'civil_disorder' => $availability === 'civil',
             'center_count' => (int)($centerCounts[$powerId] ?? 0),
             'orders_submitted' => isset($submittedByPower[$powerId]),
             'ready' => $ownerReady,
@@ -1518,6 +1756,8 @@ function diplomacy_game_build_detail_payload(int $gameId, array $game, array $us
         'map' => $mapEntry,
         'maps' => diplomacy_list_maps(),
         'nation_mode' => (string)($row['diplomacy_nation_mode'] ?? 'pick'),
+        'nation_count' => $nationCount,
+        'nation_quota' => $nationQuota,
         'year' => $year,
         'phase' => $phase,
         'phase_label' => diplomacy_phase_label($phase, $status === 'open' ? 0 : $year),

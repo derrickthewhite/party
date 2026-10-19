@@ -112,51 +112,35 @@ export function createDiplomacyGameScreen(deps) {
 					<label>Map
 						<select data-ref="mapSelect"></select>
 					</label>
-					<label>Nation assignment
+					<label>Who selects nations
 						<select data-ref="nationModeSelect">
 							<option value="pick">Players pick</option>
 							<option value="random">Random</option>
-							<option value="assign_all">Assign all</option>
-							<option value="one_each">Assign one each</option>
-							<option value="even">Assign evenly</option>
+							<option value="owner">Owner pick</option>
+						</select>
+					</label>
+					<label>How many each player gets
+						<select data-ref="nationCountSelect">
+							<option value="single">One each</option>
+							<option value="even">Evenly</option>
+							<option value="all">Assign all</option>
 						</select>
 					</label>
 					<button data-ref="saveSetupBtn">Save setup</button>
+					<button type="button" data-ref="resetNationsBtn">Reset nations</button>
 				</div>
 				<div class="row mobile-stack">
 					<label>Phase timer (minutes)
-						<input data-ref="timerMinutes" type="number" min="1" max="10080" inputmode="numeric" placeholder="Off">
+						<input data-ref="timerMinutes" type="number" min="1" max="10080" inputmode="numeric">
 					</label>
 					<label class="diplomacy-check">
 						<input data-ref="timerShortcut" type="checkbox">
-						Timer can end the phase
+						Timer on
 					</label>
-				</div>
-				<div class="row mobile-stack" data-ref="nationPickRow">
-					<label>Your nation
-						<select data-ref="nationSelect"></select>
-					</label>
-					<button data-ref="saveNationBtn">Save nation</button>
 				</div>
 				<p class="top-user-label" data-ref="setupNote"></p>
-				<div class="list" data-ref="claimsList"></div>
-				<div data-ref="assignAllList"></div>
-				<div data-ref="oneEachList"></div>
-				<div data-ref="evenPanel">
-					<div class="diplomacy-assign-tools">
-						<label>Faction
-							<span class="diplomacy-inline-control">
-								<span class="diplomacy-swatch" data-ref="evenSwatch"></span>
-								<select data-ref="evenFactionSelect"></select>
-							</span>
-						</label>
-						<label>Player
-							<select data-ref="evenPlayerSelect"></select>
-						</label>
-						<button type="button" data-ref="evenAddBtn">Add</button>
-					</div>
-					<div class="list" data-ref="evenList"></div>
-				</div>
+				<div data-ref="slotList"></div>
+				<div data-ref="nationList"></div>
 			</div>
 			<div class="card diplomacy-play-card" data-ref="playCard">
 				<div class="row">
@@ -226,30 +210,23 @@ export function createDiplomacyGameScreen(deps) {
 			</div>
 		</div>
 	`);
-	const assignAllTemplate = createTemplate(`
+	const nationTemplate = createTemplate(`
 		<div class="diplomacy-assign-row">
 			<span class="diplomacy-swatch" data-ref="swatch"></span>
-			<span data-ref="name"></span>
-			<label>Player
-				<select data-ref="playerSelect"></select>
-			</label>
+			<div class="diplomacy-power-copy">
+				<span data-ref="name"></span>
+				<small data-ref="meta"></small>
+			</div>
+			<span data-ref="status"></span>
+			<select data-ref="assignSelect"></select>
 		</div>
 	`);
-	const oneEachTemplate = createTemplate(`
+	const slotTemplate = createTemplate(`
 		<div class="diplomacy-assign-row">
-			<span data-ref="name"></span>
 			<span class="diplomacy-swatch" data-ref="swatch"></span>
-			<label>Faction
-				<select data-ref="factionSelect"></select>
+			<label>Nation
+				<select data-ref="nationSelect"></select>
 			</label>
-		</div>
-	`);
-	const evenTemplate = createTemplate(`
-		<div class="diplomacy-assign-row">
-			<span class="diplomacy-swatch" data-ref="swatch"></span>
-			<span data-ref="name"></span>
-			<span data-ref="playerName"></span>
-			<button type="button" data-ref="removeBtn">Remove</button>
 		</div>
 	`);
 
@@ -270,13 +247,10 @@ export function createDiplomacyGameScreen(deps) {
 		phaseKey: '',
 		activePower: '',
 		setupDirty: false,
-		assignments: null,
 	};
 
-	const claimRowsById = new Map();
-	const assignAllRows = new Map();
-	const oneEachRows = new Map();
-	const evenRows = new Map();
+	const nationRows = new Map();
+	const slotRows = new Map();
 	const playRowsById = new Map();
 
 	let lastGameId = null;
@@ -292,6 +266,10 @@ export function createDiplomacyGameScreen(deps) {
 	let historyBusy = false;
 	let mountPromise = null;
 	let focusOpen = false;
+	let assignmentBusy = 0;
+	let assignmentChain = Promise.resolve();
+	let settingsBusy = 0;
+	let settingsChain = Promise.resolve();
 
 	function dip() {
 		return serverSnapshot.diplomacy || {};
@@ -349,62 +327,50 @@ export function createDiplomacyGameScreen(deps) {
 		return [];
 	}
 
-	function serverAssignmentMap() {
-		const raw = dip().assignments || {};
-		const out = {};
-		Object.keys(raw).forEach(function eachKey(key) {
-			const value = raw[key];
-			out[String(key)] = value == null || value === '' ? '' : String(value);
-		});
-		(dip().powers || []).forEach(function eachPower(power) {
-			if (!Object.prototype.hasOwnProperty.call(out, power.id)) {
-				out[power.id] = '';
-			}
-		});
-		return out;
-	}
-
-	function assignmentMap() {
-		if (localDraft.setupDirty && localDraft.assignments) {
-			return localDraft.assignments;
-		}
-		return serverAssignmentMap();
-	}
-
 	function markSetupDirty() {
-		if (!localDraft.assignments) {
-			localDraft.assignments = serverAssignmentMap();
-		}
 		localDraft.setupDirty = true;
 	}
 
+	function setupFieldsAreLocal() {
+		return localDraft.setupDirty || settingsBusy > 0;
+	}
+
 	function setupMode() {
-		if (localDraft.setupDirty) {
+		if (setupFieldsAreLocal()) {
 			return refs.nationModeSelect.value || 'pick';
 		}
 		return dip().nation_mode || 'pick';
 	}
 
-	function playerOptions(includeDisorder) {
-		const options = [];
-		if (includeDisorder) {
-			options.push({ value: '', label: 'Civil disorder' });
+	function setupCount() {
+		if (setupFieldsAreLocal()) {
+			return refs.nationCountSelect.value || 'single';
 		}
-		playerMembers().forEach(function each(member) {
-			options.push({ value: String(member.id), label: member.username || ('Player ' + member.id) });
-		});
-		return options;
+		return dip().nation_count || 'single';
 	}
 
-	function factionOptions(includeEmpty) {
-		const options = [];
-		if (includeEmpty) {
-			options.push({ value: '', label: 'Unassigned' });
+	function viewerUserId() {
+		const user = deps.state.state.user || {};
+		return user.id ? String(user.id) : '';
+	}
+
+	function viewerMember() {
+		const id = viewerUserId();
+		if (!id) {
+			return null;
 		}
-		(dip().powers || []).forEach(function eachPower(power) {
-			options.push({ value: power.id, label: power.name || power.id });
-		});
-		return options;
+		return playerMembers().find(function findMember(member) {
+			return String(member.id) === id;
+		}) || null;
+	}
+
+	function viewerUsername() {
+		const member = viewerMember();
+		if (member && member.username) {
+			return member.username;
+		}
+		const user = deps.state.state.user || {};
+		return user.username || 'You';
 	}
 
 	function fillSelect(select, options, value) {
@@ -453,31 +419,6 @@ export function createDiplomacyGameScreen(deps) {
 		});
 	}
 
-	function reconcileClaims() {
-		const powers = Array.isArray(dip().powers) ? dip().powers : [];
-		const active = new Set();
-		powers.forEach(function eachPower(power) {
-			const key = String(power.id || '');
-			active.add(key);
-			let row = claimRowsById.get(key);
-			if (!row) {
-				const node = cloneTemplateNode(claimTemplate);
-				row = collectRefs(node);
-				row.root = node;
-				claimRowsById.set(key, row);
-			}
-			paintSwatch(row.swatch, power.color);
-			row.meta.textContent = power.name || power.id;
-			const assigned = power.assigned_to && power.assigned_to.username ? power.assigned_to.username : '';
-			const chosen = power.chosen_by && power.chosen_by.username ? power.chosen_by.username : '';
-			const owner = assigned
-				? ('Playing as ' + assigned)
-				: (chosen ? ('Claimed by ' + chosen) : (power.civil_disorder ? 'Civil disorder' : 'Open'));
-			row.text.textContent = owner + ' · ' + centerLabel(power.center_count);
-		});
-		dropRows(claimRowsById, active, refs.claimsList);
-	}
-
 	function reconcilePlayRoster() {
 		const powers = Array.isArray(dip().powers) ? dip().powers : [];
 		const active = new Set();
@@ -515,135 +456,194 @@ export function createDiplomacyGameScreen(deps) {
 		select.addEventListener('change', handler);
 	}
 
-	function reconcileAssignAll(canEdit) {
-		const powers = Array.isArray(dip().powers) ? dip().powers : [];
-		const assignments = assignmentMap();
-		const options = playerOptions(true);
-		const active = new Set();
-		powers.forEach(function eachPower(power) {
-			const key = String(power.id);
-			active.add(key);
-			let row = assignAllRows.get(key);
-			if (!row) {
-				const node = cloneTemplateNode(assignAllTemplate);
-				row = collectRefs(node);
-				row.root = node;
-				assignAllRows.set(key, row);
-				bindSelect(row.playerSelect, function onPlayer() {
-					markSetupDirty();
-					localDraft.assignments[key] = row.playerSelect.value;
-				});
-			}
-			paintSwatch(row.swatch, power.color);
-			row.name.textContent = power.name || power.id;
-			fillSelect(row.playerSelect, options, assignments[key] || '');
-			row.playerSelect.disabled = !canEdit;
-		});
-		dropRows(assignAllRows, active, refs.assignAllList);
-	}
-
-	function reconcileOneEach(canEdit) {
-		const assignments = assignmentMap();
-		const options = factionOptions(true);
-		const active = new Set();
-		playerMembers().forEach(function each(member) {
-			const key = String(member.id);
-			active.add(key);
-			let row = oneEachRows.get(key);
-			if (!row) {
-				const node = cloneTemplateNode(oneEachTemplate);
-				row = collectRefs(node);
-				row.root = node;
-				oneEachRows.set(key, row);
-				bindSelect(row.factionSelect, function onFaction() {
-					markSetupDirty();
-					Object.keys(localDraft.assignments).forEach(function eachPower(powerId) {
-						if (String(localDraft.assignments[powerId]) === key) {
-							localDraft.assignments[powerId] = '';
-						}
-					});
-					if (row.factionSelect.value) {
-						localDraft.assignments[row.factionSelect.value] = key;
-					}
-					const selected = powerById(row.factionSelect.value);
-					paintSwatch(row.swatch, selected ? selected.color : '');
-				});
-			}
-			row.name.textContent = member.username || ('Player ' + member.id);
-			let selectedPower = '';
-			Object.keys(assignments).forEach(function eachPower(powerId) {
-				if (!selectedPower && String(assignments[powerId]) === key) {
-					selectedPower = powerId;
-				}
-			});
-			fillSelect(row.factionSelect, options, selectedPower);
-			const selected = powerById(row.factionSelect.value);
-			paintSwatch(row.swatch, selected ? selected.color : '');
-			row.factionSelect.disabled = !canEdit;
-		});
-		dropRows(oneEachRows, active, refs.oneEachList);
-	}
-
-	function reconcileEven(canEdit) {
-		const assignments = assignmentMap();
-		const factionValue = refs.evenFactionSelect.value;
-		fillSelect(refs.evenFactionSelect, factionOptions(false), factionValue || ((dip().powers || [])[0] || {}).id || '');
-		fillSelect(refs.evenPlayerSelect, playerOptions(false), refs.evenPlayerSelect.value || ((playerMembers()[0] || {}).id || ''));
-		const selected = powerById(refs.evenFactionSelect.value);
-		paintSwatch(refs.evenSwatch, selected ? selected.color : '');
-		refs.evenFactionSelect.disabled = !canEdit;
-		refs.evenPlayerSelect.disabled = !canEdit;
-		refs.evenAddBtn.disabled = !canEdit;
-		const active = new Set();
-		Object.keys(assignments).forEach(function eachPower(powerId) {
-			const userId = assignments[powerId];
-			if (!userId) {
-				return;
-			}
-			active.add(powerId);
-			let row = evenRows.get(powerId);
-			if (!row) {
-				const node = cloneTemplateNode(evenTemplate);
-				row = collectRefs(node);
-				row.root = node;
-				evenRows.set(powerId, row);
-				row.removeBtn.addEventListener('click', function onRemove() {
-					markSetupDirty();
-					localDraft.assignments[powerId] = '';
-					reconcileEven(canEditSetup());
-				});
-			}
-			const power = powerById(powerId);
-			paintSwatch(row.swatch, power ? power.color : '');
-			row.name.textContent = power ? (power.name || power.id) : powerId;
-			const member = playerMembers().find(function findMember(item) {
-				return String(item.id) === String(userId);
-			});
-			row.playerName.textContent = member ? member.username : ('Player ' + userId);
-			row.removeBtn.disabled = !canEdit;
-		});
-		dropRows(evenRows, active, refs.evenList);
-	}
-
 	function canEditSetup() {
 		return isOpen() && !!(serverSnapshot.permissions || {}).can_start;
 	}
 
-	function reconcileAssignment() {
+	function nationStatusText(power) {
+		if (power.availability === 'civil' || power.civil_disorder) {
+			return 'Civil disorder';
+		}
+		if (power.assigned_to && power.assigned_to.username) {
+			return power.assigned_to.username;
+		}
+		return 'Open';
+	}
+
+	function managerAssignOptions() {
+		const options = [
+			{ value: 'open', label: 'Open' },
+			{ value: 'civil', label: 'Civil disorder' },
+		];
+		playerMembers().forEach(function each(member) {
+			options.push({ value: String(member.id), label: member.username || ('Player ' + member.id) });
+		});
+		return options;
+	}
+
+	function assignmentValue(power) {
+		if (power.availability === 'civil' || power.civil_disorder) {
+			return 'civil';
+		}
+		if (power.assigned_to && power.assigned_to.user_id) {
+			return String(power.assigned_to.user_id);
+		}
+		return 'open';
+	}
+
+	function viewerAssignedPowers() {
+		const id = viewerUserId();
+		const list = [];
+		(dip().powers || []).forEach(function eachPower(power) {
+			if (power.assigned_to && String(power.assigned_to.user_id) === id && power.availability !== 'civil') {
+				list.push(String(power.id));
+			}
+		});
+		return list;
+	}
+
+	function reconcileNations() {
+		const powers = Array.isArray(dip().powers) ? dip().powers : [];
+		const canManage = canEditSetup();
+		const playerCanClaim = isOpen() && setupMode() === 'pick' && setupCount() === 'all' && !!viewerMember();
+		const me = viewerUserId();
+		const active = new Set();
+		powers.forEach(function eachPower(power) {
+			const key = String(power.id);
+			active.add(key);
+			let row = nationRows.get(key);
+			if (!row) {
+				const node = cloneTemplateNode(nationTemplate);
+				row = collectRefs(node);
+				row.root = node;
+				nationRows.set(key, row);
+				bindSelect(row.assignSelect, function onAssign() {
+					queueAssignmentSave([{ power: key, state: row.assignSelect.value }]);
+				});
+			}
+			paintSwatch(row.swatch, power.color);
+			row.name.textContent = power.name || power.id;
+			row.meta.textContent = centerLabel(power.center_count);
+			row.status.textContent = nationStatusText(power);
+			const mine = !!(power.assigned_to && String(power.assigned_to.user_id) === me);
+			const open = power.availability === 'open' || (!power.availability && !power.civil_disorder && !power.assigned_to);
+			let showSelect = false;
+			let options = [];
+			if (canManage) {
+				showSelect = true;
+				options = managerAssignOptions();
+			} else if (playerCanClaim && (open || mine)) {
+				showSelect = true;
+				options = [
+					{ value: 'open', label: 'Open' },
+					{ value: me, label: viewerUsername() },
+				];
+			}
+			row.assignSelect.style.display = showSelect ? '' : 'none';
+			if (showSelect) {
+				const value = assignmentBusy > 0 ? row.assignSelect.value : assignmentValue(power);
+				fillSelect(row.assignSelect, options, value);
+			}
+		});
+		dropRows(nationRows, active, refs.nationList);
+	}
+
+	function slotChoices(chosen, index) {
+		const taken = {};
+		chosen.forEach(function eachChosen(powerId, chosenIndex) {
+			if (chosenIndex !== index && powerId) {
+				taken[powerId] = true;
+			}
+		});
+		const me = viewerUserId();
+		const options = [{ value: '', label: 'Random' }];
+		(dip().powers || []).forEach(function eachPower(power) {
+			const id = String(power.id);
+			if (power.availability === 'civil' || power.civil_disorder) {
+				return;
+			}
+			if (power.assigned_to && String(power.assigned_to.user_id) !== me) {
+				return;
+			}
+			if (taken[id]) {
+				return;
+			}
+			options.push({ value: id, label: power.name || id });
+		});
+		return options;
+	}
+
+	function reconcileSlots() {
+		const quota = Number(dip().nation_quota || 0);
+		const show = isOpen() && setupMode() === 'pick' && setupCount() !== 'all' && quota > 0 && !!viewerMember();
+		refs.slotList.style.display = show ? '' : 'none';
+		if (!show) {
+			dropRows(slotRows, new Set(), refs.slotList);
+			return;
+		}
+		const assigned = viewerAssignedPowers();
+		const slotCount = Math.max(quota, assignmentBusy > 0 ? slotRows.size : assigned.length, assigned.length);
+		const chosen = [];
+		for (let i = 0; i < slotCount; i += 1) {
+			const existing = slotRows.get(String(i));
+			chosen.push(assignmentBusy > 0 && existing ? (existing.nationSelect.value || '') : (assigned[i] || ''));
+		}
+		const active = new Set();
+		chosen.forEach(function eachSlot(selectedId, index) {
+			const key = String(index);
+			active.add(key);
+			let row = slotRows.get(key);
+			if (!row) {
+				const node = cloneTemplateNode(slotTemplate);
+				row = collectRefs(node);
+				row.root = node;
+				row.powerId = '';
+				slotRows.set(key, row);
+				bindSelect(row.nationSelect, function onSlot() {
+					const previous = row.powerId || '';
+					const next = row.nationSelect.value || '';
+					if (previous === next) {
+						return;
+					}
+					const updates = [];
+					const me = Number(viewerUserId() || 0);
+					if (previous) {
+						updates.push({ power: previous, state: 'open' });
+					}
+					if (next) {
+						updates.push({ power: next, state: me });
+					}
+					row.powerId = next;
+					const selected = powerById(next);
+					paintSwatch(row.swatch, selected ? selected.color : '');
+					queueAssignmentSave(updates);
+				});
+			}
+			row.powerId = selectedId;
+			fillSelect(row.nationSelect, slotChoices(chosen, index), selectedId);
+			const selected = powerById(row.nationSelect.value);
+			paintSwatch(row.swatch, selected ? selected.color : '');
+		});
+		dropRows(slotRows, active, refs.slotList);
+	}
+
+	function setupNoteText() {
 		const mode = setupMode();
-		const canEdit = canEditSetup();
-		refs.assignAllList.style.display = mode === 'assign_all' ? '' : 'none';
-		refs.oneEachList.style.display = mode === 'one_each' ? '' : 'none';
-		refs.evenPanel.style.display = mode === 'even' ? '' : 'none';
-		if (mode === 'assign_all') {
-			reconcileAssignAll(canEdit);
+		const count = setupCount();
+		const quota = Number(dip().nation_quota || 0);
+		if (count === 'all' && mode === 'random') {
+			return 'Random deals every open nation when the game starts. Civil disorder stays out, and nations already assigned stay with that player.';
 		}
-		if (mode === 'one_each') {
-			reconcileOneEach(canEdit);
+		if (count === 'all') {
+			return 'A player can hold more than one nation. Open nations become civil disorder when the game starts.';
 		}
-		if (mode === 'even') {
-			reconcileEven(canEdit);
+		if (count === 'single') {
+			return 'Each player needs one nation. Anyone still short is filled from open nations, then from civil disorder. Leftover open nations become civil disorder.';
 		}
+		if (quota < 1) {
+			return 'There are not enough nations in play to give every player one. Open nations become civil disorder when the game starts.';
+		}
+		return 'Each player needs ' + quota + ' nations. Leftovers stay unassigned and become civil disorder. Anyone still short is filled from open nations, then from civil disorder.';
 	}
 
 	function historyEntries() {
@@ -676,11 +676,13 @@ export function createDiplomacyGameScreen(deps) {
 	function reconcileSetup() {
 		const data = dip();
 		const maps = Array.isArray(data.maps) ? data.maps : [];
+		const keepLocal = setupFieldsAreLocal();
 		fillSelect(refs.mapSelect, maps.map(function eachMap(map) {
 			return { value: map.key, label: map.label || map.key };
-		}), localDraft.setupDirty ? refs.mapSelect.value : data.map_key);
-		if (!localDraft.setupDirty) {
+		}), keepLocal ? refs.mapSelect.value : data.map_key);
+		if (!keepLocal) {
 			refs.nationModeSelect.value = data.nation_mode || 'pick';
+			refs.nationCountSelect.value = data.nation_count || 'single';
 			const timer = data.timer || {};
 			refs.timerMinutes.value = timer.minutes ? String(timer.minutes) : '';
 			refs.timerShortcut.checked = !!timer.shortcut;
@@ -688,61 +690,36 @@ export function createDiplomacyGameScreen(deps) {
 		const canEdit = canEditSetup();
 		refs.mapSelect.disabled = !canEdit;
 		refs.nationModeSelect.disabled = !canEdit;
-		refs.timerMinutes.disabled = !canEdit;
+		refs.nationCountSelect.disabled = !canEdit;
 		refs.timerShortcut.disabled = !canEdit;
+		refs.timerMinutes.disabled = !canEdit || !refs.timerShortcut.checked;
 		refs.saveSetupBtn.disabled = !canEdit;
 		refs.saveSetupBtn.style.display = canEdit ? '' : 'none';
-
-		const mode = setupMode();
-		const pickMode = mode === 'pick';
-		refs.nationPickRow.style.display = isOpen() && pickMode ? '' : 'none';
-		const nationOptions = [{ value: 'random', label: 'Random' }];
-		(data.powers || []).forEach(function eachPower(power) {
-			nationOptions.push({ value: power.id, label: power.name || power.id });
-		});
-		fillSelect(refs.nationSelect, nationOptions, data.my_chosen_power || 'random');
-		const perms = serverSnapshot.permissions || {};
-		refs.nationSelect.disabled = !isOpen() || !pickMode || !perms.can_chat;
-		refs.saveNationBtn.disabled = refs.nationSelect.disabled;
-		if (mode === 'assign_all') {
-			refs.setupNote.textContent = 'Assign every nation to a player, or leave it in civil disorder. A player can take more than one nation.';
-		} else if (mode === 'one_each') {
-			refs.setupNote.textContent = 'Give each player one faction. The color swatch matches that faction. Leftover factions are civil disorder.';
-		} else if (mode === 'even') {
-			refs.setupNote.textContent = 'Pair each faction with a player. Add more than one faction to a player when the nations need to be spread evenly.';
-		} else if (pickMode) {
-			refs.setupNote.textContent = 'Choose a nation or random. The owner can still start with unclaimed seats left in civil disorder.';
-		} else {
-			refs.setupNote.textContent = 'The owner will assign nations at random when the game starts.';
-		}
-		reconcileClaims();
-		reconcileAssignment();
+		refs.resetNationsBtn.disabled = !canEdit;
+		refs.resetNationsBtn.style.display = canEdit ? '' : 'none';
+		refs.setupNote.textContent = setupNoteText();
+		reconcileSlots();
+		reconcileNations();
 	}
 
 	function paintTimer() {
 		const timer = dip().timer || {};
-		if (!timer.minutes || isOpen()) {
+		if (!timer.shortcut || !timer.minutes || isOpen()) {
 			refs.timerText.textContent = '';
 			return;
 		}
 		if (!timer.deadline) {
-			refs.timerText.textContent = timer.shortcut
-				? 'A phase timer is set and can end the phase.'
-				: 'A phase timer is set. It does not end the phase.';
+			refs.timerText.textContent = 'A phase timer is set.';
 			return;
 		}
 		const end = Date.parse(timer.deadline);
 		const remain = Number.isFinite(end) ? Math.max(0, Math.floor((end - Date.now()) / 1000)) : 0;
 		const clock = Math.floor(remain / 60) + ':' + String(remain % 60).padStart(2, '0');
 		if (remain > 0) {
-			refs.timerText.textContent = timer.shortcut
-				? ('Phase ends in ' + clock + '.')
-				: ('Timer ' + clock + '. It does not end the phase.');
+			refs.timerText.textContent = 'Phase ends in ' + clock + '.';
 			return;
 		}
-		refs.timerText.textContent = timer.shortcut
-			? 'The phase timer has run out.'
-			: 'The timer has run out. It does not end the phase.';
+		refs.timerText.textContent = 'The phase timer has run out.';
 	}
 
 	function viewedHistoryLabel() {
@@ -1046,30 +1023,68 @@ export function createDiplomacyGameScreen(deps) {
 		timerTickId = setInterval(paintTimer, 1000);
 	}
 
-	function collectAssignments(mode) {
-		const out = {};
-		(dip().powers || []).forEach(function eachPower(power) {
-			out[power.id] = null;
-		});
-		if (mode === 'assign_all') {
-			assignAllRows.forEach(function eachRow(row, powerId) {
-				out[powerId] = row.playerSelect.value ? Number(row.playerSelect.value) : null;
-			});
-		} else if (mode === 'one_each') {
-			oneEachRows.forEach(function eachRow(row, userId) {
-				if (row.factionSelect.value) {
-					out[row.factionSelect.value] = Number(userId);
-				}
-			});
-		} else if (mode === 'even') {
-			const current = assignmentMap();
-			Object.keys(current).forEach(function eachPower(powerId) {
-				if (current[powerId]) {
-					out[powerId] = Number(current[powerId]);
-				}
-			});
+	function setupPayload() {
+		const timerOn = !!refs.timerShortcut.checked;
+		const minutesRaw = timerOn ? refs.timerMinutes.value.trim() : '';
+		return {
+			diplomacy_map_key: refs.mapSelect.value,
+			diplomacy_nation_mode: refs.nationModeSelect.value,
+			diplomacy_nation_count: refs.nationCountSelect.value,
+			diplomacy_timer_minutes: minutesRaw === '' ? null : Number(minutesRaw),
+			diplomacy_timer_shortcut: timerOn,
+		};
+	}
+
+	function applyDetail(detail) {
+		if (detail && detail.game) {
+			deps.state.patch({ activeGame: detail.game });
+			screen.setGame(detail.game);
 		}
-		return out;
+	}
+
+	function queueSettingsSave() {
+		if (!lastGameId || !canEditSetup()) {
+			return;
+		}
+		const payload = setupPayload();
+		settingsBusy += 1;
+		settingsChain = settingsChain.then(async function saveSettings() {
+			try {
+				const detail = await deps.api.setGameSettings(lastGameId, payload);
+				localDraft.setupDirty = false;
+				applyDetail(detail);
+			} catch (err) {
+				localDraft.setupDirty = false;
+				setStatusNode(err.message || 'Unable to save setup.', 'error');
+				reconcileSetup();
+			} finally {
+				settingsBusy -= 1;
+				if (settingsBusy === 0) {
+					reconcileSetup();
+				}
+			}
+		});
+	}
+
+	function queueAssignmentSave(updates) {
+		if (!lastGameId || !updates.length) {
+			return;
+		}
+		assignmentBusy += 1;
+		assignmentChain = assignmentChain.then(async function saveAssignments() {
+			try {
+				const detail = await deps.api.setDiplomacyAssignments(lastGameId, updates);
+				applyDetail(detail);
+			} catch (err) {
+				setStatusNode(err.message || 'Unable to save nation.', 'error');
+				reconcileSetup();
+			} finally {
+				assignmentBusy -= 1;
+				if (assignmentBusy === 0) {
+					reconcileSetup();
+				}
+			}
+		});
 	}
 
 	const screen = createBaseGameScreen(deps, {
@@ -1100,7 +1115,11 @@ export function createDiplomacyGameScreen(deps) {
 	});
 
 	refs.nationModeSelect.addEventListener('change', function onMode() {
-		markSetupDirty();
+		queueSettingsSave();
+		reconcileSetup();
+	});
+	refs.nationCountSelect.addEventListener('change', function onCount() {
+		queueSettingsSave();
 		reconcileSetup();
 	});
 	refs.mapSelect.addEventListener('change', function onMap() {
@@ -1111,66 +1130,26 @@ export function createDiplomacyGameScreen(deps) {
 	});
 	refs.timerShortcut.addEventListener('change', function onShortcut() {
 		markSetupDirty();
+		refs.timerMinutes.disabled = !canEditSetup() || !refs.timerShortcut.checked;
 	});
-	refs.evenFactionSelect.addEventListener('change', function onEvenFaction() {
-		const selected = powerById(refs.evenFactionSelect.value);
-		paintSwatch(refs.evenSwatch, selected ? selected.color : '');
-	});
-	refs.evenAddBtn.addEventListener('click', function onEvenAdd() {
-		const powerId = refs.evenFactionSelect.value;
-		const userId = refs.evenPlayerSelect.value;
-		if (!powerId || !userId) {
-			return;
-		}
-		markSetupDirty();
-		localDraft.assignments[powerId] = userId;
-		reconcileEven(canEditSetup());
+	refs.resetNationsBtn.addEventListener('click', function onResetNations() {
+		const updates = (dip().powers || []).map(function eachPower(power) {
+			return { power: power.id, state: 'open' };
+		});
+		queueAssignmentSave(updates);
 	});
 
 	refs.saveSetupBtn.addEventListener('click', async function onSaveSetup() {
 		if (!lastGameId) {
 			return;
 		}
-		const mode = refs.nationModeSelect.value;
-		const minutesRaw = refs.timerMinutes.value.trim();
-		const payload = {
-			diplomacy_map_key: refs.mapSelect.value,
-			diplomacy_nation_mode: mode,
-			diplomacy_timer_minutes: minutesRaw === '' ? null : Number(minutesRaw),
-			diplomacy_timer_shortcut: !!refs.timerShortcut.checked,
-		};
-		if (mode === 'assign_all' || mode === 'one_each' || mode === 'even') {
-			payload.diplomacy_assignments = refs.mapSelect.value === (dip().map_key || '')
-				? collectAssignments(mode)
-				: {};
-		}
 		try {
-			const detail = await deps.api.setGameSettings(lastGameId, payload);
+			const detail = await deps.api.setGameSettings(lastGameId, setupPayload());
 			localDraft.setupDirty = false;
-			localDraft.assignments = null;
-			if (detail && detail.game) {
-				deps.state.patch({ activeGame: detail.game });
-				screen.setGame(detail.game);
-			}
+			applyDetail(detail);
 			setStatusNode('Setup saved.', 'ok');
 		} catch (err) {
 			setStatusNode(err.message || 'Unable to save setup.', 'error');
-		}
-	});
-
-	refs.saveNationBtn.addEventListener('click', async function onSaveNation() {
-		if (!lastGameId) {
-			return;
-		}
-		try {
-			const detail = await deps.api.setDiplomacyPower(lastGameId, refs.nationSelect.value);
-			if (detail && detail.game) {
-				deps.state.patch({ activeGame: detail.game });
-				screen.setGame(detail.game);
-			}
-			setStatusNode('Nation saved.', 'ok');
-		} catch (err) {
-			setStatusNode(err.message || 'Unable to save nation.', 'error');
 		}
 	});
 

@@ -83,6 +83,13 @@ function handle_games_route(string $method, array $segments): void
         games_set_diplomacy_power((int)$segments[1]);
     }
 
+    if (count($segments) === 3 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'diplomacy-assignment') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+        games_set_diplomacy_assignments((int)$segments[1]);
+    }
+
     if (count($segments) === 3 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'diplomacy-snapshot') {
         if ($method !== 'GET') {
             error_response('Method not allowed.', 405);
@@ -625,6 +632,36 @@ function games_update_settings(int $gameId): void
     ]);
 
     // Return the refreshed full game detail so the client can update UI.
+    games_detail($gameId);
+}
+
+function games_set_diplomacy_assignments(int $gameId): void
+{
+    $user = require_user();
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+    if (normalize_game_type((string)$game['game_type']) !== 'diplomacy') {
+        error_response('This game is not Diplomacy.', 409);
+    }
+
+    $isOwner = (int)$game['owner_user_id'] === (int)$user['id'];
+    $isAdmin = (int)($user['is_admin'] ?? 0) === 1;
+    $isManager = $isOwner || $isAdmin;
+    if (!$isManager) {
+        $role = game_require_member_or_403((int)$user['id'], $gameId);
+        if ($role === 'observer') {
+            error_response('Observers cannot choose a nation.', 403);
+        }
+    }
+
+    $body = json_input();
+    $updates = $body['updates'] ?? null;
+    if (!is_array($updates)) {
+        error_response('Updates are required.', 422);
+    }
+    diplomacy_apply_assignment_updates($gameId, (int)$user['id'], $isManager, $updates);
     games_detail($gameId);
 }
 

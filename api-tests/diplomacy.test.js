@@ -62,16 +62,21 @@ test('owner can set the map and nation mode while the game is open', async () =>
   expect(open.phase).toBe('setup');
   expect(open.diplomacy.map_key).toBe('EuropeDiploMap');
   expect(open.diplomacy.nation_mode).toBe('pick');
+  expect(open.diplomacy.nation_count).toBe('single');
+  expect(open.diplomacy.nation_quota).toBe(1);
+  expect(open.diplomacy.powers.every((power) => power.availability === 'open')).toBe(true);
   expect(open.diplomacy.maps.length).toBeGreaterThan(0);
 
   const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
     json: {
       diplomacy_map_key: 'EuropeDiploMap',
       diplomacy_nation_mode: 'random',
+      diplomacy_nation_count: 'single',
     },
   });
   expect(saved.status).toBe(200);
   expect(saved.body.data.game.diplomacy.nation_mode).toBe('random');
+  expect(saved.body.data.game.diplomacy.nation_count).toBe('single');
 });
 
 test('conflicting nation picks are rejected and start assigns remaining powers', async () => {
@@ -82,26 +87,30 @@ test('conflicting nation picks are rejected and start assigns remaining powers',
   await player.client.post(`/api/games/${game.id}/join`);
   await extra.client.post(`/api/games/${game.id}/join`);
 
-  const claimEngland = await owner.client.post(`/api/games/${game.id}/diplomacy-power`, {
-    json: { power: 'england' },
+  const open = await detail(owner.client, game.id);
+  const ownerId = memberId(open, owner);
+  const playerId = memberId(open, player);
+
+  const claimEngland = await owner.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+    json: { updates: [{ power: 'england', state: ownerId }] },
   });
   expect(claimEngland.status).toBe(200);
-  expect(claimEngland.body.data.game.diplomacy.my_chosen_power).toBe('england');
+  expect(claimEngland.body.data.game.diplomacy.my_powers).toEqual(['england']);
 
-  const conflict = await player.client.post(`/api/games/${game.id}/diplomacy-power`, {
-    json: { power: 'england' },
+  const conflict = await player.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+    json: { updates: [{ power: 'england', state: playerId }] },
   });
   expect(conflict.status).toBe(409);
 
-  const claimFrance = await player.client.post(`/api/games/${game.id}/diplomacy-power`, {
-    json: { power: 'france' },
+  const claimFrance = await player.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+    json: { updates: [{ power: 'france', state: playerId }] },
   });
   expect(claimFrance.status).toBe(200);
 
-  const randomPick = await extra.client.post(`/api/games/${game.id}/diplomacy-power`, {
-    json: { power: 'random' },
+  const civil = await player.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+    json: { updates: [{ power: 'france', state: 'civil' }] },
   });
-  expect(randomPick.status).toBe(200);
+  expect(civil.status).toBe(403);
 
   const started = await owner.client.post(`/api/games/${game.id}/start`);
   expect(started.status).toBe(200);
@@ -199,7 +208,11 @@ test('owner can resolve early and too many players cannot start', async () => {
     expect(joined.status).toBe(200);
   }
   const start = await owner.client.post(`/api/games/${crowded.id}/start`);
-  expect(start.status).toBe(409);
+  expect(start.status).toBe(200);
+  const crowdedGame = await detail(owner.client, crowded.id);
+  const seated = crowdedGame.diplomacy.powers.filter((power) => power.assigned_to);
+  expect(seated).toHaveLength(7);
+  expect(crowdedGame.diplomacy.powers.filter((power) => power.civil_disorder)).toHaveLength(0);
 });
 
 test('an 18-center majority after fall closes the game', async () => {
@@ -263,24 +276,29 @@ test('assign all lets one player take several nations and leaves the rest in civ
   const open = await detail(owner.client, game.id);
   const ownerId = memberId(open, owner);
   const playerId = memberId(open, player);
-  const assignments = {};
-  open.diplomacy.powers.forEach((power) => {
-    assignments[power.id] = null;
-  });
-  assignments.england = ownerId;
-  assignments.france = ownerId;
-  assignments.germany = playerId;
 
   const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
     json: {
       diplomacy_map_key: 'EuropeDiploMap',
-      diplomacy_nation_mode: 'assign_all',
-      diplomacy_assignments: assignments,
-      diplomacy_timer_minutes: null,
+      diplomacy_nation_mode: 'owner',
+      diplomacy_nation_count: 'all',
+      diplomacy_timer_minutes: 30,
       diplomacy_timer_shortcut: false,
     },
   });
   expect(saved.status).toBe(200);
+  expect(saved.body.data.game.diplomacy.timer.minutes).toBeNull();
+  expect(saved.body.data.game.diplomacy.timer.shortcut).toBe(false);
+  const assigned = await owner.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+    json: {
+      updates: [
+        { power: 'england', state: ownerId },
+        { power: 'france', state: ownerId },
+        { power: 'germany', state: playerId },
+      ],
+    },
+  });
+  expect(assigned.status).toBe(200);
   const started = await owner.client.post(`/api/games/${game.id}/start`);
   expect(started.status).toBe(200);
   const ownerGame = await detail(owner.client, game.id);
@@ -316,31 +334,35 @@ test('assign one each gives every player a single colored faction', async () => 
   const game = await createDiplomacyGame(owner);
   await player.client.post(`/api/games/${game.id}/join`);
   const open = await detail(owner.client, game.id);
-  const assignments = {};
-  open.diplomacy.powers.forEach((power) => {
-    assignments[power.id] = null;
-  });
-  assignments.england = memberId(open, owner);
-  assignments.france = memberId(open, owner);
-
-  const duplicate = await owner.client.post(`/api/games/${game.id}/settings`, {
-    json: {
-      diplomacy_map_key: 'EuropeDiploMap',
-      diplomacy_nation_mode: 'one_each',
-      diplomacy_assignments: assignments,
-    },
-  });
-  expect(duplicate.status).toBe(422);
-
-  assignments.france = memberId(open, player);
+  const ownerId = memberId(open, owner);
+  const playerId = memberId(open, player);
   const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
     json: {
       diplomacy_map_key: 'EuropeDiploMap',
-      diplomacy_nation_mode: 'one_each',
-      diplomacy_assignments: assignments,
+      diplomacy_nation_mode: 'pick',
+      diplomacy_nation_count: 'single',
     },
   });
   expect(saved.status).toBe(200);
+
+  const duplicate = await player.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+    json: {
+      updates: [
+        { power: 'england', state: playerId },
+        { power: 'france', state: playerId },
+      ],
+    },
+  });
+  expect(duplicate.status).toBe(409);
+
+  const ownerClaim = await owner.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+    json: { updates: [{ power: 'england', state: ownerId }] },
+  });
+  expect(ownerClaim.status).toBe(200);
+  const playerClaim = await player.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+    json: { updates: [{ power: 'france', state: playerId }] },
+  });
+  expect(playerClaim.status).toBe(200);
   const started = await owner.client.post(`/api/games/${game.id}/start`);
   expect(started.status).toBe(200);
   const ownerGame = await detail(owner.client, game.id);
@@ -356,23 +378,38 @@ test('assign evenly pairs factions to players and can give one player two nation
   const game = await createDiplomacyGame(owner);
   await player.client.post(`/api/games/${game.id}/join`);
   const open = await detail(owner.client, game.id);
-  const assignments = {
-    england: memberId(open, owner),
-    france: memberId(open, owner),
-    germany: memberId(open, player),
-  };
+  const ownerId = memberId(open, owner);
+  const playerId = memberId(open, player);
   const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
     json: {
       diplomacy_map_key: 'EuropeDiploMap',
-      diplomacy_nation_mode: 'even',
-      diplomacy_assignments: assignments,
+      diplomacy_nation_mode: 'pick',
+      diplomacy_nation_count: 'even',
     },
   });
   expect(saved.status).toBe(200);
+  expect(saved.body.data.game.diplomacy.nation_quota).toBe(3);
+  const assigned = await owner.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+    json: {
+      updates: [
+        { power: 'england', state: ownerId },
+        { power: 'france', state: ownerId },
+        { power: 'germany', state: playerId },
+        { power: 'italy', state: 'civil' },
+      ],
+    },
+  });
+  expect(assigned.status).toBe(200);
+  expect(assigned.body.data.game.diplomacy.nation_quota).toBe(3);
   const started = await owner.client.post(`/api/games/${game.id}/start`);
   expect(started.status).toBe(200);
   const ownerGame = await detail(owner.client, game.id);
-  expect(ownerGame.diplomacy.my_powers.slice().sort()).toEqual(['england', 'france']);
+  const playerGame = await detail(player.client, game.id);
+  expect(ownerGame.diplomacy.my_powers).toHaveLength(3);
+  expect(ownerGame.diplomacy.my_powers).toEqual(expect.arrayContaining(['england', 'france']));
+  expect(playerGame.diplomacy.my_powers).toHaveLength(3);
+  expect(playerGame.diplomacy.my_powers).toContain('germany');
+  expect(ownerGame.diplomacy.powers.filter((power) => power.civil_disorder)).toHaveLength(1);
   expect(ownerGame.diplomacy.powers.find((power) => power.id === 'italy').civil_disorder).toBe(true);
 });
 
@@ -386,18 +423,23 @@ test('assign all can start when there are more players than nations', async () =
   }
   const open = await detail(owner.client, game.id);
   const ids = [owner, ...players].map((person) => memberId(open, person));
-  const assignments = {};
-  open.diplomacy.powers.forEach((power, index) => {
-    assignments[power.id] = ids[index];
-  });
   const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
     json: {
       diplomacy_map_key: 'EuropeDiploMap',
-      diplomacy_nation_mode: 'assign_all',
-      diplomacy_assignments: assignments,
+      diplomacy_nation_mode: 'owner',
+      diplomacy_nation_count: 'all',
     },
   });
   expect(saved.status).toBe(200);
+  const assigned = await owner.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+    json: {
+      updates: open.diplomacy.powers.map((power, index) => ({
+        power: power.id,
+        state: ids[index],
+      })),
+    },
+  });
+  expect(assigned.status).toBe(200);
   const started = await owner.client.post(`/api/games/${game.id}/start`);
   expect(started.status).toBe(200);
   const live = await detail(owner.client, game.id);
@@ -416,20 +458,23 @@ test('builds are offered per nation and history keeps a combined adjustment docu
   const game = await createDiplomacyGame(owner);
   const open = await detail(owner.client, game.id);
   const ownerId = memberId(open, owner);
-  const assignments = {};
-  open.diplomacy.powers.forEach((power) => {
-    assignments[power.id] = null;
-  });
-  assignments.england = ownerId;
-  assignments.france = ownerId;
   const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
     json: {
       diplomacy_map_key: 'EuropeDiploMap',
-      diplomacy_nation_mode: 'assign_all',
-      diplomacy_assignments: assignments,
+      diplomacy_nation_mode: 'owner',
+      diplomacy_nation_count: 'all',
     },
   });
   expect(saved.status).toBe(200);
+  const assigned = await owner.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+    json: {
+      updates: [
+        { power: 'england', state: ownerId },
+        { power: 'france', state: ownerId },
+      ],
+    },
+  });
+  expect(assigned.status).toBe(200);
   const started = await owner.client.post(`/api/games/${game.id}/start`);
   expect(started.status).toBe(200);
 
@@ -527,17 +572,30 @@ test('a phase timer shortcuts only when that option is on', async () => {
   const { spawnSync } = require('child_process');
   const owner = await session('dip-timer-owner');
   const game = await createDiplomacyGame(owner);
-  const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
+  const off = await owner.client.post(`/api/games/${game.id}/settings`, {
     json: {
       diplomacy_map_key: 'EuropeDiploMap',
       diplomacy_nation_mode: 'random',
+      diplomacy_nation_count: 'single',
       diplomacy_timer_minutes: 30,
       diplomacy_timer_shortcut: false,
     },
   });
+  expect(off.status).toBe(200);
+  expect(off.body.data.game.diplomacy.timer.minutes).toBeNull();
+  expect(off.body.data.game.diplomacy.timer.shortcut).toBe(false);
+  const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
+    json: {
+      diplomacy_map_key: 'EuropeDiploMap',
+      diplomacy_nation_mode: 'random',
+      diplomacy_nation_count: 'single',
+      diplomacy_timer_minutes: 30,
+      diplomacy_timer_shortcut: true,
+    },
+  });
   expect(saved.status).toBe(200);
   expect(saved.body.data.game.diplomacy.timer.minutes).toBe(30);
-  expect(saved.body.data.game.diplomacy.timer.shortcut).toBe(false);
+  expect(saved.body.data.game.diplomacy.timer.shortcut).toBe(true);
   await owner.client.post(`/api/games/${game.id}/start`);
 
   const { rootDir } = getServerInfo();
@@ -556,7 +614,7 @@ test('a phase timer shortcuts only when that option is on', async () => {
   runPhp([
     'require "api/lib/diplomacy.php";',
     '$gameId = (int)$argv[1];',
-    'db()->prepare("UPDATE games SET diplomacy_phase_deadline = datetime(\'now\', \'-1 minute\') WHERE id = :id")->execute(["id" => $gameId]);',
+    'db()->prepare("UPDATE games SET diplomacy_phase_deadline = datetime(\'now\', \'-1 minute\'), diplomacy_timer_shortcut = 0 WHERE id = :id")->execute(["id" => $gameId]);',
     'echo "ok";',
   ].join(''));
   const waiting = await detail(owner.client, game.id);
@@ -573,4 +631,63 @@ test('a phase timer shortcuts only when that option is on', async () => {
   expect(advanced.phase).toBe('fall_orders');
   expect(advanced.diplomacy.timer.shortcut).toBe(true);
   expect(advanced.diplomacy.timer.remaining_seconds).toBeGreaterThan(0);
+});
+
+test('random assign-all deals open nations and reset clears every claim', async () => {
+  const owner = await session('dip-deal-owner');
+  const player = await session('dip-deal-player');
+  const extra = await session('dip-deal-extra');
+  const game = await createDiplomacyGame(owner);
+  await player.client.post(`/api/games/${game.id}/join`);
+  await extra.client.post(`/api/games/${game.id}/join`);
+  const open = await detail(owner.client, game.id);
+  const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
+    json: {
+      diplomacy_map_key: 'EuropeDiploMap',
+      diplomacy_nation_mode: 'random',
+      diplomacy_nation_count: 'all',
+    },
+  });
+  expect(saved.status).toBe(200);
+  const marked = await owner.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+    json: { updates: [{ power: 'turkey', state: 'civil' }] },
+  });
+  expect(marked.status).toBe(200);
+  const started = await owner.client.post(`/api/games/${game.id}/start`);
+  expect(started.status).toBe(200);
+  const live = await detail(owner.client, game.id);
+  const turkey = live.diplomacy.powers.find((power) => power.id === 'turkey');
+  expect(turkey.civil_disorder).toBe(true);
+  const counts = {};
+  live.diplomacy.powers.forEach((power) => {
+    if (!power.assigned_to) {
+      return;
+    }
+    counts[power.assigned_to.user_id] = (counts[power.assigned_to.user_id] || 0) + 1;
+  });
+  const values = Object.values(counts).sort((a, b) => a - b);
+  expect(values).toHaveLength(3);
+  expect(values[values.length - 1] - values[0]).toBeLessThanOrEqual(1);
+  expect(values.reduce((sum, count) => sum + count, 0)).toBe(open.diplomacy.powers.length - 1);
+
+  const fresh = await createDiplomacyGame(owner);
+  const freshDetail = await detail(owner.client, fresh.id);
+  const ownerId = memberId(freshDetail, owner);
+  await owner.client.post(`/api/games/${fresh.id}/settings`, {
+    json: {
+      diplomacy_map_key: 'EuropeDiploMap',
+      diplomacy_nation_mode: 'pick',
+      diplomacy_nation_count: 'all',
+    },
+  });
+  await owner.client.post(`/api/games/${fresh.id}/diplomacy-assignment`, {
+    json: { updates: [{ power: 'england', state: ownerId }, { power: 'france', state: 'civil' }] },
+  });
+  const reset = await owner.client.post(`/api/games/${fresh.id}/diplomacy-assignment`, {
+    json: {
+      updates: freshDetail.diplomacy.powers.map((power) => ({ power: power.id, state: 'open' })),
+    },
+  });
+  expect(reset.status).toBe(200);
+  expect(reset.body.data.game.diplomacy.powers.every((power) => power.availability === 'open')).toBe(true);
 });

@@ -142,13 +142,48 @@ describe('diplomacy presentation coverage', () => {
       const detailBefore = await getGameDetail(owner, game.id);
       await waitForActiveHeading(ownerPage, phaseHeadingForGame(detailBefore, 'Diplomacy'));
       await ownerPage.waitForSelector('[data-ref="timerMinutes"]');
-      await ownerPage.select('[data-ref="nationModeSelect"]', 'assign_all');
+      const timerDisabled = await ownerPage.$eval('[data-ref="timerMinutes"]', (node) => node.disabled);
+      expect(timerDisabled).toBe(true);
+      await ownerPage.click('[data-ref="timerShortcut"]');
+      const timerEnabled = await ownerPage.$eval('[data-ref="timerMinutes"]', (node) => node.disabled);
+      expect(timerEnabled).toBe(false);
       await ownerPage.waitForFunction(() => {
         const active = document.querySelector('.screen:not(.hidden)');
-        const list = active && active.querySelector('[data-ref="assignAllList"]');
+        const list = active && active.querySelector('[data-ref="nationList"]');
         const swatch = list && list.querySelector('.diplomacy-swatch');
         const disorder = list && Array.from(list.querySelectorAll('option')).some((option) => option.textContent === 'Civil disorder');
-        return !!(swatch && disorder && swatch.style.backgroundColor && swatch.style.backgroundColor !== 'transparent');
+        const claims = active && active.querySelector('[data-ref="claimsList"]');
+        const assignAll = active && active.querySelector('[data-ref="assignAllList"]');
+        return !!(swatch && disorder && !claims && !assignAll && swatch.style.backgroundColor && swatch.style.backgroundColor !== 'transparent');
+      });
+      await ownerPage.waitForSelector('[data-ref="slotList"] select');
+      await ownerPage.evaluate(() => {
+        const active = document.querySelector('.screen:not(.hidden)');
+        const rows = Array.from(active.querySelectorAll('[data-ref="nationList"] .diplomacy-assign-row'));
+        const england = rows.find((row) => {
+          const name = row.querySelector('[data-ref="name"]');
+          return name && name.textContent === 'England';
+        });
+        const select = england.querySelector('select');
+        const option = Array.from(select.options).find((item) => item.value !== 'open' && item.value !== 'civil');
+        select.value = option.value;
+        select.dispatchEvent(new Event('change', { bubbles: true }));
+      });
+      await ownerPage.waitForFunction(() => {
+        const active = document.querySelector('.screen:not(.hidden)');
+        const rows = Array.from(active.querySelectorAll('[data-ref="nationList"] .diplomacy-assign-row'));
+        const england = rows.find((row) => {
+          const name = row.querySelector('[data-ref="name"]');
+          return name && name.textContent === 'England';
+        });
+        const status = england && england.querySelector('[data-ref="status"]');
+        return !!(status && status.textContent && status.textContent !== 'Open' && status.textContent !== 'Civil disorder');
+      });
+      await ownerPage.click('[data-ref="resetNationsBtn"]');
+      await ownerPage.waitForFunction(() => {
+        const active = document.querySelector('.screen:not(.hidden)');
+        const statuses = Array.from(active.querySelectorAll('[data-ref="nationList"] [data-ref="status"]'));
+        return statuses.length > 0 && statuses.every((node) => node.textContent === 'Open');
       });
       await assertNoHorizontalOverflow(ownerPage);
 
@@ -210,20 +245,23 @@ describe('diplomacy presentation coverage', () => {
     const game = await createGame(owner, 'diplomacy', uniqueLabel('dip-build'));
     const open = await getGameDetail(owner, game.id);
     const ownerId = open.members.find((member) => member.username === owner.credentials.username).id;
-    const assignments = {};
-    open.diplomacy.powers.forEach((power) => {
-      assignments[power.id] = null;
-    });
-    assignments.england = ownerId;
-    assignments.france = ownerId;
     const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
       json: {
         diplomacy_map_key: 'EuropeDiploMap',
-        diplomacy_nation_mode: 'assign_all',
-        diplomacy_assignments: assignments,
+        diplomacy_nation_mode: 'owner',
+        diplomacy_nation_count: 'all',
       },
     });
     expect(saved.status).toBe(200);
+    const assigned = await owner.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+      json: {
+        updates: [
+          { power: 'england', state: ownerId },
+          { power: 'france', state: ownerId },
+        ],
+      },
+    });
+    expect(assigned.status).toBe(200);
     await startGame(owner, game.id);
 
     const { rootDir } = getServerInfo();
