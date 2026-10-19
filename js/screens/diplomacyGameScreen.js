@@ -108,39 +108,43 @@ export function createDiplomacyGameScreen(deps) {
 					<div data-ref="setupSpacer"></div>
 					${createGameActionButtonMarkup('refresh', 'refreshSetupBtn', '')}
 				</div>
-				<div class="row mobile-stack">
-					<label>Map
+				<div class="diplomacy-setup-fields">
+					<label class="diplomacy-field">Map
 						<select data-ref="mapSelect"></select>
 					</label>
-					<label>Who selects nations
+					<label class="diplomacy-field">Who selects nations
 						<select data-ref="nationModeSelect">
 							<option value="pick">Players pick</option>
 							<option value="random">Random</option>
 							<option value="owner">Owner pick</option>
 						</select>
 					</label>
-					<label>How many each player gets
+					<label class="diplomacy-field">How many each player gets
 						<select data-ref="nationCountSelect">
 							<option value="single">One each</option>
 							<option value="even">Evenly</option>
 							<option value="all">Assign all</option>
 						</select>
 					</label>
-					<button data-ref="saveSetupBtn">Save setup</button>
-					<button type="button" data-ref="resetNationsBtn">Reset nations</button>
+					<div class="diplomacy-timer-field">
+						<label class="diplomacy-check">
+							<input data-ref="timerShortcut" type="checkbox">
+							Timer on
+						</label>
+						<label class="diplomacy-field">Minutes
+							<input data-ref="timerMinutes" type="number" min="1" max="10080" inputmode="numeric">
+						</label>
+					</div>
+					<div class="diplomacy-setup-actions">
+						<button class="primary" data-ref="saveSetupBtn">Save setup</button>
+						<button type="button" data-ref="resetNationsBtn">Reset nations</button>
+					</div>
 				</div>
-				<div class="row mobile-stack">
-					<label>Phase timer (minutes)
-						<input data-ref="timerMinutes" type="number" min="1" max="10080" inputmode="numeric">
-					</label>
-					<label class="diplomacy-check">
-						<input data-ref="timerShortcut" type="checkbox">
-						Timer on
-					</label>
+				<p class="diplomacy-setup-note" data-ref="setupNote"></p>
+				<div class="diplomacy-slot-list" data-ref="slotList">
+					<p class="diplomacy-section-label">Your nations</p>
 				</div>
-				<p class="top-user-label" data-ref="setupNote"></p>
-				<div data-ref="slotList"></div>
-				<div data-ref="nationList"></div>
+				<div class="diplomacy-nation-list" data-ref="nationList"></div>
 			</div>
 			<div class="card diplomacy-play-card" data-ref="playCard">
 				<div class="row">
@@ -211,20 +215,23 @@ export function createDiplomacyGameScreen(deps) {
 		</div>
 	`);
 	const nationTemplate = createTemplate(`
-		<div class="diplomacy-assign-row">
-			<span class="diplomacy-swatch" data-ref="swatch"></span>
-			<div class="diplomacy-power-copy">
-				<span data-ref="name"></span>
-				<small data-ref="meta"></small>
+		<div class="diplomacy-nation-row">
+			<div class="diplomacy-nation-head">
+				<span class="diplomacy-swatch" data-ref="swatch"></span>
+				<span class="diplomacy-nation-name" data-ref="name"></span>
+				<span class="diplomacy-nation-centers" data-ref="meta"></span>
 			</div>
-			<span data-ref="status"></span>
-			<select data-ref="assignSelect"></select>
+			<div class="diplomacy-nation-assign">
+				<span class="diplomacy-nation-status" data-ref="status"></span>
+				<select data-ref="assignSelect"></select>
+			</div>
 		</div>
 	`);
 	const slotTemplate = createTemplate(`
-		<div class="diplomacy-assign-row">
-			<span class="diplomacy-swatch" data-ref="swatch"></span>
-			<label>Nation
+		<div class="diplomacy-slot-row">
+			<span class="diplomacy-swatch is-empty" data-ref="swatch"></span>
+			<label>
+				<span data-ref="slotLabel">Nation</span>
 				<select data-ref="nationSelect"></select>
 			</label>
 		</div>
@@ -314,6 +321,18 @@ export function createDiplomacyGameScreen(deps) {
 	function centerLabel(count) {
 		const centers = Number(count || 0);
 		return centers === 1 ? '1 supply center' : (centers + ' supply centers');
+	}
+
+	function centerCountLabel(count) {
+		const centers = Number(count || 0);
+		return centers === 1 ? '1 center' : (centers + ' centers');
+	}
+
+	function paintSlotSwatch(swatch, power) {
+		paintSwatch(swatch, power ? power.color : '');
+		if (swatch) {
+			swatch.classList.toggle('is-empty', !power);
+		}
 	}
 
 	function viewerPowers() {
@@ -523,7 +542,7 @@ export function createDiplomacyGameScreen(deps) {
 			}
 			paintSwatch(row.swatch, power.color);
 			row.name.textContent = power.name || power.id;
-			row.meta.textContent = centerLabel(power.center_count);
+			row.meta.textContent = centerCountLabel(power.center_count);
 			row.status.textContent = nationStatusText(power);
 			const mine = !!(power.assigned_to && String(power.assigned_to.user_id) === me);
 			const open = power.availability === 'open' || (!power.availability && !power.civil_disorder && !power.assigned_to);
@@ -540,6 +559,7 @@ export function createDiplomacyGameScreen(deps) {
 				];
 			}
 			row.assignSelect.style.display = showSelect ? '' : 'none';
+			row.status.style.display = showSelect ? 'none' : '';
 			if (showSelect) {
 				const value = assignmentBusy > 0 ? row.assignSelect.value : assignmentValue(power);
 				fillSelect(row.assignSelect, options, value);
@@ -614,15 +634,14 @@ export function createDiplomacyGameScreen(deps) {
 						updates.push({ power: next, state: me });
 					}
 					row.powerId = next;
-					const selected = powerById(next);
-					paintSwatch(row.swatch, selected ? selected.color : '');
+					paintSlotSwatch(row.swatch, powerById(next));
 					queueAssignmentSave(updates);
 				});
 			}
+			row.slotLabel.textContent = chosen.length > 1 ? ('Nation ' + (index + 1)) : 'Your nation';
 			row.powerId = selectedId;
 			fillSelect(row.nationSelect, slotChoices(chosen, index), selectedId);
-			const selected = powerById(row.nationSelect.value);
-			paintSwatch(row.swatch, selected ? selected.color : '');
+			paintSlotSwatch(row.swatch, powerById(row.nationSelect.value));
 		});
 		dropRows(slotRows, active, refs.slotList);
 	}

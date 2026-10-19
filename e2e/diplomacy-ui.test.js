@@ -159,7 +159,7 @@ describe('diplomacy presentation coverage', () => {
       await ownerPage.waitForSelector('[data-ref="slotList"] select');
       await ownerPage.evaluate(() => {
         const active = document.querySelector('.screen:not(.hidden)');
-        const rows = Array.from(active.querySelectorAll('[data-ref="nationList"] .diplomacy-assign-row'));
+        const rows = Array.from(active.querySelectorAll('[data-ref="nationList"] .diplomacy-nation-row'));
         const england = rows.find((row) => {
           const name = row.querySelector('[data-ref="name"]');
           return name && name.textContent === 'England';
@@ -171,7 +171,7 @@ describe('diplomacy presentation coverage', () => {
       });
       await ownerPage.waitForFunction(() => {
         const active = document.querySelector('.screen:not(.hidden)');
-        const rows = Array.from(active.querySelectorAll('[data-ref="nationList"] .diplomacy-assign-row'));
+        const rows = Array.from(active.querySelectorAll('[data-ref="nationList"] .diplomacy-nation-row'));
         const england = rows.find((row) => {
           const name = row.querySelector('[data-ref="name"]');
           return name && name.textContent === 'England';
