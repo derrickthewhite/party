@@ -124,6 +124,13 @@ DiplomacyBoard.uniteProvinces = function (graph) {
 		province.neighbors = unique(province.neighbors || [], ids[n]);
 		province.army = unique(province.army || [], ids[n]);
 		province.fleet = unique(province.fleet || [], ids[n]);
+		if (Array.isArray(province.coasts)) {
+			for (var ci = 0; ci < province.coasts.length; ci++) {
+				var coast = province.coasts[ci];
+				if (!coast) continue;
+				coast.fleet = unique(coast.fleet || [], ids[n]);
+			}
+		}
 	}
 	graph.aliases = aliases;
 	return graph;
@@ -182,11 +189,194 @@ DiplomacyBoard.isLegalMove = function (graph, from, unitType, to) {
 	return DiplomacyBoard.legalDestinations(graph, from, unitType).indexOf(DiplomacyBoard.provinceId(graph, to)) !== -1;
 };
 
+DiplomacyBoard.coastList = function (province) {
+	return province && Array.isArray(province.coasts) ? province.coasts : [];
+};
+
+DiplomacyBoard.isMultiCoast = function (province) {
+	return DiplomacyBoard.coastList(province).length > 1;
+};
+
+DiplomacyBoard.coastById = function (province, coastId) {
+	if (!coastId) return null;
+	var coasts = DiplomacyBoard.coastList(province);
+	for (var i = 0; i < coasts.length; i++) {
+		if (coasts[i] && coasts[i].id === coastId) return coasts[i];
+	}
+	return null;
+};
+
+// A fleet on a multi-coast province moves by that coast's list. Other spaces
+// keep using the province fleet list.
+DiplomacyBoard.fleetMoves = function (graph, provinceId, coastId) {
+	var province = DiplomacyBoard.province(graph, provinceId);
+	if (!province) return [];
+	if (DiplomacyBoard.isMultiCoast(province)) {
+		var coast = DiplomacyBoard.coastById(province, coastId);
+		return coast && Array.isArray(coast.fleet) ? coast.fleet.slice() : [];
+	}
+	return (province.fleet || []).slice();
+};
+
+DiplomacyBoard.fleetMoveLegal = function (graph, fromId, fromCoast, toId, toCoast) {
+	fromId = DiplomacyBoard.provinceId(graph, fromId);
+	toId = DiplomacyBoard.provinceId(graph, toId);
+	if (!fromId || !toId || fromId === toId) return false;
+	if (DiplomacyBoard.fleetMoves(graph, fromId, fromCoast).indexOf(toId) === -1) return false;
+	var dest = DiplomacyBoard.province(graph, toId);
+	if (DiplomacyBoard.isMultiCoast(dest)) {
+		if (!toCoast) return false;
+		var coast = DiplomacyBoard.coastById(dest, toCoast);
+		if (!coast) return false;
+		if ((coast.fleet || []).indexOf(fromId) === -1) return false;
+		// Two split provinces can meet on both shores. `via` names which
+		// coast of the other province this coast actually touches.
+		var origin = DiplomacyBoard.province(graph, fromId);
+		if (!DiplomacyBoard.isMultiCoast(origin)) return true;
+		var from = DiplomacyBoard.coastById(origin, fromCoast);
+		if (!from) return false;
+		return DiplomacyBoard.coastViaAllows(from, toId, toCoast) && DiplomacyBoard.coastViaAllows(coast, fromId, fromCoast);
+	}
+	return !toCoast;
+};
+
+DiplomacyBoard.coastViaAllows = function (coast, otherId, otherCoast) {
+	if (!coast || !coast.via || !Object.prototype.hasOwnProperty.call(coast.via, otherId)) return true;
+	var allowed = coast.via[otherId];
+	return Array.isArray(allowed) && allowed.indexOf(otherCoast) !== -1;
+};
+
+DiplomacyBoard.reachableCoasts = function (graph, fromId, fromCoast, toId) {
+	var dest = DiplomacyBoard.province(graph, toId);
+	if (!DiplomacyBoard.isMultiCoast(dest)) return [];
+	var coasts = DiplomacyBoard.coastList(dest);
+	var out = [];
+	for (var i = 0; i < coasts.length; i++) {
+		if (DiplomacyBoard.fleetMoveLegal(graph, fromId, fromCoast, toId, coasts[i].id)) out.push(coasts[i]);
+	}
+	return out;
+};
+
+DiplomacyBoard.fleetCanReachProvince = function (graph, fromId, fromCoast, toId) {
+	var dest = DiplomacyBoard.province(graph, toId);
+	if (!dest) return false;
+	if (DiplomacyBoard.isMultiCoast(dest)) return DiplomacyBoard.reachableCoasts(graph, fromId, fromCoast, toId).length > 0;
+	return DiplomacyBoard.fleetMoveLegal(graph, fromId, fromCoast, toId, "");
+};
+
+DiplomacyBoard.placeLabel = function (graph, provinceId, coastId) {
+	var province = DiplomacyBoard.province(graph, provinceId);
+	var name = province && province.name ? province.name : String(provinceId || "");
+	var coast = DiplomacyBoard.coastById(province, coastId);
+	if (coast && coast.name) return name + ", " + coast.name;
+	return name;
+};
+
+DiplomacyBoard.unitHeading = function (graph, unit) {
+	var kind = unit && unit.unit ? unit.unit : "unit";
+	return kind + " in " + DiplomacyBoard.placeLabel(graph, unit && unit.province, unit && unit.coast);
+};
+
+DiplomacyBoard.clickProvince = function (click) {
+	if (click && typeof click === "object") return click.province || "";
+	return click || "";
+};
+
+DiplomacyBoard.clickCoast = function (click) {
+	if (click && typeof click === "object") return click.coast || "";
+	return "";
+};
+
+DiplomacyBoard.nearestSea = function (graph, province) {
+	if (!province || !province.center) return null;
+	var list = province.fleet || [];
+	var best = null;
+	var bestD = Infinity;
+	for (var i = 0; i < list.length; i++) {
+		var sea = DiplomacyBoard.province(graph, list[i]);
+		if (!sea || sea.kind !== "sea" || !sea.center) continue;
+		var dx = sea.center.x - province.center.x;
+		var dy = sea.center.y - province.center.y;
+		var d = dx * dx + dy * dy;
+		if (d < bestD) {
+			bestD = d;
+			best = sea;
+		}
+	}
+	return best;
+};
+
+// Armies use the province center. A fleet uses its coast anchor, or sits on
+// the water edge toward the nearest sea.
+DiplomacyBoard.unitPoint = function (graph, unit) {
+	var province = DiplomacyBoard.province(graph, unit && unit.province);
+	if (!province || !province.center) return null;
+	if (!unit || unit.unit !== "fleet" || province.kind === "sea") return province.center;
+	var coast = DiplomacyBoard.coastById(province, unit.coast);
+	if (!coast && DiplomacyBoard.coastList(province).length === 1) coast = province.coasts[0];
+	if (coast && coast.anchor) return { x: coast.anchor.x, y: coast.anchor.y };
+	var sea = DiplomacyBoard.nearestSea(graph, province);
+	if (!sea) return province.center;
+	var dx = sea.center.x - province.center.x;
+	var dy = sea.center.y - province.center.y;
+	var len = Math.hypot(dx, dy) || 1;
+	var step = Math.min(len * 0.45, 80);
+	return {
+		x: province.center.x + (dx / len) * step,
+		y: province.center.y + (dy / len) * step
+	};
+};
+
+// Local hull space has the bow at negative y. Map y grows downward, so
+// starboard is a clockwise quarter-turn from the facing vector.
+DiplomacyBoard.hullOffset = function (facing, lx, ly) {
+	var fx = facing && typeof facing.x === "number" ? facing.x : 0;
+	var fy = facing && typeof facing.y === "number" ? facing.y : -1;
+	var len = Math.hypot(fx, fy) || 1;
+	var ux = fx / len;
+	var uy = fy / len;
+	var rx = -uy;
+	var ry = ux;
+	return {
+		x: lx * rx - ly * ux,
+		y: lx * ry - ly * uy
+	};
+};
+
+DiplomacyBoard.fleetFacing = function (graph, unit, anchor) {
+	var province = DiplomacyBoard.province(graph, unit && unit.province);
+	if (!province || !anchor) return { x: 0, y: -1 };
+	var coast = DiplomacyBoard.coastById(province, unit.coast);
+	if (!coast && DiplomacyBoard.coastList(province).length === 1) coast = province.coasts[0];
+	if (coast && coast.facing && (coast.facing.x || coast.facing.y)) return coast.facing;
+	var ids = coast && Array.isArray(coast.fleet) ? coast.fleet : (province.fleet || []);
+	var sx = 0;
+	var sy = 0;
+	var n = 0;
+	for (var i = 0; i < ids.length; i++) {
+		var sea = DiplomacyBoard.province(graph, ids[i]);
+		if (!sea || sea.kind !== "sea" || !sea.center) continue;
+		sx += sea.center.x;
+		sy += sea.center.y;
+		n += 1;
+	}
+	if (!n) {
+		var nearest = DiplomacyBoard.nearestSea(graph, province);
+		if (!nearest) return { x: 0, y: -1 };
+		return { x: nearest.center.x - anchor.x, y: nearest.center.y - anchor.y };
+	}
+	return { x: sx / n - anchor.x, y: sy / n - anchor.y };
+};
+
 // Direct move, or an army convoy along seas that currently have fleets.
 // This does not look at orders: a convoy counts as a move the army could make.
-DiplomacyBoard.canReach = function (graph, position, unit, destId) {
+DiplomacyBoard.canReach = function (graph, position, unit, destId, destCoast) {
 	if (!unit || !destId) return false;
 	destId = DiplomacyBoard.provinceId(graph, destId);
+	if (unit.unit === "fleet") {
+		if (destCoast) return DiplomacyBoard.fleetMoveLegal(graph, unit.province, unit.coast, destId, destCoast);
+		return DiplomacyBoard.fleetCanReachProvince(graph, unit.province, unit.coast, destId);
+	}
 	if (DiplomacyBoard.isLegalMove(graph, unit.province, unit.unit, destId)) return true;
 	if (unit.unit !== "army") return false;
 	var dest = DiplomacyBoard.province(graph, destId);
@@ -378,10 +568,18 @@ DiplomacyBoard.validatePosition = function (graph, doc) {
 		occupied[unit.province] = true;
 		if (unit.unit !== "army" && unit.unit !== "fleet") DiplomacyBoard.fail("Unit in " + unit.province + " must be army or fleet");
 		if (!seen[unit.power]) DiplomacyBoard.fail("Unit in " + unit.province + " belongs to unknown power " + unit.power);
+		var home = DiplomacyBoard.province(graph, unit.province);
+		if (!home) DiplomacyBoard.fail("Unknown province " + unit.province);
 		if (!DiplomacyBoard.canPlace(graph, unit.province, unit.unit)) {
 			DiplomacyBoard.fail("A " + unit.unit + " cannot stand in " + unit.province);
 		}
-		if (!DiplomacyBoard.province(graph, unit.province)) DiplomacyBoard.fail("Unknown province " + unit.province);
+		if (unit.unit === "fleet" && DiplomacyBoard.isMultiCoast(home)) {
+			if (!DiplomacyBoard.coastById(home, unit.coast)) {
+				DiplomacyBoard.fail("Fleet in " + (home.name || unit.province) + " needs a coast");
+			}
+		} else if (unit.coast) {
+			DiplomacyBoard.fail((home.name || unit.province) + " does not use a coast");
+		}
 	}
 	return true;
 };
@@ -414,11 +612,15 @@ DiplomacyBoard.copyOrder = function (raw, standing) {
 		power: standing.power,
 		action: action
 	};
-	if (action === "move") order.to = raw.to;
+	if (action === "move") {
+		order.to = raw.to;
+		if (raw.coast) order.coast = raw.coast;
+	}
 	if (action === "support-defense") order.target = raw.target;
 	if (action === "support-move") {
 		order.target = raw.target;
 		order.to = raw.to;
+		if (raw.coast) order.coast = raw.coast;
 	}
 	if (action === "convoy") {
 		order.from = raw.from || (standing.unit === "army" ? standing.province : raw.from);
@@ -435,11 +637,15 @@ DiplomacyBoard.exportableOrder = function (order) {
 		unit: order.unit,
 		action: action
 	};
-	if (action === "move") out.to = order.to;
+	if (action === "move") {
+		out.to = order.to;
+		if (order.coast) out.coast = order.coast;
+	}
 	if (action === "support-defense") out.target = order.target;
 	if (action === "support-move") {
 		out.target = order.target;
 		out.to = order.to;
+		if (order.coast) out.coast = order.coast;
 	}
 	if (action === "convoy") {
 		out.from = order.from;
@@ -454,24 +660,36 @@ DiplomacyBoard.isLegalOrder = function (graph, position, order) {
 	if (!standing) return false;
 	if (order.unit && order.unit !== standing.unit) return false;
 	var action = DiplomacyBoard.normalizeAction(order.action);
-	if (action === "hold") return true;
+	if (action === "hold") return !order.coast;
 	if (action === "move") {
-		return DiplomacyBoard.isLegalMove(graph, order.province, standing.unit, order.to);
+		if (standing.unit === "fleet") {
+			return DiplomacyBoard.fleetMoveLegal(graph, order.province, standing.coast, order.to, order.coast || "");
+		}
+		return !order.coast && DiplomacyBoard.isLegalMove(graph, order.province, standing.unit, order.to);
 	}
 	if (action === "support-defense") {
-		return order.target
-			&& order.target !== order.province
-			&& DiplomacyBoard.unitAt(position.units, order.target)
-			&& DiplomacyBoard.isLegalMove(graph, order.province, standing.unit, order.target);
+		if (!order.target || order.target === order.province || order.coast) return false;
+		if (!DiplomacyBoard.unitAt(position.units, order.target)) return false;
+		if (standing.unit === "fleet") return DiplomacyBoard.fleetCanReachProvince(graph, order.province, standing.coast, order.target);
+		return DiplomacyBoard.isLegalMove(graph, order.province, standing.unit, order.target);
 	}
 	if (action === "support-move") {
 		var ally = DiplomacyBoard.unitAt(position.units, order.target);
-		return !!(ally
-			&& order.target !== order.province
-			&& order.to
-			&& order.to !== order.province
-			&& DiplomacyBoard.isLegalMove(graph, order.province, standing.unit, order.to)
-			&& DiplomacyBoard.canReach(graph, position, ally, order.to));
+		if (!ally || order.target === order.province || !order.to || order.to === order.province) return false;
+		var dest = DiplomacyBoard.province(graph, order.to);
+		var coast = order.coast || "";
+		if (ally.unit === "fleet") {
+			if (DiplomacyBoard.isMultiCoast(dest)) {
+				if (!coast || !DiplomacyBoard.fleetMoveLegal(graph, ally.province, ally.coast, order.to, coast)) return false;
+			} else if (coast || !DiplomacyBoard.fleetMoveLegal(graph, ally.province, ally.coast, order.to, "")) return false;
+		} else if (coast || !DiplomacyBoard.canReach(graph, position, ally, order.to)) return false;
+		if (standing.unit === "fleet") {
+			if (DiplomacyBoard.isMultiCoast(dest)) {
+				return !!coast && DiplomacyBoard.fleetMoveLegal(graph, order.province, standing.coast, order.to, coast);
+			}
+			return DiplomacyBoard.fleetMoveLegal(graph, order.province, standing.coast, order.to, "");
+		}
+		return DiplomacyBoard.isLegalMove(graph, order.province, standing.unit, order.to);
 	}
 	if (action === "convoy") {
 		var here = DiplomacyBoard.province(graph, order.province);
@@ -585,13 +803,18 @@ DiplomacyBoard.exportRetreatOrder = function (order) {
 		unit: order.unit,
 		action: order.action
 	};
-	if (order.action === "retreat") out.to = order.to;
+	if (order.action === "retreat") {
+		out.to = order.to;
+		if (order.coast) out.coast = order.coast;
+	}
 	return out;
 };
 
 DiplomacyBoard.exportAdjustmentOrder = function (order) {
 	if (order.action === "build") {
-		return { action: "build", province: order.province, unit: order.unit };
+		var built = { action: "build", province: order.province, unit: order.unit };
+		if (order.coast) built.coast = order.coast;
+		return built;
 	}
 	return { action: "disband", province: order.province };
 };
@@ -623,6 +846,14 @@ DiplomacyBoard.validateRetreats = function (graph, doc, retreats, expectedPower)
 				if (DiplomacyBoard.canonProvince(graph, choices[c]) === to) allowed = true;
 			}
 			if (!allowed) DiplomacyBoard.fail("Retreat from " + order.province + " is not one of the choices");
+			var dest = DiplomacyBoard.province(graph, to);
+			if (order.unit === "fleet" && DiplomacyBoard.isMultiCoast(dest)) {
+				if (!DiplomacyBoard.coastById(dest, order.coast)) {
+					DiplomacyBoard.fail("Retreat to " + (dest.name || to) + " needs a coast");
+				}
+			} else if (order.coast) {
+				DiplomacyBoard.fail("Retreat to " + (dest && dest.name || to) + " does not use a coast");
+			}
 		} else if (order.action === "disband") {
 			if (!entry.disband) DiplomacyBoard.fail("Disband is not offered for " + order.province);
 		} else {
@@ -654,6 +885,14 @@ DiplomacyBoard.validateAdjustments = function (graph, doc, adjustments, expected
 		if (order.action === "build") {
 			var offered = DiplomacyBoard.adjustmentBuildsAt(graph, adjustment, provinceId);
 			if (offered.indexOf(order.unit) === -1) DiplomacyBoard.fail("Build in " + order.province + " is not one of the choices");
+			var buildAt = DiplomacyBoard.province(graph, provinceId);
+			if (order.unit === "fleet" && DiplomacyBoard.isMultiCoast(buildAt)) {
+				if (!DiplomacyBoard.coastById(buildAt, order.coast)) {
+					DiplomacyBoard.fail("Build in " + (buildAt.name || provinceId) + " needs a coast");
+				}
+			} else if (order.coast) {
+				DiplomacyBoard.fail("Build in " + (buildAt && buildAt.name || provinceId) + " does not use a coast");
+			}
 			builds += 1;
 		} else if (order.action === "disband") {
 			if (!DiplomacyBoard.adjustmentCanDisband(graph, adjustment, provinceId)) {

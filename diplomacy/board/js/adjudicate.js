@@ -85,13 +85,16 @@ DiplomacyBoard.adjudicate = function (graph, position, orders) {
 		var standing = units[i];
 		var outcome = standing && byProvince[standing.province];
 		if (!outcome) continue;
-		drawn.push({
+		var drawnUnit = {
 			province: outcome.moved ? outcome.to : standing.province,
 			origin: standing.province,
 			unit: standing.unit,
 			power: standing.power,
 			dislodged: !!outcome.dislodged
-		});
+		};
+		var coast = outcome.moved && standing.unit === "fleet" ? (outcome.destCoast || "") : (standing.coast || "");
+		if (coast) drawnUnit.coast = coast;
+		drawn.push(drawnUnit);
 	}
 
 	return { text: text, notes: notes.slice(), units: drawn, results: results };
@@ -108,6 +111,9 @@ DiplomacyBoard.adjudicate = function (graph, position, orders) {
 			supportMove: false,
 			supportTarget: null,
 			supportTo: null,
+			supportCoast: "",
+			destCoast: "",
+			unitCoast: unit.coast || "",
 			convoyFrom: null,
 			convoyTo: null,
 			state: UNRESOLVED,
@@ -119,6 +125,7 @@ DiplomacyBoard.adjudicate = function (graph, position, orders) {
 		if (action === "move") {
 			order.action = "move";
 			order.to = raw.to || null;
+			order.destCoast = raw.coast || "";
 			if (!order.to) order.illegal = true;
 		} else if (action === "convoy" && unit.unit === "army") {
 			order.action = "move";
@@ -138,6 +145,7 @@ DiplomacyBoard.adjudicate = function (graph, position, orders) {
 			order.supportMove = true;
 			order.supportTarget = raw.target || null;
 			order.supportTo = raw.to || null;
+			order.supportCoast = raw.coast || "";
 		} else if (action !== "hold") {
 			order.illegal = true;
 		}
@@ -184,7 +192,11 @@ DiplomacyBoard.adjudicate = function (graph, position, orders) {
 	}
 
 	function directPath(order) {
-		return !!(order.to && DiplomacyBoard.isLegalMove(graph, order.province, order.unit, order.to));
+		if (!order.to) return false;
+		if (order.unit === "fleet") {
+			return DiplomacyBoard.fleetMoveLegal(graph, order.province, order.unitCoast, order.to, order.destCoast || "");
+		}
+		return DiplomacyBoard.isLegalMove(graph, order.province, order.unit, order.to);
 	}
 
 	function pathSucceeds(order) {
@@ -226,7 +238,7 @@ DiplomacyBoard.adjudicate = function (graph, position, orders) {
 		var target = byProvince[order.supportTarget];
 		if (!target) return false;
 		if (!order.supportMove) return target.action !== "move";
-		return target.action === "move" && target.to === order.supportTo;
+		return target.action === "move" && target.to === order.supportTo && (target.destCoast || "") === (order.supportCoast || "");
 	}
 
 	function supportCount(move, skipPower) {
@@ -427,8 +439,15 @@ DiplomacyBoard.adjudicate = function (graph, position, orders) {
 		return resolve(nr);
 	}
 
+	function coastName(order) {
+		if (!order || !order.destCoast) return "";
+		var province = DiplomacyBoard.province(graph, order.to);
+		var coast = DiplomacyBoard.coastById(province, order.destCoast);
+		return coast && coast.name ? ", " + coast.name : "";
+	}
+
 	function summary(order) {
-		var dest = order.to ? placeName(order.to) : "";
+		var dest = order.to ? placeName(order.to) + coastName(order) : "";
 		if (order.action === "move" && order.dislodged) {
 			if (order.viaConvoy && !order.pathOk) return "convoy to " + dest + " is disrupted, and the unit is dislodged";
 			return "fails to move to " + dest + " and is dislodged";
@@ -448,7 +467,14 @@ DiplomacyBoard.adjudicate = function (graph, position, orders) {
 		if (order.action === "support") {
 			if (!supportWanted(order)) return "support is void";
 			if (!order.resolution) return "support is cut";
-			if (order.supportMove) return "supports " + placeName(order.supportTarget) + " to " + placeName(order.supportTo);
+			if (order.supportMove) {
+				var supported = placeName(order.supportTo);
+				if (order.supportCoast) {
+					var coast = DiplomacyBoard.coastById(DiplomacyBoard.province(graph, order.supportTo), order.supportCoast);
+					if (coast && coast.name) supported += ", " + coast.name;
+				}
+				return "supports " + placeName(order.supportTarget) + " to " + supported;
+			}
 			return "supports " + placeName(order.supportTarget);
 		}
 		if (order.action === "convoy") {

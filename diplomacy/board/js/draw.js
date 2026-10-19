@@ -131,7 +131,10 @@ DiplomacyBoard.markPickProvinces = function (svg, cam, ids) {
 };
 
 DiplomacyBoard.tokenSize = function (stage) {
-	return Math.max(30, Math.min(39, (stage.clientWidth || 1) * 0.06));
+	var w = stage.clientWidth || 1;
+	var h = stage.clientHeight || 1;
+	var short = Math.min(w, h);
+	return Math.max(22, Math.min(64, short * 0.08));
 };
 
 DiplomacyBoard.hitRadiusMap = function (stage, cam) {
@@ -167,10 +170,10 @@ DiplomacyBoard.unitNear = function (graph, units, mapPt, radius) {
 	var bestD = radius * radius;
 	for (var i = 0; i < units.length; i++) {
 		var unit = units[i];
-		var province = DiplomacyBoard.province(graph, unit.province);
-		if (!province) continue;
-		var dx = mapPt.x - province.center.x;
-		var dy = mapPt.y - province.center.y;
+		var at = DiplomacyBoard.unitPoint(graph, unit);
+		if (!at) continue;
+		var dx = mapPt.x - at.x;
+		var dy = mapPt.y - at.y;
 		var d = dx * dx + dy * dy;
 		if (d <= bestD) {
 			bestD = d;
@@ -178,6 +181,52 @@ DiplomacyBoard.unitNear = function (graph, units, mapPt, radius) {
 		}
 	}
 	return best;
+};
+
+DiplomacyBoard.markOwnedProvinces = function (svg, cam, graph, position, powerId) {
+	if (!svg) return;
+	var overlay = svg.querySelector("#owned-highlight");
+	if (!overlay) {
+		var ns = "http://www.w3.org/2000/svg";
+		overlay = document.createElementNS(ns, "g");
+		overlay.setAttribute("id", "owned-highlight");
+		overlay.setAttribute("fill", "none");
+		overlay.setAttribute("stroke-linejoin", "round");
+		overlay.setAttribute("stroke-linecap", "round");
+		overlay.setAttribute("pointer-events", "none");
+		var pick = svg.querySelector("#pick-highlight");
+		if (pick) svg.insertBefore(overlay, pick);
+		else {
+			var dots = svg.querySelector("#dots");
+			if (dots) svg.insertBefore(overlay, dots);
+			else svg.appendChild(overlay);
+		}
+	}
+	while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
+	if (!powerId || !position) return;
+	var power = DiplomacyBoard.powerById(position.powers || [], powerId);
+	if (!power) return;
+	var borders = svg.querySelector("#borders");
+	var borderWidth = borders ? parseFloat(borders.getAttribute("stroke-width")) : NaN;
+	if (!borderWidth || borderWidth !== borderWidth) borderWidth = Math.max(cam.w, cam.h) * 0.0016;
+	var span = Math.max(cam.w, cam.h);
+	overlay.setAttribute("stroke", power.color || "#1c1c1c");
+	overlay.setAttribute("stroke-width", String(Math.max(borderWidth * 3.2, span * 0.0045)));
+	var ns = "http://www.w3.org/2000/svg";
+	var nodes = DiplomacyBoard.territoryNodes(svg);
+	for (var n = 0; n < nodes.length; n++) {
+		var node = nodes[n];
+		var province = DiplomacyBoard.province(graph, node.id);
+		if (!province || province.kind === "sea") continue;
+		if (province.waterParts && province.waterParts.indexOf(node.id) !== -1) continue;
+		var id = DiplomacyBoard.provinceId(graph, node.id);
+		if (position.ownership[id] !== powerId) continue;
+		var d = node.getAttribute("d");
+		if (!d) continue;
+		var outline = document.createElementNS(ns, "path");
+		outline.setAttribute("d", d);
+		overlay.appendChild(outline);
+	}
 };
 
 DiplomacyBoard.provinceFromEvent = function (svg, graph, event) {
@@ -196,8 +245,10 @@ DiplomacyBoard.syncUnitsCanvas = function (canvas, stage) {
 	var dpr = window.devicePixelRatio || 1;
 	var nextW = Math.max(1, Math.round(cssW * dpr));
 	var nextH = Math.max(1, Math.round(cssH * dpr));
-	if (canvas.width !== nextW) canvas.width = nextW;
-	if (canvas.height !== nextH) canvas.height = nextH;
+	if (canvas.width !== nextW || canvas.height !== nextH) {
+		canvas.width = nextW;
+		canvas.height = nextH;
+	}
 	var ctx = canvas.getContext("2d");
 	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 	ctx.clearRect(0, 0, cssW, cssH);
@@ -383,17 +434,51 @@ function paintPendingDisband(ctx, project, token, center, color) {
 	ctx.restore();
 }
 
-function paintBuild(ctx, project, token, center, unit, color) {
+function hullPath(ctx, x, y, r, facing) {
+	var scale = r;
+	var pts = [
+		[0, -0.95],
+		[-0.28, -0.48],
+		[-0.40, 0.02],
+		[-0.62, 0.58],
+		[-0.58, 0.96],
+		[0.58, 0.96],
+		[0.62, 0.58],
+		[0.40, 0.02],
+		[0.28, -0.48]
+	];
+	ctx.beginPath();
+	for (var i = 0; i < pts.length; i++) {
+		var off = DiplomacyBoard.hullOffset(facing, pts[i][0] * scale, pts[i][1] * scale);
+		var px = x + off.x;
+		var py = y + off.y;
+		if (i === 0) ctx.moveTo(px, py);
+		else ctx.lineTo(px, py);
+	}
+	ctx.closePath();
+}
+
+function paintRing(ctx, x, y, radius, color) {
+	ctx.save();
+	ctx.beginPath();
+	ctx.arc(x, y, radius, 0, Math.PI * 2);
+	ctx.strokeStyle = "#ffffff";
+	ctx.lineWidth = Math.max(3.5, radius * 0.14);
+	ctx.stroke();
+	ctx.beginPath();
+	ctx.arc(x, y, radius, 0, Math.PI * 2);
+	ctx.strokeStyle = color;
+	ctx.lineWidth = Math.max(2.25, radius * 0.09);
+	ctx.stroke();
+	ctx.restore();
+}
+
+function paintBuild(ctx, project, token, center, unit, color, facing) {
 	var at = project(center);
 	var r = token / 2;
 	function outline(width, stroke) {
-		if (unit === "fleet") {
-			var s = r * 1.55;
-			ctx.beginPath();
-			ctx.rect(at.x - s / 2, at.y - s / 2, s, s);
-		} else {
-			starPath(ctx, at.x, at.y, r);
-		}
+		if (unit === "fleet") hullPath(ctx, at.x, at.y, r, facing);
+		else starPath(ctx, at.x, at.y, r);
 		ctx.setLineDash([5, 4]);
 		ctx.strokeStyle = stroke;
 		ctx.lineWidth = width;
@@ -439,54 +524,71 @@ function paintHold(ctx, project, token, center, color) {
 	ctx.restore();
 }
 
+function orderUnit(position, order) {
+	var standing = DiplomacyBoard.unitAt(position.units || [], order.province);
+	if (standing) return standing;
+	return { province: order.province, unit: order.unit, power: order.power, coast: order.coast };
+}
+
+function pointFor(graph, spec) {
+	return DiplomacyBoard.unitPoint(graph, spec) || { x: 0, y: 0 };
+}
+
 function paintOrders(ctx, view) {
 	var project = view.project;
 	var token = view.tokenSize;
 	var graph = view.graph;
 	var position = view.position;
 	var orders = view.orders;
+	var ghost = !!view.ghost;
 	for (var i = 0; i < orders.length; i++) {
 		var order = orders[i];
 		var here = DiplomacyBoard.province(graph, order.province);
 		if (!here) continue;
-		var power = DiplomacyBoard.powerById(position.powers, order.power);
+		var actor = orderUnit(position, order);
+		var from = pointFor(graph, actor);
+		var power = DiplomacyBoard.powerById(position.powers, order.power || actor.power);
 		var color = power ? power.color : "#1c1c1c";
 		var action = DiplomacyBoard.normalizeAction(order.action);
 		if (action === "hold") {
-			paintHold(ctx, project, token, here.center, color);
+			paintHold(ctx, project, token, from, color);
 			continue;
 		}
 		if (action === "move") {
-			var dest = DiplomacyBoard.province(graph, order.to);
-			if (dest) paintArrow(ctx, project, token, here.center, dest.center, color, false, true);
+			var dest = pointFor(graph, { province: order.to, unit: actor.unit, coast: order.coast });
+			if (DiplomacyBoard.province(graph, order.to)) paintArrow(ctx, project, token, from, dest, color, ghost, true);
 			continue;
 		}
 		if (action === "support-defense") {
-			var held = DiplomacyBoard.province(graph, order.target);
-			if (held) paintArrow(ctx, project, token, here.center, held.center, color, true, true);
+			var heldUnit = DiplomacyBoard.unitAt(position.units || [], order.target);
+			var held = pointFor(graph, heldUnit || { province: order.target, unit: "army" });
+			if (DiplomacyBoard.province(graph, order.target)) paintArrow(ctx, project, token, from, held, color, true, true);
 			continue;
 		}
 		if (action === "support-move") {
-			var allyProv = DiplomacyBoard.province(graph, order.target);
-			var attackTo = DiplomacyBoard.province(graph, order.to);
-			if (allyProv && attackTo) {
-				paintArrow(ctx, project, token, here.center, attackTo.center, color, true, true, allyProv.center);
-			} else if (attackTo) {
-				paintArrow(ctx, project, token, here.center, attackTo.center, color, true, true);
+			var ally = DiplomacyBoard.unitAt(position.units || [], order.target);
+			var allyAt = pointFor(graph, ally || { province: order.target, unit: "army" });
+			var attackTo = pointFor(graph, { province: order.to, unit: ally && ally.unit || "fleet", coast: order.coast });
+			if (DiplomacyBoard.province(graph, order.target) && DiplomacyBoard.province(graph, order.to)) {
+				paintArrow(ctx, project, token, from, attackTo, color, true, true, allyAt);
+			} else if (DiplomacyBoard.province(graph, order.to)) {
+				paintArrow(ctx, project, token, from, attackTo, color, true, true);
 			}
 			continue;
 		}
 		if (action === "retreat") {
-			var retreatTo = DiplomacyBoard.province(graph, order.to);
-			if (retreatTo) paintArrow(ctx, project, token, here.center, retreatTo.center, color, true, true);
+			var retreatTo = pointFor(graph, { province: order.to, unit: order.unit, coast: order.coast });
+			if (DiplomacyBoard.province(graph, order.to)) paintArrow(ctx, project, token, from, retreatTo, color, true, true);
 			continue;
 		}
 		if (action === "disband") {
-			paintPendingDisband(ctx, project, token, here.center, color);
+			paintPendingDisband(ctx, project, token, from, color);
 			continue;
 		}
 		if (action === "build") {
-			paintBuild(ctx, project, token, here.center, order.unit, color);
+			var buildAt = pointFor(graph, { province: order.province, unit: order.unit, coast: order.coast });
+			var facing = order.unit === "fleet" ? DiplomacyBoard.fleetFacing(graph, { province: order.province, unit: "fleet", coast: order.coast }, buildAt) : null;
+			paintBuild(ctx, project, token, buildAt, order.unit, color, facing);
 			continue;
 		}
 		if (action === "convoy") {
@@ -494,8 +596,8 @@ function paintOrders(ctx, view) {
 			var landAt = DiplomacyBoard.province(graph, order.to);
 			if (order.unit === "fleet") {
 				if (origin && landAt) {
-					paintArrow(ctx, project, token, origin.center, landAt.center, color, false, true);
-					paintArrow(ctx, project, token, here.center, {
+					paintArrow(ctx, project, token, origin.center, landAt.center, color, ghost, true);
+					paintArrow(ctx, project, token, from, {
 						x: (origin.center.x + landAt.center.x) / 2,
 						y: (origin.center.y + landAt.center.y) / 2
 					}, color, true, true);
@@ -508,7 +610,7 @@ function paintOrders(ctx, view) {
 					if (sea) points.push(sea.center);
 				}
 				points.push(landAt.center);
-				paintSnake(ctx, project, token, points, color, false, true);
+				paintSnake(ctx, project, token, points, color, ghost, true);
 			}
 		}
 	}
@@ -524,20 +626,46 @@ function tokensToDraw(view) {
 			origin: unit.province,
 			unit: unit.unit,
 			power: unit.power,
+			coast: unit.coast,
 			dislodged: false
 		});
 	}
 	return list;
 }
 
+function unitNeedsOrder(view, unit) {
+	if (view.readOnly || view.orderScope !== "mine" || !view.playingAs) return false;
+	if (unit.power !== view.playingAs) return false;
+	var home = unit.origin || unit.province;
+	var orders = view.orders || [];
+	var ordered = false;
+	for (var i = 0; i < orders.length; i++) {
+		if (orders[i].province === home) ordered = true;
+	}
+	if (ordered) return false;
+	if (view.mode === "retreat") {
+		var entry = DiplomacyBoard.findRetreat(view.graph, view.retreats || [], home);
+		return !!(entry && entry.power === view.playingAs);
+	}
+	if (view.mode === "build") {
+		var adjustment = DiplomacyBoard.findAdjustment(view.adjustments || [], view.playingAs);
+		return DiplomacyBoard.adjustmentCanDisband(view.graph, adjustment, home);
+	}
+	return view.mode === "orders";
+}
+
 function paintTokens(ctx, view) {
 	var r = view.tokenSize / 2;
+	var ring = r * 1.6;
 	var list = tokensToDraw(view);
 	var groups = {};
 	var keys = [];
 	var i;
 	for (i = 0; i < list.length; i++) {
-		var key = list[i].province;
+		var atPoint = DiplomacyBoard.unitPoint(view.graph, list[i]);
+		if (!atPoint) continue;
+		list[i].at = atPoint;
+		var key = Math.round(atPoint.x) + "," + Math.round(atPoint.y);
 		if (!groups[key]) {
 			groups[key] = [];
 			keys.push(key);
@@ -546,25 +674,23 @@ function paintTokens(ctx, view) {
 	}
 	for (var g = 0; g < keys.length; g++) {
 		var group = groups[keys[g]];
-		var province = DiplomacyBoard.province(view.graph, keys[g]);
-		if (!province) continue;
-		var at = view.project(province.center);
 		for (i = 0; i < group.length; i++) {
 			var unit = group[i];
+			var at = view.project(unit.at);
 			var dx = group.length === 1 ? 0 : (i - (group.length - 1) / 2) * r * 1.8;
 			var x = at.x + dx;
 			var y = at.y;
 			var power = DiplomacyBoard.powerById(view.position.powers, unit.power);
 			var color = power ? power.color : "#1c1c1c";
-			var selected = view.openProvince === unit.origin;
+			var selected = view.openProvince === unit.origin || view.openProvince === unit.province;
+			if (!selected && unitNeedsOrder(view, unit)) paintRing(ctx, x, y, ring, color);
 			if (unit.unit === "fleet") {
-				var s = r * 1.55;
-				ctx.beginPath();
-				ctx.rect(x - s / 2, y - s / 2, s, s);
+				hullPath(ctx, x, y, r, DiplomacyBoard.fleetFacing(view.graph, unit, unit.at));
 			} else {
 				starPath(ctx, x, y, r);
 			}
 			paintToken(ctx, color, selected);
+			if (selected) paintRing(ctx, x, y, ring, "#111111");
 			if (unit.dislodged) paintDislodged(ctx, x, y, r);
 		}
 	}
@@ -573,5 +699,15 @@ function paintTokens(ctx, view) {
 DiplomacyBoard.paintUnitsAndOrders = function (ctx, view) {
 	paintTokens(ctx, view);
 	paintOrders(ctx, view);
+	if (view.ghostOrders && view.ghostOrders.length) {
+		paintOrders(ctx, {
+			project: view.project,
+			tokenSize: view.tokenSize,
+			graph: view.graph,
+			position: view.position,
+			orders: view.ghostOrders,
+			ghost: true
+		});
+	}
 };
 })();

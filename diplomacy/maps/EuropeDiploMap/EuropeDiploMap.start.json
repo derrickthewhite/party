@@ -71,7 +71,7 @@
     { "province": "territory-55", "unit": "army", "power": "austria" },
     { "province": "territory-59", "unit": "army", "power": "austria" },
     { "province": "territory-63", "unit": "fleet", "power": "austria" },
-    { "province": "territory-6", "unit": "fleet", "power": "russia" },
+    { "province": "territory-6", "unit": "fleet", "power": "russia", "coast": "sc" },
     { "province": "territory-23", "unit": "army", "power": "russia" },
     { "province": "territory-40", "unit": "army", "power": "russia" },
     { "province": "territory-49", "unit": "fleet", "power": "russia" },

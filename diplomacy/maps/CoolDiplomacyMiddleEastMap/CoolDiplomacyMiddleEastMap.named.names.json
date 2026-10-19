@@ -1,0 +1,13 @@
+{
+  "aegean-sea": "Aegean Sea",
+  "aegean-sea-2": { "name": "Gulf of Corinth", "access": "unnamed" },
+  "aegean-sea-3": { "name": "Thermaic Gulf", "access": "unnamed" },
+  "aegean-sea-4": { "name": "Gulf of Euboea", "access": "unnamed" },
+  "aegean-sea-5": { "name": "Ionian Sea", "access": "unnamed" },
+  "island": "Bahrain",
+  "island-2": "Crete",
+  "island-3": "Socotra",
+  "island-4": "Lesbos",
+  "island-5": "Rhodes",
+  "sahara": { "name": "Sahara", "access": "impassable" }
+}

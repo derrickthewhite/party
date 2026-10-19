@@ -238,6 +238,22 @@
         "black-sea",
         "caspian-sea",
         "sakartvelo"
+      ],
+      "coasts": [
+        {
+          "id": "wc",
+          "name": "West Coast",
+          "anchor": { "x": 2064, "y": 357.8 },
+          "fleet": ["ankara", "black-sea", "sakartvelo"],
+          "via": { "sakartvelo": ["wc"] }
+        },
+        {
+          "id": "ec",
+          "name": "East Coast",
+          "anchor": { "x": 2909.6, "y": 599.6 },
+          "fleet": ["azerbaijan", "caspian-sea", "sakartvelo"],
+          "via": { "sakartvelo": ["ec"] }
+        }
       ]
     },
     "azerbaijan": {
@@ -1491,6 +1507,22 @@
         "armenia",
         "black-sea",
         "caspian-sea"
+      ],
+      "coasts": [
+        {
+          "id": "wc",
+          "name": "West Coast",
+          "anchor": { "x": 1985, "y": 155.7 },
+          "fleet": ["black-sea", "armenia"],
+          "via": { "armenia": ["wc"] }
+        },
+        {
+          "id": "ec",
+          "name": "East Coast",
+          "anchor": { "x": 2715.8, "y": 197.8 },
+          "fleet": ["caspian-sea", "armenia"],
+          "via": { "armenia": ["ec"] }
+        }
       ]
     },
     "samakand": {
@@ -1595,6 +1627,20 @@
         "black-sea",
         "constantinople",
         "greece"
+      ],
+      "coasts": [
+        {
+          "id": "ec",
+          "name": "East Coast",
+          "anchor": { "x": 768.2, "y": 136 },
+          "fleet": ["black-sea", "constantinople"]
+        },
+        {
+          "id": "sc",
+          "name": "South Coast",
+          "anchor": { "x": 355.9, "y": 503.7 },
+          "fleet": ["aegean-sea", "greece", "constantinople"]
+        }
       ]
     },
     "south-arabia": {

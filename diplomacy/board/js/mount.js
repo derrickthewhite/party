@@ -18,6 +18,7 @@ DiplomacyBoard.mount = function (host, options) {
 	var suppliedResolution = null;
 	var position = DiplomacyBoard.emptyPosition(graph.source);
 	var orders = [];
+	var ghostOrders = [];
 	var showResolved = false;
 	var resolution = null;
 	var openProvince = null;
@@ -147,17 +148,24 @@ DiplomacyBoard.mount = function (host, options) {
 			if (order.action !== "retreat") return false;
 			var choices = entry.choices || [];
 			var to = DiplomacyBoard.canonProvince(graph, order.to);
+			var listed = false;
 			for (var i = 0; i < choices.length; i++) {
-				if (DiplomacyBoard.canonProvince(graph, choices[i]) === to) return true;
+				if (DiplomacyBoard.canonProvince(graph, choices[i]) === to) listed = true;
 			}
-			return false;
+			if (!listed) return false;
+			var dest = DiplomacyBoard.province(graph, to);
+			if (order.unit === "fleet" && DiplomacyBoard.isMultiCoast(dest)) return !!DiplomacyBoard.coastById(dest, order.coast);
+			return !order.coast;
 		}
 		if (mode !== "build") return false;
 		var adjustment = DiplomacyBoard.findAdjustment(adjustments, order.power);
 		if (!adjustment) return false;
 		if (order.action === "build") {
 			if (!(adjustment.count > 0)) return false;
-			return DiplomacyBoard.adjustmentBuildsAt(graph, adjustment, order.province).indexOf(order.unit) !== -1;
+			if (DiplomacyBoard.adjustmentBuildsAt(graph, adjustment, order.province).indexOf(order.unit) === -1) return false;
+			var buildAt = DiplomacyBoard.province(graph, order.province);
+			if (order.unit === "fleet" && DiplomacyBoard.isMultiCoast(buildAt)) return !!DiplomacyBoard.coastById(buildAt, order.coast);
+			return !order.coast;
 		}
 		if (order.action === "disband") return DiplomacyBoard.adjustmentCanDisband(graph, adjustment, order.province);
 		return false;
@@ -235,23 +243,22 @@ DiplomacyBoard.mount = function (host, options) {
 	}
 
 	function placePopup() {
-		if (popup.hidden || !openProvince || !svg) return;
-		var province = DiplomacyBoard.province(graph, openProvince);
-		if (!province) return;
-		var ctm = svg.getScreenCTM();
+		if (popup.hidden) return;
 		var rect = viewport.getBoundingClientRect();
-		if (!ctm) {
-			var fallback = pct(province.center);
-			popup.style.left = fallback.left;
-			popup.style.top = fallback.top;
-			return;
-		}
-		var pt = svg.createSVGPoint();
-		pt.x = province.center.x;
-		pt.y = province.center.y;
-		var screen = pt.matrixTransform(ctm);
-		popup.style.left = Math.max(8, Math.min(rect.width - 180, screen.x - rect.left + 18)) + "px";
-		popup.style.top = Math.max(8, Math.min(rect.height - 80, screen.y - rect.top + 18)) + "px";
+		var margin = 8;
+		popup.style.left = "0px";
+		popup.style.top = "0px";
+		popup.style.maxHeight = Math.max(48, rect.height - margin * 2) + "px";
+		popup.style.maxWidth = Math.max(120, rect.width - margin * 2) + "px";
+		var pop = popup.getBoundingClientRect();
+		var left = (rect.width - pop.width) / 2;
+		var top = (rect.height - pop.height) / 2;
+		if (left < margin) left = margin;
+		if (top < margin) top = margin;
+		if (left + pop.width > rect.width - margin) left = Math.max(margin, rect.width - margin - pop.width);
+		if (top + pop.height > rect.height - margin) top = Math.max(margin, rect.height - margin - pop.height);
+		popup.style.left = left + "px";
+		popup.style.top = top + "px";
 	}
 
 	function pickList() {
@@ -336,13 +343,30 @@ DiplomacyBoard.mount = function (host, options) {
 		highlightPicks();
 	}
 
+	function refreshCoastPopup() {
+		if (!pending) return;
+		var options = DiplomacyBoard.coastOptions(graph, position, pending);
+		if (!options.length) {
+			if (popup.hidden === false && popup.querySelector("[data-pick-coast]")) {
+				popup.hidden = true;
+				popup.innerHTML = "";
+			}
+			return;
+		}
+		popup.innerHTML = DiplomacyBoard.coastOptionsHtml(graph, pending.unit, options);
+		popup.hidden = false;
+		placePopup();
+	}
+
 	function startPending(unit, action) {
 		pending = { unit: unit, action: action, clicks: [] };
 		openProvince = unit.province;
 		popup.hidden = true;
+		popup.innerHTML = "";
 		host.classList.add("is-picking");
 		showPrompt();
 		highlightPicks();
+		refreshCoastPopup();
 		swallowClick = true;
 		setTimeout(function () {
 			swallowClick = false;
@@ -356,10 +380,8 @@ DiplomacyBoard.mount = function (host, options) {
 		writeOrder(draft);
 	}
 
-	function tryPick(provinceId) {
-		if (!pending) return false;
-		if (pickList().indexOf(provinceId) === -1) return false;
-		pending.clicks.push(provinceId);
+	function pushPick(provinceId, coastId) {
+		pending.clicks.push(coastId ? { province: provinceId, coast: coastId } : provinceId);
 		var done = false;
 		if (pending.action === "convoy" && pending.unit.unit === "army") {
 			var land = DiplomacyBoard.province(graph, provinceId);
@@ -367,12 +389,40 @@ DiplomacyBoard.mount = function (host, options) {
 		} else {
 			done = pending.clicks.length >= DiplomacyBoard.clicksFor(pending.action, pending.unit);
 		}
-		if (done) {
-			finishPending();
-		} else {
+		if (done) finishPending();
+		else {
 			showPrompt();
 			highlightPicks();
+			refreshCoastPopup();
 		}
+	}
+
+	function coastChoicesFor(provinceId) {
+		var options = DiplomacyBoard.coastOptions(graph, position, pending);
+		var found = [];
+		for (var i = 0; i < options.length; i++) {
+			if (options[i].province === provinceId) found.push(options[i]);
+		}
+		return found;
+	}
+
+	function tryPick(provinceId) {
+		if (!pending) return false;
+		if (pickList().indexOf(provinceId) === -1) return false;
+		var action = DiplomacyBoard.normalizeAction(pending.action);
+		var choosingDest = pending.clicks.length === 0 && (action === "move" || action === "support-move");
+		if (choosingDest) {
+			var choices = coastChoicesFor(provinceId);
+			if (choices.length > 1) {
+				refreshCoastPopup();
+				return true;
+			}
+			if (choices.length === 1) {
+				pushPick(provinceId, choices[0].coast);
+				return true;
+			}
+		}
+		pushPick(provinceId, "");
 		return true;
 	}
 
@@ -425,7 +475,26 @@ DiplomacyBoard.mount = function (host, options) {
 		return DiplomacyBoard.provinceFromEvent(svg, graph, event);
 	}
 
+	function fitStage() {
+		var vw = viewport.clientWidth;
+		var vh = viewport.clientHeight;
+		if (!vw || !vh || !viewBox.w || !viewBox.h) return;
+		var aspect = viewBox.w / viewBox.h;
+		var stageW = vw;
+		var stageH = vw / aspect;
+		if (stageH > vh) {
+			stageH = vh;
+			stageW = vh * aspect;
+		}
+		var nextW = Math.max(1, Math.round(stageW));
+		var nextH = Math.max(1, Math.round(stageH));
+		if (stage.style.width === nextW + "px" && stage.style.height === nextH + "px") return;
+		stage.style.width = nextW + "px";
+		stage.style.height = nextH + "px";
+	}
+
 	function drawUnits() {
+		fitStage();
 		if (!stage.clientWidth) return;
 		var ctx = DiplomacyBoard.syncUnitsCanvas(unitsCanvas, stage);
 		DiplomacyBoard.paintUnitsAndOrders(ctx, {
@@ -434,10 +503,28 @@ DiplomacyBoard.mount = function (host, options) {
 			graph: graph,
 			position: position,
 			orders: orders,
+			ghostOrders: ghostOrders,
 			showResolved: showResolved,
 			resolution: resolution,
-			openProvince: openProvince
+			openProvince: openProvince,
+			playingAs: playingAs,
+			orderScope: orderScope,
+			readOnly: readOnly,
+			mode: mode,
+			retreats: retreats,
+			adjustments: adjustments
 		});
+	}
+
+	function relayout() {
+		if (destroyed) return;
+		drawUnits();
+		if (!popup.hidden) placePopup();
+	}
+
+	function paintPlayerEdge() {
+		var markPower = !readOnly && orderScope === "mine" && playingAs ? playingAs : "";
+		DiplomacyBoard.markOwnedProvinces(svg, cam, graph, position, markPower);
 	}
 
 	function render() {
@@ -464,25 +551,51 @@ DiplomacyBoard.mount = function (host, options) {
 		host.classList.toggle("is-readonly", readOnly);
 		host.classList.toggle("is-resolved", showResolved);
 		paintOwnership();
+		paintPlayerEdge();
 		showPrompt();
 		highlightPicks();
 		drawUnits();
 		if (mode === "orders" && openProvince && !DiplomacyBoard.unitAt(position.units, openProvince) && !pending) closePopup();
 	}
 
-	function placeUnit(provinceId, unitType) {
+	function showPlaceCoastPopup(provinceId) {
+		var province = DiplomacyBoard.province(graph, provinceId);
+		var coasts = DiplomacyBoard.coastList(province);
+		var html = "<h2>Fleet in " + DiplomacyBoard.esc(province ? province.name : provinceId) + "</h2>";
+		html += "<div class=\"move-options\">";
+		for (var i = 0; i < coasts.length; i++) {
+			html += "<button type=\"button\" data-place-coast=\"" + DiplomacyBoard.esc(coasts[i].id) + "\">";
+			html += DiplomacyBoard.esc(DiplomacyBoard.placeLabel(graph, provinceId, coasts[i].id)) + "</button>";
+		}
+		html += "</div>";
+		popup.innerHTML = html;
+		popup.hidden = false;
+		openProvince = provinceId;
+		placePopup();
+		drawUnits();
+	}
+
+	function placeUnit(provinceId, unitType, coastId) {
 		if (readOnly) return;
 		if (!playingAs) return;
 		if (!DiplomacyBoard.powerById(position.powers, playingAs)) return;
 		if (!DiplomacyBoard.canPlace(graph, provinceId, unitType)) return;
+		var province = DiplomacyBoard.province(graph, provinceId);
+		if (unitType === "fleet" && DiplomacyBoard.isMultiCoast(province) && !coastId) {
+			showPlaceCoastPopup(provinceId);
+			return;
+		}
 		position.units = position.units.filter(function (unit) {
 			return unit.province !== provinceId;
 		});
-		position.units.push({
+		var placed = {
 			province: provinceId,
 			unit: unitType,
 			power: playingAs
-		});
+		};
+		if (coastId) placed.coast = coastId;
+		position.units.push(placed);
+		closePopup();
 		keepOrdersThatMatch();
 		render();
 		emit();
@@ -530,7 +643,16 @@ DiplomacyBoard.mount = function (host, options) {
 
 	function showRetreatPopup(entry) {
 		if (!retreatClickable(entry)) return;
-		popup.innerHTML = DiplomacyBoard.retreatPopupHtml(graph, entry, orderFrom(DiplomacyBoard.canonProvince(graph, entry.province)));
+		var standing = DiplomacyBoard.unitAt(position.units, DiplomacyBoard.canonProvince(graph, entry.province));
+		var view = {
+			province: entry.province,
+			unit: entry.unit,
+			power: entry.power,
+			choices: entry.choices,
+			disband: entry.disband,
+			coast: standing && standing.coast || entry.coast || ""
+		};
+		popup.innerHTML = DiplomacyBoard.retreatPopupHtml(graph, view, orderFrom(DiplomacyBoard.canonProvince(graph, entry.province)));
 		popup.hidden = false;
 		openProvince = DiplomacyBoard.canonProvince(graph, entry.province);
 		placePopup();
@@ -638,13 +760,20 @@ DiplomacyBoard.mount = function (host, options) {
 			var target = DiplomacyBoard.canonProvince(graph, provinceId);
 			for (var i = 0; i < choices.length; i++) {
 				if (DiplomacyBoard.canonProvince(graph, choices[i]) === target) {
-					rememberPhaseOrder({
+					var standing = DiplomacyBoard.unitAt(position.units, DiplomacyBoard.canonProvince(graph, entry.province));
+					var coasts = entry.unit === "fleet" ? DiplomacyBoard.reachableCoasts(graph, entry.province, standing && standing.coast, target) : [];
+					if (entry.unit === "fleet" && DiplomacyBoard.isMultiCoast(DiplomacyBoard.province(graph, target))) {
+						if (coasts.length !== 1) return;
+					}
+					var retreatOrder = {
 						province: DiplomacyBoard.canonProvince(graph, entry.province),
 						unit: entry.unit,
 						power: entry.power,
 						action: "retreat",
 						to: target
-					});
+					};
+					if (coasts.length === 1) retreatOrder.coast = coasts[0].id;
+					rememberPhaseOrder(retreatOrder);
 					return;
 				}
 			}
@@ -707,17 +836,27 @@ DiplomacyBoard.mount = function (host, options) {
 			clearOrder(openProvince);
 			return;
 		}
+		if (button.dataset.placeCoast) {
+			placeUnit(openProvince, "fleet", button.dataset.placeCoast);
+			return;
+		}
+		if (button.dataset.pickCoast && pending) {
+			pushPick(button.dataset.province, button.dataset.pickCoast);
+			return;
+		}
 		if (mode === "retreat") {
 			var entry = DiplomacyBoard.findRetreat(graph, retreats, openProvince);
 			if (!retreatClickable(entry)) return;
 			if (button.dataset.retreatTo) {
-				rememberPhaseOrder({
+				var retreatOrder = {
 					province: DiplomacyBoard.canonProvince(graph, entry.province),
 					unit: entry.unit,
 					power: entry.power,
 					action: "retreat",
 					to: button.dataset.retreatTo
-				});
+				};
+				if (button.dataset.coast) retreatOrder.coast = button.dataset.coast;
+				rememberPhaseOrder(retreatOrder);
 				return;
 			}
 			if (button.dataset.action === "disband" && entry.disband) {
@@ -737,12 +876,14 @@ DiplomacyBoard.mount = function (host, options) {
 				if (!withinAdjustmentCount(adjustment, "build", openProvince)) return;
 				var offered = DiplomacyBoard.adjustmentBuildsAt(graph, adjustment, openProvince);
 				if (offered.indexOf(button.dataset.buildUnit) === -1) return;
-				rememberPhaseOrder({
+				var buildOrder = {
 					province: openProvince,
 					unit: button.dataset.buildUnit,
 					power: adjustment.power,
 					action: "build"
-				});
+				};
+				if (button.dataset.coast) buildOrder.coast = button.dataset.coast;
+				rememberPhaseOrder(buildOrder);
 				return;
 			}
 			if (button.dataset.action === "disband" && DiplomacyBoard.adjustmentCanDisband(graph, adjustment, openProvince)) {
@@ -835,9 +976,9 @@ DiplomacyBoard.mount = function (host, options) {
 		if (resizeObserver) resizeObserver.disconnect();
 		if (window.ResizeObserver) {
 			resizeObserver = new ResizeObserver(function () {
-				if (!destroyed) drawUnits();
+				if (!destroyed) relayout();
 			});
-			resizeObserver.observe(stage);
+			resizeObserver.observe(viewport);
 		}
 	}
 
@@ -947,13 +1088,15 @@ DiplomacyBoard.mount = function (host, options) {
 		var stored = [];
 		for (var i = 0; i < incoming.length; i++) {
 			var entry = DiplomacyBoard.findRetreat(graph, retreats, incoming[i].province);
-			stored.push({
+			var storedOrder = {
 				province: DiplomacyBoard.canonProvince(graph, incoming[i].province),
 				unit: incoming[i].unit,
 				power: entry.power,
 				action: incoming[i].action,
 				to: incoming[i].action === "retreat" ? DiplomacyBoard.canonProvince(graph, incoming[i].to) : undefined
-			});
+			};
+			if (incoming[i].coast) storedOrder.coast = incoming[i].coast;
+			stored.push(storedOrder);
 			if (stored[i].action !== "retreat") delete stored[i].to;
 		}
 		replacePhaseOrders(doc.power || "", stored);
@@ -980,7 +1123,10 @@ DiplomacyBoard.mount = function (host, options) {
 				power: doc.power,
 				action: incoming[i].action
 			};
-			if (incoming[i].action === "build") order.unit = incoming[i].unit;
+			if (incoming[i].action === "build") {
+				order.unit = incoming[i].unit;
+				if (incoming[i].coast) order.coast = incoming[i].coast;
+			}
 			stored.push(order);
 		}
 		replacePhaseOrders(doc.power || "", stored);
@@ -1158,6 +1304,7 @@ DiplomacyBoard.mount = function (host, options) {
 			playingAs = id || "";
 			if (!popupStillAllowed()) closePopup();
 			if (mode === "retreat" || mode === "build") highlightPicks();
+			paintPlayerEdge();
 			drawUnits();
 		},
 		getShowResolved: function () {
@@ -1176,6 +1323,12 @@ DiplomacyBoard.mount = function (host, options) {
 			if (suppliedResolution) return DiplomacyBoard.clone(suppliedResolution);
 			return DiplomacyBoard.adjudicate(graph, position, orders);
 		},
+		setGhostOrders: function (list) {
+			ghostOrders = Array.isArray(list) ? DiplomacyBoard.clone(list) : [];
+			for (var i = 0; i < ghostOrders.length; i++) DiplomacyBoard.canonicalizeOrder(graph, ghostOrders[i]);
+			drawUnits();
+		},
+		relayout: relayout,
 		setOrderScope: function (scope) {
 			orderScope = scope === "mine" ? "mine" : "all";
 			if (!popupStillAllowed()) closePopup();
@@ -1183,6 +1336,7 @@ DiplomacyBoard.mount = function (host, options) {
 				highlightPicks();
 				showPrompt();
 			}
+			paintPlayerEdge();
 			drawUnits();
 		},
 		setPowers: function (powers) {

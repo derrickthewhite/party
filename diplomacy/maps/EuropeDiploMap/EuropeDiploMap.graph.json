@@ -1550,6 +1550,20 @@
         "territory-22",
         "territory-5",
         "territory-7"
+      ],
+      "coasts": [
+        {
+          "id": "nc",
+          "name": "North Coast",
+          "anchor": { "x": 946.4, "y": 96.3 },
+          "fleet": ["territory-1", "territory-7"]
+        },
+        {
+          "id": "sc",
+          "name": "South Coast",
+          "anchor": { "x": 801.0, "y": 402.5 },
+          "fleet": ["territory-12", "territory-22"]
+        }
       ]
     },
     "territory-60": {
@@ -1986,6 +2000,20 @@
         "territory-79",
         "territory-89",
         "territory-90"
+      ],
+      "coasts": [
+        {
+          "id": "ec",
+          "name": "East Coast",
+          "anchor": { "x": 946.6, "y": 896.9 },
+          "fleet": ["territory-65", "territory-82", "territory-60"]
+        },
+        {
+          "id": "sc",
+          "name": "South Coast",
+          "anchor": { "x": 882.0, "y": 993.6 },
+          "fleet": ["territory-90", "territory-82", "territory-89"]
+        }
       ]
     },
     "territory-73": {
@@ -2077,7 +2105,23 @@
         "territory-67",
         "territory-76",
         "territory-77",
-        "territory-92"
+        "territory-92",
+        "territory-99"
+      ],
+      "coasts": [
+        {
+          "id": "nc",
+          "name": "North Coast",
+          "anchor": { "x": 133.3, "y": 826.8 },
+          "fleet": ["territory-67", "territory-61"]
+        },
+        {
+          "id": "sc",
+          "name": "South Coast",
+          "anchor": { "x": 166.1, "y": 1066.3 },
+          "facing": { "x": 0.2, "y": 1 },
+          "fleet": ["territory-67", "territory-76", "territory-92", "territory-64", "territory-99", "territory-77"]
+        }
       ]
     },
     "territory-76": {
@@ -2742,6 +2786,7 @@
       "fleet": [
         "territory-100",
         "territory-67",
+        "territory-75",
         "territory-92"
       ]
     }

@@ -1,49 +1,117 @@
 // Targets, prompt text, and popup markup for writing an order.
 var DiplomacyBoard = DiplomacyBoard || {};
 
+DiplomacyBoard.moveDestinations = function (graph, unit) {
+	if (!unit) return [];
+	if (unit.unit === "fleet") {
+		var ids = DiplomacyBoard.fleetMoves(graph, unit.province, unit.coast);
+		var out = [];
+		for (var i = 0; i < ids.length; i++) {
+			var dest = DiplomacyBoard.province(graph, ids[i]);
+			if (DiplomacyBoard.isMultiCoast(dest)) {
+				if (!DiplomacyBoard.reachableCoasts(graph, unit.province, unit.coast, ids[i]).length) continue;
+			}
+			out.push(ids[i]);
+		}
+		return out;
+	}
+	return DiplomacyBoard.legalDestinations(graph, unit.province, unit.unit);
+};
+
+DiplomacyBoard.coastOptions = function (graph, position, pending) {
+	if (!pending || !pending.unit) return [];
+	var action = DiplomacyBoard.normalizeAction(pending.action);
+	var unit = pending.unit;
+	var n = pending.clicks.length;
+	var out = [];
+	var seen = {};
+	function add(provinceId, coastId) {
+		var key = provinceId + "\0" + coastId;
+		if (seen[key]) return;
+		seen[key] = true;
+		out.push({ province: provinceId, coast: coastId });
+	}
+	function otherFleetCanEnter(provinceId, coastId, exceptId) {
+		var units = position && position.units ? position.units : [];
+		for (var u = 0; u < units.length; u++) {
+			var other = units[u];
+			if (other.province === exceptId || other.unit !== "fleet") continue;
+			if (DiplomacyBoard.fleetMoveLegal(graph, other.province, other.coast, provinceId, coastId)) return true;
+		}
+		return false;
+	}
+	if (n !== 0) return out;
+	if (action !== "move" && action !== "support-move") return out;
+	var dests = action === "move"
+		? DiplomacyBoard.moveDestinations(graph, unit)
+		: DiplomacyBoard.legalDestinations(graph, unit.province, unit.unit);
+	for (var i = 0; i < dests.length; i++) {
+		var dest = DiplomacyBoard.province(graph, dests[i]);
+		if (!DiplomacyBoard.isMultiCoast(dest)) continue;
+		var coasts = DiplomacyBoard.coastList(dest);
+		for (var c = 0; c < coasts.length; c++) {
+			var coastId = coasts[c].id;
+			if (unit.unit === "fleet") {
+				if (!DiplomacyBoard.fleetMoveLegal(graph, unit.province, unit.coast, dests[i], coastId)) continue;
+			} else if (!DiplomacyBoard.isLegalMove(graph, unit.province, unit.unit, dests[i])) continue;
+			if (action === "support-move" && !otherFleetCanEnter(dests[i], coastId, unit.province)) continue;
+			if (action === "move" && unit.unit !== "fleet") continue;
+			add(dests[i], coastId);
+		}
+	}
+	return out;
+};
+
 DiplomacyBoard.orderPickList = function (graph, position, pending) {
 	if (!pending) return [];
 	var standing = pending.unit;
 	var n = pending.clicks.length;
 	var action = DiplomacyBoard.normalizeAction(pending.action);
-	var dests = DiplomacyBoard.legalDestinations(graph, standing.province, standing.unit);
+	var dests = DiplomacyBoard.moveDestinations(graph, standing);
 	var ids = [];
 	var i;
-	function otherUnitCanReach(destId) {
+	function otherUnitCanReach(destId, destCoast) {
 		for (var u = 0; u < position.units.length; u++) {
 			var other = position.units[u];
 			if (other.province === standing.province || other.province === destId) continue;
-			if (DiplomacyBoard.canReach(graph, position, other, destId)) return true;
+			if (destCoast && other.unit !== "fleet") continue;
+			if (DiplomacyBoard.canReach(graph, position, other, destId, destCoast)) return true;
 		}
 		return false;
 	}
 	if (action === "move") return dests;
 	if (action === "support-defense") {
 		for (i = 0; i < dests.length; i++) {
-			if (dests[i] !== standing.province && DiplomacyBoard.unitAt(position.units, dests[i])) ids.push(dests[i]);
+			if (dests[i] === standing.province) continue;
+			var target = DiplomacyBoard.unitAt(position.units, dests[i]);
+			if (!target) continue;
+			if (standing.unit === "fleet" && !DiplomacyBoard.fleetCanReachProvince(graph, standing.province, standing.coast, dests[i])) continue;
+			ids.push(dests[i]);
 		}
 		return ids;
 	}
 	if (action === "support-move") {
 		if (n === 0) {
 			for (i = 0; i < dests.length; i++) {
-				if (otherUnitCanReach(dests[i])) ids.push(dests[i]);
+				if (otherUnitCanReach(dests[i], "")) ids.push(dests[i]);
 			}
 			return ids;
 		}
-		var dest = pending.clicks[0];
+		var dest = DiplomacyBoard.clickProvince(pending.clicks[0]);
+		var destCoast = DiplomacyBoard.clickCoast(pending.clicks[0]);
 		for (i = 0; i < position.units.length; i++) {
 			var candidate = position.units[i];
 			if (candidate.province === standing.province || candidate.province === dest) continue;
-			if (DiplomacyBoard.canReach(graph, position, candidate, dest)) ids.push(candidate.province);
+			if (destCoast && candidate.unit !== "fleet") continue;
+			if (DiplomacyBoard.canReach(graph, position, candidate, dest, destCoast)) ids.push(candidate.province);
 		}
 		return ids;
 	}
 	if (action === "convoy") {
 		if (standing.unit === "army") {
 			var used = {};
-			for (i = 0; i < n; i++) used[pending.clicks[i]] = true;
-			var fromSea = n === 0 ? standing.province : pending.clicks[n - 1];
+			for (i = 0; i < n; i++) used[DiplomacyBoard.clickProvince(pending.clicks[i])] = true;
+			var fromSea = n === 0 ? standing.province : DiplomacyBoard.clickProvince(pending.clicks[n - 1]);
 			var hops = DiplomacyBoard.legalDestinations(graph, fromSea, "fleet");
 			for (i = 0; i < hops.length; i++) {
 				var hop = DiplomacyBoard.province(graph, hops[i]);
@@ -64,7 +132,7 @@ DiplomacyBoard.orderPickList = function (graph, position, pending) {
 			}
 			return ids;
 		}
-		return DiplomacyBoard.coastalLands(graph, pending.clicks[0]);
+		return DiplomacyBoard.coastalLands(graph, DiplomacyBoard.clickProvince(pending.clicks[0]));
 	}
 	return [];
 };
@@ -95,28 +163,33 @@ DiplomacyBoard.orderDraft = function (pending) {
 		power: standing.power,
 		action: pending.action
 	};
-	if (pending.action === "move" || pending.action === "attack") draft.to = clicks[0];
-	if (pending.action === "support-defense") draft.target = clicks[0];
+	function putDest(click) {
+		draft.to = DiplomacyBoard.clickProvince(click);
+		var coast = DiplomacyBoard.clickCoast(click);
+		if (coast) draft.coast = coast;
+	}
+	if (pending.action === "move" || pending.action === "attack") putDest(clicks[0]);
+	if (pending.action === "support-defense") draft.target = DiplomacyBoard.clickProvince(clicks[0]);
 	if (pending.action === "support-move" || pending.action === "support-attack") {
-		draft.to = clicks[0];
-		draft.target = clicks[1];
+		putDest(clicks[0]);
+		draft.target = DiplomacyBoard.clickProvince(clicks[1]);
 	}
 	if (pending.action === "convoy") {
 		if (standing.unit === "army") {
 			draft.from = standing.province;
-			draft.to = clicks[clicks.length - 1];
-			draft.via = clicks.slice(0, -1);
+			draft.to = DiplomacyBoard.clickProvince(clicks[clicks.length - 1]);
+			draft.via = clicks.slice(0, -1).map(DiplomacyBoard.clickProvince);
 		} else {
-			draft.from = clicks[0];
-			draft.to = clicks[1];
+			draft.from = DiplomacyBoard.clickProvince(clicks[0]);
+			draft.to = DiplomacyBoard.clickProvince(clicks[1]);
 		}
 	}
 	return draft;
 };
 
 DiplomacyBoard.orderPopupHtml = function (graph, unit, current) {
-	var province = DiplomacyBoard.province(graph, unit.province);
-	var html = "<h2>" + DiplomacyBoard.esc(unit.unit) + " in " + DiplomacyBoard.esc(province ? province.name : unit.province) + "</h2>";
+	var html = "<h2>" + DiplomacyBoard.esc(DiplomacyBoard.unitHeading(graph, unit)) + "</h2>";
+	html += "<div class=\"move-options\">";
 	html += "<button type=\"button\" data-action=\"hold\">Hold</button>";
 	html += "<button type=\"button\" data-action=\"move\">Move</button>";
 	html += "<button type=\"button\" data-action=\"support-defense\">Support defense</button>";
@@ -127,20 +200,48 @@ DiplomacyBoard.orderPopupHtml = function (graph, unit, current) {
 	if (current) {
 		html += "<button type=\"button\" class=\"clear\" data-clear=\"1\">Clear</button>";
 	}
+	html += "</div>";
+	return html;
+};
+
+DiplomacyBoard.coastOptionsHtml = function (graph, unit, options) {
+	var html = "<h2>" + DiplomacyBoard.esc(DiplomacyBoard.unitHeading(graph, unit)) + "</h2>";
+	html += "<div class=\"move-options\">";
+	for (var i = 0; i < options.length; i++) {
+		var opt = options[i];
+		html += "<button type=\"button\" data-pick-coast=\"" + DiplomacyBoard.esc(opt.coast) + "\" data-province=\"" + DiplomacyBoard.esc(opt.province) + "\">";
+		html += DiplomacyBoard.esc(DiplomacyBoard.placeLabel(graph, opt.province, opt.coast));
+		html += "</button>";
+	}
+	html += "</div>";
 	return html;
 };
 
 DiplomacyBoard.retreatPopupHtml = function (graph, entry, current) {
-	var province = DiplomacyBoard.province(graph, entry.province);
-	var html = "<h2>Retreat " + DiplomacyBoard.esc(entry.unit) + " in " + DiplomacyBoard.esc(province ? province.name : entry.province) + "</h2>";
+	var where = DiplomacyBoard.placeLabel(graph, entry.province, entry.coast);
+	var html = "<h2>Retreat " + DiplomacyBoard.esc(entry.unit) + " in " + DiplomacyBoard.esc(where) + "</h2>";
+	html += "<div class=\"move-options\">";
 	var choices = entry.choices || [];
 	for (var i = 0; i < choices.length; i++) {
-		var dest = DiplomacyBoard.province(graph, choices[i]);
-		html += "<button type=\"button\" data-retreat-to=\"" + DiplomacyBoard.esc(DiplomacyBoard.canonProvince(graph, choices[i])) + "\">";
-		html += DiplomacyBoard.esc(dest ? dest.name : choices[i]) + "</button>";
+		var provinceId = DiplomacyBoard.canonProvince(graph, choices[i]);
+		var dest = DiplomacyBoard.province(graph, provinceId);
+		var coasts = entry.unit === "fleet" ? DiplomacyBoard.reachableCoasts(graph, entry.province, entry.coast, provinceId) : [];
+		if (entry.unit === "fleet" && DiplomacyBoard.isMultiCoast(dest) && !coasts.length) {
+			coasts = DiplomacyBoard.coastList(dest);
+		}
+		if (coasts.length) {
+			for (var c = 0; c < coasts.length; c++) {
+				html += "<button type=\"button\" data-retreat-to=\"" + DiplomacyBoard.esc(provinceId) + "\" data-coast=\"" + DiplomacyBoard.esc(coasts[c].id) + "\">";
+				html += DiplomacyBoard.esc(DiplomacyBoard.placeLabel(graph, provinceId, coasts[c].id)) + "</button>";
+			}
+		} else {
+			html += "<button type=\"button\" data-retreat-to=\"" + DiplomacyBoard.esc(provinceId) + "\">";
+			html += DiplomacyBoard.esc(dest ? dest.name : choices[i]) + "</button>";
+		}
 	}
 	if (entry.disband) html += "<button type=\"button\" data-action=\"disband\">Disband</button>";
 	if (current) html += "<button type=\"button\" class=\"clear\" data-clear=\"1\">Clear</button>";
+	html += "</div>";
 	return html;
 };
 
@@ -148,11 +249,21 @@ DiplomacyBoard.adjustPopupHtml = function (graph, spec) {
 	var province = DiplomacyBoard.province(graph, spec.province);
 	var name = province ? province.name : spec.province;
 	var html = "<h2>" + DiplomacyBoard.esc(name) + "</h2>";
+	html += "<div class=\"move-options\">";
 	var units = spec.units || [];
 	for (var i = 0; i < units.length; i++) {
-		html += "<button type=\"button\" data-build-unit=\"" + DiplomacyBoard.esc(units[i]) + "\">Build " + DiplomacyBoard.esc(units[i]) + "</button>";
+		if (units[i] === "fleet" && DiplomacyBoard.isMultiCoast(province)) {
+			var coasts = DiplomacyBoard.coastList(province);
+			for (var c = 0; c < coasts.length; c++) {
+				html += "<button type=\"button\" data-build-unit=\"fleet\" data-coast=\"" + DiplomacyBoard.esc(coasts[c].id) + "\">";
+				html += "Build fleet, " + DiplomacyBoard.esc(coasts[c].name) + "</button>";
+			}
+		} else {
+			html += "<button type=\"button\" data-build-unit=\"" + DiplomacyBoard.esc(units[i]) + "\">Build " + DiplomacyBoard.esc(units[i]) + "</button>";
+		}
 	}
 	if (spec.canDisband) html += "<button type=\"button\" data-action=\"disband\">Disband</button>";
 	if (spec.current) html += "<button type=\"button\" class=\"clear\" data-clear=\"1\">Clear</button>";
+	html += "</div>";
 	return html;
 };
