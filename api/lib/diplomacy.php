@@ -1112,6 +1112,9 @@ function diplomacy_assert_adjustments(array &$graph, array $doc, array $adjustme
         }
     }
     if ($entry === null) {
+        if ((array)($doc['orders'] ?? []) === []) {
+            return;
+        }
         error_response('No adjustment offered for your power.', 422);
     }
     $count = (int)($entry['count'] ?? 0);
@@ -1548,6 +1551,7 @@ function diplomacy_game_build_detail_payload(int $gameId, array $game, array $us
         'svg_url' => '',
         'graph_url' => '',
         'unions_url' => '',
+        'tokens_url' => '',
         'start_url' => '',
         'power_count' => 0,
     ];

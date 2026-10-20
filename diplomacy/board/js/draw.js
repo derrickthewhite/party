@@ -183,7 +183,61 @@ DiplomacyBoard.unitNear = function (graph, units, mapPt, radius) {
 	return best;
 };
 
-DiplomacyBoard.markOwnedProvinces = function (svg, cam, graph, position, powerId) {
+DiplomacyBoard.parseHexColor = function (value) {
+	var raw = String(value || "").trim();
+	if (raw.charAt(0) === "#") raw = raw.slice(1);
+	if (raw.length === 3) {
+		raw = raw.charAt(0) + raw.charAt(0) + raw.charAt(1) + raw.charAt(1) + raw.charAt(2) + raw.charAt(2);
+	}
+	if (!/^[0-9a-fA-F]{6}$/.test(raw)) return null;
+	return {
+		r: parseInt(raw.slice(0, 2), 16),
+		g: parseInt(raw.slice(2, 4), 16),
+		b: parseInt(raw.slice(4, 6), 16)
+	};
+};
+
+DiplomacyBoard.hexColor = function (rgb) {
+	function byte(n) {
+		var v = Math.max(0, Math.min(255, Math.round(n)));
+		return (v < 16 ? "0" : "") + v.toString(16);
+	}
+	return "#" + byte(rgb.r) + byte(rgb.g) + byte(rgb.b);
+};
+
+// ~20% darker on light fills, ~20% lighter on dark fills, so owned borders read.
+DiplomacyBoard.contrastStroke = function (hex) {
+	var rgb = DiplomacyBoard.parseHexColor(hex);
+	if (!rgb) return "#1c1c1c";
+	var luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
+	var amount = 0.2;
+	if (luminance >= 0.55) {
+		return DiplomacyBoard.hexColor({
+			r: rgb.r * (1 - amount),
+			g: rgb.g * (1 - amount),
+			b: rgb.b * (1 - amount)
+		});
+	}
+	return DiplomacyBoard.hexColor({
+		r: rgb.r + (255 - rgb.r) * amount,
+		g: rgb.g + (255 - rgb.g) * amount,
+		b: rgb.b + (255 - rgb.b) * amount
+	});
+};
+
+DiplomacyBoard.ownedPowerIds = function (powerIds) {
+	if (Array.isArray(powerIds)) {
+		var out = [];
+		for (var i = 0; i < powerIds.length; i++) {
+			if (powerIds[i]) out.push(String(powerIds[i]));
+		}
+		return out;
+	}
+	if (powerIds) return [String(powerIds)];
+	return [];
+};
+
+DiplomacyBoard.markOwnedProvinces = function (svg, cam, graph, position, powerIds) {
 	if (!svg) return;
 	var overlay = svg.querySelector("#owned-highlight");
 	if (!overlay) {
@@ -203,15 +257,16 @@ DiplomacyBoard.markOwnedProvinces = function (svg, cam, graph, position, powerId
 		}
 	}
 	while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
-	if (!powerId || !position) return;
-	var power = DiplomacyBoard.powerById(position.powers || [], powerId);
-	if (!power) return;
+	overlay.removeAttribute("stroke");
+	var ids = DiplomacyBoard.ownedPowerIds(powerIds);
+	if (!ids.length || !position) return;
 	var borders = svg.querySelector("#borders");
 	var borderWidth = borders ? parseFloat(borders.getAttribute("stroke-width")) : NaN;
 	if (!borderWidth || borderWidth !== borderWidth) borderWidth = Math.max(cam.w, cam.h) * 0.0016;
 	var span = Math.max(cam.w, cam.h);
-	overlay.setAttribute("stroke", power.color || "#1c1c1c");
 	overlay.setAttribute("stroke-width", String(Math.max(borderWidth * 3.2, span * 0.0045)));
+	var wanted = {};
+	for (var w = 0; w < ids.length; w++) wanted[ids[w]] = true;
 	var ns = "http://www.w3.org/2000/svg";
 	var nodes = DiplomacyBoard.territoryNodes(svg);
 	for (var n = 0; n < nodes.length; n++) {
@@ -220,11 +275,14 @@ DiplomacyBoard.markOwnedProvinces = function (svg, cam, graph, position, powerId
 		if (!province || province.kind === "sea") continue;
 		if (province.waterParts && province.waterParts.indexOf(node.id) !== -1) continue;
 		var id = DiplomacyBoard.provinceId(graph, node.id);
-		if (position.ownership[id] !== powerId) continue;
+		var ownerId = position.ownership[id];
+		if (!wanted[ownerId]) continue;
+		var power = DiplomacyBoard.powerById(position.powers || [], ownerId);
 		var d = node.getAttribute("d");
 		if (!d) continue;
 		var outline = document.createElementNS(ns, "path");
 		outline.setAttribute("d", d);
+		outline.setAttribute("stroke", DiplomacyBoard.contrastStroke(power && power.color));
 		overlay.appendChild(outline);
 	}
 };
@@ -633,9 +691,19 @@ function tokensToDraw(view) {
 	return list;
 }
 
+function playingAsSet(view) {
+	if (Array.isArray(view.playingAsPowers) && view.playingAsPowers.length) return view.playingAsPowers;
+	if (view.playingAs) return [view.playingAs];
+	return [];
+}
+
+function controlsPower(view, powerId) {
+	var ids = playingAsSet(view);
+	return ids.indexOf(powerId) !== -1;
+}
+
 function unitNeedsOrder(view, unit) {
-	if (view.readOnly || view.orderScope !== "mine" || !view.playingAs) return false;
-	if (unit.power !== view.playingAs) return false;
+	if (view.readOnly || view.orderScope !== "mine" || !controlsPower(view, unit.power)) return false;
 	var home = unit.origin || unit.province;
 	var orders = view.orders || [];
 	var ordered = false;
@@ -645,10 +713,10 @@ function unitNeedsOrder(view, unit) {
 	if (ordered) return false;
 	if (view.mode === "retreat") {
 		var entry = DiplomacyBoard.findRetreat(view.graph, view.retreats || [], home);
-		return !!(entry && entry.power === view.playingAs);
+		return !!(entry && controlsPower(view, entry.power));
 	}
 	if (view.mode === "build") {
-		var adjustment = DiplomacyBoard.findAdjustment(view.adjustments || [], view.playingAs);
+		var adjustment = DiplomacyBoard.findAdjustment(view.adjustments || [], unit.power);
 		return DiplomacyBoard.adjustmentCanDisband(view.graph, adjustment, home);
 	}
 	return view.mode === "orders";
@@ -696,6 +764,40 @@ function paintTokens(ctx, view) {
 	}
 }
 
+DiplomacyBoard.paintTokenSlots = function (ctx, view) {
+	if (!view.tokenEdit || !ctx) return;
+	var slots = DiplomacyBoard.listTokenSlots(view.graph);
+	var r = view.tokenSize / 2;
+	for (var i = 0; i < slots.length; i++) {
+		var slot = slots[i];
+		var at = view.project({ x: slot.x, y: slot.y });
+		var selected = view.tokenEditKey === slot.key && view.tokenEditKind === slot.kind;
+		ctx.save();
+		ctx.beginPath();
+		ctx.arc(at.x, at.y, r * 0.95, 0, Math.PI * 2);
+		ctx.strokeStyle = selected ? "#111111" : (slot.kind === "fleet" ? "#1c4b73" : "#5a3a1c");
+		ctx.lineWidth = selected ? 3 : 2;
+		ctx.setLineDash(selected ? [] : [4, 3]);
+		ctx.stroke();
+		if (slot.kind === "fleet" && slot.facing) {
+			var fx = slot.facing.x;
+			var fy = slot.facing.y;
+			var len = Math.hypot(fx, fy) || 1;
+			ctx.beginPath();
+			ctx.moveTo(at.x, at.y);
+			ctx.lineTo(at.x + (fx / len) * r * 1.6, at.y + (fy / len) * r * 1.6);
+			ctx.setLineDash([]);
+			ctx.stroke();
+		}
+		ctx.fillStyle = "#1c1c1c";
+		ctx.font = Math.max(9, Math.round(r * 0.42)) + "px Segoe UI, sans-serif";
+		ctx.textAlign = "center";
+		ctx.textBaseline = "top";
+		ctx.fillText(slot.key + " " + slot.kind, at.x, at.y + r + 2);
+		ctx.restore();
+	}
+};
+
 DiplomacyBoard.paintUnitsAndOrders = function (ctx, view) {
 	paintTokens(ctx, view);
 	paintOrders(ctx, view);
@@ -709,5 +811,6 @@ DiplomacyBoard.paintUnitsAndOrders = function (ctx, view) {
 			ghost: true
 		});
 	}
+	DiplomacyBoard.paintTokenSlots(ctx, view);
 };
 })();

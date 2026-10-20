@@ -71,6 +71,7 @@ function diplomacy_map_catalog_entry(string $mapKey): ?array
         'svg_url' => 'diplomacy/maps/' . $mapKey . '/' . $mapKey . '.svg',
         'graph_url' => 'diplomacy/maps/' . $mapKey . '/' . $mapKey . '.graph.json',
         'unions_url' => 'diplomacy/maps/' . $mapKey . '/' . $mapKey . '.unions.json',
+        'tokens_url' => 'diplomacy/maps/' . $mapKey . '/' . $mapKey . '.tokens.json',
         'start_url' => 'diplomacy/maps/' . $mapKey . '/' . $mapKey . '.start.json',
         'powers' => $powers,
         'power_count' => count($powers),

@@ -73,6 +73,34 @@
 	cursor: pointer;
 }
 
+.diplomacy-board .token-edit-bar {
+	position: absolute;
+	left: 10px;
+	top: 10px;
+	z-index: 8;
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 6px;
+	background: #f7f3ea;
+	border: 1px solid #1c1c1c;
+	padding: 6px 8px;
+	max-width: calc(100% - 84px);
+}
+
+.diplomacy-board .token-edit-bar[hidden] {
+	display: none;
+}
+
+.diplomacy-board .token-edit-bar button {
+	border: 1px solid #1c1c1c;
+	background: #1c1c1c;
+	color: #f4efe4;
+	font: inherit;
+	padding: 4px 8px;
+	cursor: pointer;
+}
+
 .diplomacy-board .map-zoom {
 	position: absolute;
 	top: 10px;
@@ -104,6 +132,10 @@
 	color: #f4efe4;
 	padding: 8px 10px;
 	font-size: 13px;
+}
+
+.diplomacy-board .move-popup[hidden] {
+	display: none;
 }
 
 .diplomacy-board .move-popup {

@@ -1,0 +1,892 @@
+﻿diff --git a/diplomacy/board/css/board.css b/diplomacy/board/css/board.css
+index d9601d7..4f83cf4 100644
+--- a/diplomacy/board/css/board.css
++++ b/diplomacy/board/css/board.css
+@@ -73,6 +73,34 @@
+ 	cursor: pointer;
+ }
+ 
++.diplomacy-board .token-edit-bar {
++	position: absolute;
++	left: 10px;
++	top: 10px;
++	z-index: 8;
++	display: flex;
++	flex-wrap: wrap;
++	align-items: center;
++	gap: 6px;
++	background: #f7f3ea;
++	border: 1px solid #1c1c1c;
++	padding: 6px 8px;
++	max-width: calc(100% - 84px);
++}
++
++.diplomacy-board .token-edit-bar[hidden] {
++	display: none;
++}
++
++.diplomacy-board .token-edit-bar button {
++	border: 1px solid #1c1c1c;
++	background: #1c1c1c;
++	color: #f4efe4;
++	font: inherit;
++	padding: 4px 8px;
++	cursor: pointer;
++}
++
+ .diplomacy-board .map-zoom {
+ 	position: absolute;
+ 	top: 10px;
+diff --git a/diplomacy/board/js/board.js b/diplomacy/board/js/board.js
+index 8c7c9ee..fc4f32f 100644
+--- a/diplomacy/board/js/board.js
++++ b/diplomacy/board/js/board.js
+@@ -306,14 +306,73 @@ DiplomacyBoard.nearestSea = function (graph, province) {
+ 	return best;
+ };
+ 
++DiplomacyBoard.mapKeyFromSource = function (source) {
++	return String(source || "").replace(/\.(svg|json)$/i, "");
++};
++
++DiplomacyBoard.tokenSlotKey = function (unitType, provinceId, coastId) {
++	if (unitType === "fleet" && coastId) return provinceId + ":" + coastId;
++	return provinceId;
++};
++
++DiplomacyBoard.ensureTokenSlots = function (graph) {
++	if (!graph.tokenSlots || typeof graph.tokenSlots !== "object") graph.tokenSlots = {};
++	return graph.tokenSlots;
++};
++
++DiplomacyBoard.mergeTokenPositions = function (graph, doc) {
++	var slots = DiplomacyBoard.ensureTokenSlots(graph);
++	var incoming = doc && doc.slots ? doc.slots : doc;
++	if (!incoming || typeof incoming !== "object") return graph;
++	for (var key in incoming) {
++		if (!Object.prototype.hasOwnProperty.call(incoming, key)) continue;
++		var kinds = incoming[key];
++		if (!kinds || typeof kinds !== "object") continue;
++		if (!slots[key]) slots[key] = {};
++		for (var kind in kinds) {
++			if (!Object.prototype.hasOwnProperty.call(kinds, kind)) continue;
++			var src = kinds[kind];
++			if (!src || typeof src.x !== "number" || typeof src.y !== "number") continue;
++			var copy = { x: src.x, y: src.y };
++			if (src.facing && typeof src.facing.x === "number" && typeof src.facing.y === "number") {
++				copy.facing = { x: src.facing.x, y: src.facing.y };
++			}
++			slots[key][kind] = copy;
++		}
++	}
++	return graph;
++};
++
++DiplomacyBoard.resolvedFleetCoast = function (province, coastId) {
++	var coast = DiplomacyBoard.coastById(province, coastId);
++	if (!coast && DiplomacyBoard.coastList(province).length === 1) coast = province.coasts[0];
++	return coast || null;
++};
++
++DiplomacyBoard.tokenSlotForUnit = function (graph, unit) {
++	if (!graph || !unit) return null;
++	var slots = graph.tokenSlots;
++	if (!slots) return null;
++	var provinceId = DiplomacyBoard.provinceId(graph, unit.province);
++	var kind = unit.unit === "fleet" ? "fleet" : "army";
++	var coastId = "";
++	if (kind === "fleet") {
++		var coast = DiplomacyBoard.resolvedFleetCoast(DiplomacyBoard.province(graph, provinceId), unit.coast);
++		if (coast && coast.id) coastId = coast.id;
++	}
++	var keyed = DiplomacyBoard.tokenSlotKey(kind, provinceId, coastId);
++	if (slots[keyed] && slots[keyed][kind]) return slots[keyed][kind];
++	if (kind === "fleet" && coastId && slots[provinceId] && slots[provinceId].fleet) return slots[provinceId].fleet;
++	return null;
++};
++
+ // Armies use the province center. A fleet uses its coast anchor, or sits on
+ // the water edge toward the nearest sea.
+-DiplomacyBoard.unitPoint = function (graph, unit) {
++DiplomacyBoard.defaultUnitPoint = function (graph, unit) {
+ 	var province = DiplomacyBoard.province(graph, unit && unit.province);
+ 	if (!province || !province.center) return null;
+ 	if (!unit || unit.unit !== "fleet" || province.kind === "sea") return province.center;
+-	var coast = DiplomacyBoard.coastById(province, unit.coast);
+-	if (!coast && DiplomacyBoard.coastList(province).length === 1) coast = province.coasts[0];
++	var coast = DiplomacyBoard.resolvedFleetCoast(province, unit.coast);
+ 	if (coast && coast.anchor) return { x: coast.anchor.x, y: coast.anchor.y };
+ 	var sea = DiplomacyBoard.nearestSea(graph, province);
+ 	if (!sea) return province.center;
+@@ -327,6 +386,12 @@ DiplomacyBoard.unitPoint = function (graph, unit) {
+ 	};
+ };
+ 
++DiplomacyBoard.unitPoint = function (graph, unit) {
++	var slot = DiplomacyBoard.tokenSlotForUnit(graph, unit);
++	if (slot) return { x: slot.x, y: slot.y };
++	return DiplomacyBoard.defaultUnitPoint(graph, unit);
++};
++
+ // Local hull space has the bow at negative y. Map y grows downward, so
+ // starboard is a clockwise quarter-turn from the facing vector.
+ DiplomacyBoard.hullOffset = function (facing, lx, ly) {
+@@ -343,11 +408,10 @@ DiplomacyBoard.hullOffset = function (facing, lx, ly) {
+ 	};
+ };
+ 
+-DiplomacyBoard.fleetFacing = function (graph, unit, anchor) {
++DiplomacyBoard.defaultFleetFacing = function (graph, unit, anchor) {
+ 	var province = DiplomacyBoard.province(graph, unit && unit.province);
+ 	if (!province || !anchor) return { x: 0, y: -1 };
+-	var coast = DiplomacyBoard.coastById(province, unit.coast);
+-	if (!coast && DiplomacyBoard.coastList(province).length === 1) coast = province.coasts[0];
++	var coast = DiplomacyBoard.resolvedFleetCoast(province, unit && unit.coast);
+ 	if (coast && coast.facing && (coast.facing.x || coast.facing.y)) return coast.facing;
+ 	var ids = coast && Array.isArray(coast.fleet) ? coast.fleet : (province.fleet || []);
+ 	var sx = 0;
+@@ -368,6 +432,133 @@ DiplomacyBoard.fleetFacing = function (graph, unit, anchor) {
+ 	return { x: sx / n - anchor.x, y: sy / n - anchor.y };
+ };
+ 
++DiplomacyBoard.fleetFacing = function (graph, unit, anchor) {
++	var slot = DiplomacyBoard.tokenSlotForUnit(graph, unit);
++	if (slot && slot.facing && (slot.facing.x || slot.facing.y)) return slot.facing;
++	return DiplomacyBoard.defaultFleetFacing(graph, unit, anchor);
++};
++
++DiplomacyBoard.moveTokenSlot = function (graph, key, kind, point) {
++	var slots = DiplomacyBoard.ensureTokenSlots(graph);
++	if (!slots[key]) slots[key] = {};
++	if (!slots[key][kind]) slots[key][kind] = { x: point.x, y: point.y };
++	slots[key][kind].x = point.x;
++	slots[key][kind].y = point.y;
++};
++
++DiplomacyBoard.buildTokenPositions = function (graph) {
++	DiplomacyBoard.uniteProvinces(graph);
++	var slots = DiplomacyBoard.ensureTokenSlots(graph);
++	var ids = [];
++	var id;
++	for (id in graph.provinces) {
++		if (Object.prototype.hasOwnProperty.call(graph.provinces, id)) ids.push(id);
++	}
++	ids.sort();
++	for (var i = 0; i < ids.length; i++) {
++		id = ids[i];
++		var province = graph.provinces[id];
++		if (!DiplomacyBoard.isOpen(province) || !province.center) continue;
++		if (province.kind !== "sea") {
++			if (!slots[id]) slots[id] = {};
++			if (!slots[id].army) {
++				var armyAt = DiplomacyBoard.defaultUnitPoint(graph, { province: id, unit: "army" });
++				if (armyAt) slots[id].army = { x: armyAt.x, y: armyAt.y };
++			}
++		}
++		if (province.kind === "sea") {
++			if (!slots[id]) slots[id] = {};
++			if (!slots[id].fleet) {
++				var seaAt = DiplomacyBoard.defaultUnitPoint(graph, { province: id, unit: "fleet" });
++				var seaFace = DiplomacyBoard.defaultFleetFacing(graph, { province: id, unit: "fleet" }, seaAt);
++				slots[id].fleet = { x: seaAt.x, y: seaAt.y, facing: { x: seaFace.x, y: seaFace.y } };
++			}
++		} else if (province.coastal) {
++			var coasts = DiplomacyBoard.coastList(province);
++			if (!coasts.length) {
++				if (!slots[id]) slots[id] = {};
++				if (!slots[id].fleet) {
++					var fleetAt = DiplomacyBoard.defaultUnitPoint(graph, { province: id, unit: "fleet" });
++					var fleetFace = DiplomacyBoard.defaultFleetFacing(graph, { province: id, unit: "fleet" }, fleetAt);
++					slots[id].fleet = { x: fleetAt.x, y: fleetAt.y, facing: { x: fleetFace.x, y: fleetFace.y } };
++				}
++			} else {
++				for (var c = 0; c < coasts.length; c++) {
++					var coast = coasts[c];
++					var key = DiplomacyBoard.tokenSlotKey("fleet", id, coast.id);
++					if (!slots[key]) slots[key] = {};
++					if (!slots[key].fleet) {
++						var coastAt = DiplomacyBoard.defaultUnitPoint(graph, { province: id, unit: "fleet", coast: coast.id });
++						var coastFace = DiplomacyBoard.defaultFleetFacing(graph, { province: id, unit: "fleet", coast: coast.id }, coastAt);
++						slots[key].fleet = { x: coastAt.x, y: coastAt.y, facing: { x: coastFace.x, y: coastFace.y } };
++					}
++				}
++			}
++		}
++	}
++	return {
++		kind: "diplomacy-token-positions",
++		map: DiplomacyBoard.mapKeyFromSource(graph.source),
++		slots: slots
++	};
++};
++
++DiplomacyBoard.listTokenSlots = function (graph) {
++	DiplomacyBoard.buildTokenPositions(graph);
++	var slots = graph.tokenSlots || {};
++	var out = [];
++	var keys = [];
++	var key;
++	for (key in slots) {
++		if (Object.prototype.hasOwnProperty.call(slots, key)) keys.push(key);
++	}
++	keys.sort();
++	for (var i = 0; i < keys.length; i++) {
++		key = keys[i];
++		var kinds = slots[key];
++		for (var kind in kinds) {
++			if (!Object.prototype.hasOwnProperty.call(kinds, kind)) continue;
++			var src = kinds[kind];
++			if (!src || typeof src.x !== "number" || typeof src.y !== "number") continue;
++			out.push({
++				key: key,
++				kind: kind,
++				x: src.x,
++				y: src.y,
++				facing: src.facing ? { x: src.facing.x, y: src.facing.y } : null
++			});
++		}
++	}
++	return out;
++};
++
++DiplomacyBoard.exportTokenPositions = function (graph) {
++	DiplomacyBoard.buildTokenPositions(graph);
++	return {
++		kind: "diplomacy-token-positions",
++		map: DiplomacyBoard.mapKeyFromSource(graph.source),
++		slots: DiplomacyBoard.clone(graph.tokenSlots)
++	};
++};
++
++DiplomacyBoard.slotNear = function (graph, mapPt, radius) {
++	if (!mapPt) return null;
++	var best = null;
++	var bestD = radius * radius;
++	var slots = DiplomacyBoard.listTokenSlots(graph);
++	for (var i = 0; i < slots.length; i++) {
++		var slot = slots[i];
++		var dx = mapPt.x - slot.x;
++		var dy = mapPt.y - slot.y;
++		var d = dx * dx + dy * dy;
++		if (d <= bestD) {
++			bestD = d;
++			best = slot;
++		}
++	}
++	return best;
++};
++
+ // Direct move, or an army convoy along seas that currently have fleets.
+ // This does not look at orders: a convoy counts as a move the army could make.
+ DiplomacyBoard.canReach = function (graph, position, unit, destId, destCoast) {
+diff --git a/diplomacy/board/js/camera.js b/diplomacy/board/js/camera.js
+index 74cb882..0fb02b4 100644
+--- a/diplomacy/board/js/camera.js
++++ b/diplomacy/board/js/camera.js
+@@ -79,7 +79,7 @@ DiplomacyBoard.attachCamera = function (b) {
+ 
+ 	b.onPointerDown = function (event) {
+ 		if (event.button !== 0) return;
+-		if (event.target.closest(".move-popup, .map-zoom, .order-prompt")) return;
++		if (event.target.closest(".move-popup, .map-zoom, .order-prompt, .token-edit-bar")) return;
+ 		b.pointers[event.pointerId] = { id: event.pointerId, x: event.clientX, y: event.clientY };
+ 		var pts = pointerList();
+ 		if (pts.length >= 2) {
+diff --git a/diplomacy/board/js/draw.js b/diplomacy/board/js/draw.js
+index ffc8ea7..16e0b23 100644
+--- a/diplomacy/board/js/draw.js
++++ b/diplomacy/board/js/draw.js
+@@ -183,7 +183,61 @@ DiplomacyBoard.unitNear = function (graph, units, mapPt, radius) {
+ 	return best;
+ };
+ 
+-DiplomacyBoard.markOwnedProvinces = function (svg, cam, graph, position, powerId) {
++DiplomacyBoard.parseHexColor = function (value) {
++	var raw = String(value || "").trim();
++	if (raw.charAt(0) === "#") raw = raw.slice(1);
++	if (raw.length === 3) {
++		raw = raw.charAt(0) + raw.charAt(0) + raw.charAt(1) + raw.charAt(1) + raw.charAt(2) + raw.charAt(2);
++	}
++	if (!/^[0-9a-fA-F]{6}$/.test(raw)) return null;
++	return {
++		r: parseInt(raw.slice(0, 2), 16),
++		g: parseInt(raw.slice(2, 4), 16),
++		b: parseInt(raw.slice(4, 6), 16)
++	};
++};
++
++DiplomacyBoard.hexColor = function (rgb) {
++	function byte(n) {
++		var v = Math.max(0, Math.min(255, Math.round(n)));
++		return (v < 16 ? "0" : "") + v.toString(16);
++	}
++	return "#" + byte(rgb.r) + byte(rgb.g) + byte(rgb.b);
++};
++
++// ~20% darker on light fills, ~20% lighter on dark fills, so owned borders read.
++DiplomacyBoard.contrastStroke = function (hex) {
++	var rgb = DiplomacyBoard.parseHexColor(hex);
++	if (!rgb) return "#1c1c1c";
++	var luminance = (0.299 * rgb.r + 0.587 * rgb.g + 0.114 * rgb.b) / 255;
++	var amount = 0.2;
++	if (luminance >= 0.55) {
++		return DiplomacyBoard.hexColor({
++			r: rgb.r * (1 - amount),
++			g: rgb.g * (1 - amount),
++			b: rgb.b * (1 - amount)
++		});
++	}
++	return DiplomacyBoard.hexColor({
++		r: rgb.r + (255 - rgb.r) * amount,
++		g: rgb.g + (255 - rgb.g) * amount,
++		b: rgb.b + (255 - rgb.b) * amount
++	});
++};
++
++DiplomacyBoard.ownedPowerIds = function (powerIds) {
++	if (Array.isArray(powerIds)) {
++		var out = [];
++		for (var i = 0; i < powerIds.length; i++) {
++			if (powerIds[i]) out.push(String(powerIds[i]));
++		}
++		return out;
++	}
++	if (powerIds) return [String(powerIds)];
++	return [];
++};
++
++DiplomacyBoard.markOwnedProvinces = function (svg, cam, graph, position, powerIds) {
+ 	if (!svg) return;
+ 	var overlay = svg.querySelector("#owned-highlight");
+ 	if (!overlay) {
+@@ -203,15 +257,16 @@ DiplomacyBoard.markOwnedProvinces = function (svg, cam, graph, position, powerId
+ 		}
+ 	}
+ 	while (overlay.firstChild) overlay.removeChild(overlay.firstChild);
+-	if (!powerId || !position) return;
+-	var power = DiplomacyBoard.powerById(position.powers || [], powerId);
+-	if (!power) return;
++	overlay.removeAttribute("stroke");
++	var ids = DiplomacyBoard.ownedPowerIds(powerIds);
++	if (!ids.length || !position) return;
+ 	var borders = svg.querySelector("#borders");
+ 	var borderWidth = borders ? parseFloat(borders.getAttribute("stroke-width")) : NaN;
+ 	if (!borderWidth || borderWidth !== borderWidth) borderWidth = Math.max(cam.w, cam.h) * 0.0016;
+ 	var span = Math.max(cam.w, cam.h);
+-	overlay.setAttribute("stroke", power.color || "#1c1c1c");
+ 	overlay.setAttribute("stroke-width", String(Math.max(borderWidth * 3.2, span * 0.0045)));
++	var wanted = {};
++	for (var w = 0; w < ids.length; w++) wanted[ids[w]] = true;
+ 	var ns = "http://www.w3.org/2000/svg";
+ 	var nodes = DiplomacyBoard.territoryNodes(svg);
+ 	for (var n = 0; n < nodes.length; n++) {
+@@ -220,11 +275,14 @@ DiplomacyBoard.markOwnedProvinces = function (svg, cam, graph, position, powerId
+ 		if (!province || province.kind === "sea") continue;
+ 		if (province.waterParts && province.waterParts.indexOf(node.id) !== -1) continue;
+ 		var id = DiplomacyBoard.provinceId(graph, node.id);
+-		if (position.ownership[id] !== powerId) continue;
++		var ownerId = position.ownership[id];
++		if (!wanted[ownerId]) continue;
++		var power = DiplomacyBoard.powerById(position.powers || [], ownerId);
+ 		var d = node.getAttribute("d");
+ 		if (!d) continue;
+ 		var outline = document.createElementNS(ns, "path");
+ 		outline.setAttribute("d", d);
++		outline.setAttribute("stroke", DiplomacyBoard.contrastStroke(power && power.color));
+ 		overlay.appendChild(outline);
+ 	}
+ };
+@@ -633,9 +691,19 @@ function tokensToDraw(view) {
+ 	return list;
+ }
+ 
++function playingAsSet(view) {
++	if (Array.isArray(view.playingAsPowers) && view.playingAsPowers.length) return view.playingAsPowers;
++	if (view.playingAs) return [view.playingAs];
++	return [];
++}
++
++function controlsPower(view, powerId) {
++	var ids = playingAsSet(view);
++	return ids.indexOf(powerId) !== -1;
++}
++
+ function unitNeedsOrder(view, unit) {
+-	if (view.readOnly || view.orderScope !== "mine" || !view.playingAs) return false;
+-	if (unit.power !== view.playingAs) return false;
++	if (view.readOnly || view.orderScope !== "mine" || !controlsPower(view, unit.power)) return false;
+ 	var home = unit.origin || unit.province;
+ 	var orders = view.orders || [];
+ 	var ordered = false;
+@@ -645,10 +713,10 @@ function unitNeedsOrder(view, unit) {
+ 	if (ordered) return false;
+ 	if (view.mode === "retreat") {
+ 		var entry = DiplomacyBoard.findRetreat(view.graph, view.retreats || [], home);
+-		return !!(entry && entry.power === view.playingAs);
++		return !!(entry && controlsPower(view, entry.power));
+ 	}
+ 	if (view.mode === "build") {
+-		var adjustment = DiplomacyBoard.findAdjustment(view.adjustments || [], view.playingAs);
++		var adjustment = DiplomacyBoard.findAdjustment(view.adjustments || [], unit.power);
+ 		return DiplomacyBoard.adjustmentCanDisband(view.graph, adjustment, home);
+ 	}
+ 	return view.mode === "orders";
+@@ -696,6 +764,40 @@ function paintTokens(ctx, view) {
+ 	}
+ }
+ 
++DiplomacyBoard.paintTokenSlots = function (ctx, view) {
++	if (!view.tokenEdit || !ctx) return;
++	var slots = DiplomacyBoard.listTokenSlots(view.graph);
++	var r = view.tokenSize / 2;
++	for (var i = 0; i < slots.length; i++) {
++		var slot = slots[i];
++		var at = view.project({ x: slot.x, y: slot.y });
++		var selected = view.tokenEditKey === slot.key && view.tokenEditKind === slot.kind;
++		ctx.save();
++		ctx.beginPath();
++		ctx.arc(at.x, at.y, r * 0.95, 0, Math.PI * 2);
++		ctx.strokeStyle = selected ? "#111111" : (slot.kind === "fleet" ? "#1c4b73" : "#5a3a1c");
++		ctx.lineWidth = selected ? 3 : 2;
++		ctx.setLineDash(selected ? [] : [4, 3]);
++		ctx.stroke();
++		if (slot.kind === "fleet" && slot.facing) {
++			var fx = slot.facing.x;
++			var fy = slot.facing.y;
++			var len = Math.hypot(fx, fy) || 1;
++			ctx.beginPath();
++			ctx.moveTo(at.x, at.y);
++			ctx.lineTo(at.x + (fx / len) * r * 1.6, at.y + (fy / len) * r * 1.6);
++			ctx.setLineDash([]);
++			ctx.stroke();
++		}
++		ctx.fillStyle = "#1c1c1c";
++		ctx.font = Math.max(9, Math.round(r * 0.42)) + "px Segoe UI, sans-serif";
++		ctx.textAlign = "center";
++		ctx.textBaseline = "top";
++		ctx.fillText(slot.key + " " + slot.kind, at.x, at.y + r + 2);
++		ctx.restore();
++	}
++};
++
+ DiplomacyBoard.paintUnitsAndOrders = function (ctx, view) {
+ 	paintTokens(ctx, view);
+ 	paintOrders(ctx, view);
+@@ -709,5 +811,6 @@ DiplomacyBoard.paintUnitsAndOrders = function (ctx, view) {
+ 			ghost: true
+ 		});
+ 	}
++	DiplomacyBoard.paintTokenSlots(ctx, view);
+ };
+ })();
+diff --git a/diplomacy/board/js/mount.js b/diplomacy/board/js/mount.js
+index fe65aa8..fea4b6f 100644
+--- a/diplomacy/board/js/mount.js
++++ b/diplomacy/board/js/mount.js
+@@ -8,9 +8,11 @@ DiplomacyBoard.mount = function (host, options) {
+ 
+ 	var graph = options.graph;
+ 	DiplomacyBoard.uniteProvinces(graph);
++	DiplomacyBoard.buildTokenPositions(graph);
+ 	var mode = DiplomacyBoard.knownMode(options.mode);
+ 	var positionTool = options.positionTool || "own";
+-	var playingAs = options.playingAs || "";
++	var playingAsPowers = [];
++	var playingAs = "";
+ 	var orderScope = options.orderScope || "all";
+ 	var retreats = Array.isArray(options.retreats) ? options.retreats : [];
+ 	var adjustments = Array.isArray(options.adjustments) ? options.adjustments : [];
+@@ -34,6 +36,12 @@ DiplomacyBoard.mount = function (host, options) {
+ 	var skipClick = false;
+ 	var swallowClick = false;
+ 	var resizeObserver = null;
++	var popupAnchor = null;
++	var tokenEdit = false;
++	var tokenDrag = null;
++	var tokenEditKey = "";
++	var tokenEditKind = "";
++	var tokenBar = null;
+ 
+ 	host.innerHTML = "";
+ 	host.classList.add("diplomacy-board");
+@@ -64,6 +72,30 @@ DiplomacyBoard.mount = function (host, options) {
+ 	host.appendChild(viewport);
+ 	host.appendChild(caption);
+ 
++	function powerIdList(value) {
++		if (Array.isArray(value)) {
++			var out = [];
++			for (var i = 0; i < value.length; i++) {
++				if (value[i]) out.push(String(value[i]));
++			}
++			return out;
++		}
++		if (value) return [String(value)];
++		return [];
++	}
++
++	function assignPlayingAs(ids) {
++		playingAsPowers = powerIdList(ids);
++		playingAs = playingAsPowers[0] || "";
++	}
++
++	function controlsPower(id) {
++		if (orderScope === "all") return true;
++		return playingAsPowers.indexOf(id) !== -1;
++	}
++
++	assignPlayingAs(options.playingAsPowers && options.playingAsPowers.length ? options.playingAsPowers : options.playingAs);
++
+ 	function emit() {
+ 		if (typeof options.onChange === "function") {
+ 			options.onChange({
+@@ -204,21 +236,22 @@ DiplomacyBoard.mount = function (host, options) {
+ 	function unitClickable(unit) {
+ 		if (readOnly || mode !== "orders") return false;
+ 		if (orderScope === "all") return true;
+-		return !!playingAs && unit.power === playingAs;
++		return controlsPower(unit.power);
+ 	}
+ 
+ 	function retreatClickable(entry) {
+ 		if (readOnly || !entry) return false;
+ 		if (orderScope === "all") return true;
+-		return !!playingAs && entry.power === playingAs;
++		return controlsPower(entry.power);
+ 	}
+ 
+ 	function editableAdjustments() {
+-		if (orderScope === "mine") {
+-			var one = DiplomacyBoard.findAdjustment(adjustments, playingAs);
+-			return one ? [one] : [];
++		if (orderScope !== "mine") return adjustments;
++		var mine = [];
++		for (var i = 0; i < adjustments.length; i++) {
++			if (controlsPower(adjustments[i].power)) mine.push(adjustments[i]);
+ 		}
+-		return adjustments;
++		return mine;
+ 	}
+ 
+ 	function adjustmentAt(provinceId) {
+@@ -253,6 +286,16 @@ DiplomacyBoard.mount = function (host, options) {
+ 		var pop = popup.getBoundingClientRect();
+ 		var left = (rect.width - pop.width) / 2;
+ 		var top = (rect.height - pop.height) / 2;
++		if (popupAnchor) {
++			var at = mapToStage(popupAnchor);
++			var stageRect = stage.getBoundingClientRect();
++			var originX = stageRect.left - rect.left + at.x;
++			var originY = stageRect.top - rect.top + at.y;
++			var gap = tokenSize() * 0.7;
++			left = originX + gap;
++			top = originY - pop.height / 2;
++			if (left + pop.width > rect.width - margin) left = originX - gap - pop.width;
++		}
+ 		if (left < margin) left = margin;
+ 		if (top < margin) top = margin;
+ 		if (left + pop.width > rect.width - margin) left = Math.max(margin, rect.width - margin - pop.width);
+@@ -261,6 +304,17 @@ DiplomacyBoard.mount = function (host, options) {
+ 		popup.style.top = top + "px";
+ 	}
+ 
++	function anchorPopup(point) {
++		popupAnchor = point && typeof point.x === "number" ? { x: point.x, y: point.y } : null;
++	}
++
++	function provinceAnchor(provinceId) {
++		var standing = DiplomacyBoard.unitAt(position.units, provinceId);
++		if (standing) return DiplomacyBoard.unitPoint(graph, standing);
++		var province = DiplomacyBoard.province(graph, provinceId);
++		return province && province.center ? province.center : null;
++	}
++
+ 	function pickList() {
+ 		return DiplomacyBoard.orderPickList(graph, position, pending);
+ 	}
+@@ -433,11 +487,12 @@ DiplomacyBoard.mount = function (host, options) {
+ 		}
+ 		if (mode === "build") return !!adjustmentAt(openProvince);
+ 		var standing = DiplomacyBoard.unitAt(position.units, openProvince);
+-		return !!(standing && standing.power === playingAs);
++		return !!(standing && controlsPower(standing.power));
+ 	}
+ 
+ 	function closePopup() {
+ 		openProvince = null;
++		popupAnchor = null;
+ 		popup.hidden = true;
+ 		popup.innerHTML = "";
+ 		drawUnits();
+@@ -447,6 +502,7 @@ DiplomacyBoard.mount = function (host, options) {
+ 		popup.innerHTML = DiplomacyBoard.orderPopupHtml(graph, unit, orderFrom(unit.province));
+ 		popup.hidden = false;
+ 		openProvince = unit.province;
++		anchorPopup(DiplomacyBoard.unitPoint(graph, unit) || provinceAnchor(unit.province));
+ 		placePopup();
+ 		drawUnits();
+ 	}
+@@ -508,11 +564,15 @@ DiplomacyBoard.mount = function (host, options) {
+ 			resolution: resolution,
+ 			openProvince: openProvince,
+ 			playingAs: playingAs,
++			playingAsPowers: playingAsPowers,
+ 			orderScope: orderScope,
+ 			readOnly: readOnly,
+ 			mode: mode,
+ 			retreats: retreats,
+-			adjustments: adjustments
++			adjustments: adjustments,
++			tokenEdit: tokenEdit,
++			tokenEditKey: tokenEditKey,
++			tokenEditKind: tokenEditKind
+ 		});
+ 	}
+ 
+@@ -523,8 +583,8 @@ DiplomacyBoard.mount = function (host, options) {
+ 	}
+ 
+ 	function paintPlayerEdge() {
+-		var markPower = !readOnly && orderScope === "mine" && playingAs ? playingAs : "";
+-		DiplomacyBoard.markOwnedProvinces(svg, cam, graph, position, markPower);
++		var markPowers = !readOnly && orderScope === "mine" ? playingAsPowers : [];
++		DiplomacyBoard.markOwnedProvinces(svg, cam, graph, position, markPowers);
+ 	}
+ 
+ 	function render() {
+@@ -571,6 +631,7 @@ DiplomacyBoard.mount = function (host, options) {
+ 		popup.innerHTML = html;
+ 		popup.hidden = false;
+ 		openProvince = provinceId;
++		anchorPopup(provinceAnchor(provinceId));
+ 		placePopup();
+ 		drawUnits();
+ 	}
+@@ -655,6 +716,7 @@ DiplomacyBoard.mount = function (host, options) {
+ 		popup.innerHTML = DiplomacyBoard.retreatPopupHtml(graph, view, orderFrom(DiplomacyBoard.canonProvince(graph, entry.province)));
+ 		popup.hidden = false;
+ 		openProvince = DiplomacyBoard.canonProvince(graph, entry.province);
++		anchorPopup(provinceAnchor(openProvince));
+ 		placePopup();
+ 		showPrompt();
+ 		highlightPicks();
+@@ -680,6 +742,7 @@ DiplomacyBoard.mount = function (host, options) {
+ 		});
+ 		popup.hidden = false;
+ 		openProvince = id;
++		anchorPopup(provinceAnchor(id));
+ 		placePopup();
+ 		showPrompt();
+ 		highlightPicks();
+@@ -821,8 +884,8 @@ DiplomacyBoard.mount = function (host, options) {
+ 	}
+ 
+ 	function onMapClick(event) {
+-		if (readOnly || skipClick || swallowClick) return;
+-		if (event.target.closest(".move-popup, .map-zoom, .order-prompt")) return;
++		if (tokenEdit || readOnly || skipClick || swallowClick) return;
++		if (event.target.closest(".move-popup, .map-zoom, .order-prompt, .token-edit-bar")) return;
+ 		handleMapPointer(event);
+ 	}
+ 
+@@ -913,7 +976,7 @@ DiplomacyBoard.mount = function (host, options) {
+ 	}
+ 
+ 	function onDocumentClick(event) {
+-		if (swallowClick) return;
++		if (tokenEdit || swallowClick) return;
+ 		if (host.contains(event.target)) return;
+ 		if (event.target && !document.contains(event.target)) return;
+ 		cancelPending();
+@@ -931,10 +994,15 @@ DiplomacyBoard.mount = function (host, options) {
+ 	}
+ 
+ 	function setCaption(event) {
+-		if (!event || event.target.closest(".map-zoom, .move-popup, .order-prompt")) {
++		if (!event || event.target.closest(".map-zoom, .move-popup, .order-prompt, .token-edit-bar")) {
+ 			caption.textContent = "";
+ 			return;
+ 		}
++		if (tokenEdit) {
++			var slot = DiplomacyBoard.slotNear(graph, eventToMap(event), hitRadiusMap());
++			caption.textContent = slot ? (slot.key + " " + slot.kind) : "Drag a token slot to move it.";
++			return;
++		}
+ 		var node = provinceFromEvent(event);
+ 		var province = node ? DiplomacyBoard.province(graph, node.id) : null;
+ 		caption.textContent = DiplomacyBoard.hoverName(province);
+@@ -1176,6 +1244,130 @@ DiplomacyBoard.mount = function (host, options) {
+ 	};
+ 	DiplomacyBoard.attachCamera(camera);
+ 
++	function downloadTokenPositions() {
++		var doc = DiplomacyBoard.exportTokenPositions(graph);
++		var blob = new Blob([JSON.stringify(doc, null, 2) + "\n"], { type: "application/json" });
++		var url = URL.createObjectURL(blob);
++		var link = document.createElement("a");
++		link.href = url;
++		link.download = DiplomacyBoard.mapKeyFromSource(graph.source) + ".tokens.json";
++		document.body.appendChild(link);
++		link.click();
++		document.body.removeChild(link);
++		URL.revokeObjectURL(url);
++	}
++
++	function ensureTokenBar() {
++		if (tokenBar) return tokenBar;
++		tokenBar = document.createElement("div");
++		tokenBar.className = "token-edit-bar";
++		tokenBar.hidden = true;
++		var note = document.createElement("span");
++		note.textContent = "Editing token positions";
++		var downloadBtn = document.createElement("button");
++		downloadBtn.type = "button";
++		downloadBtn.textContent = "Download JSON";
++		downloadBtn.addEventListener("click", function onDownload(event) {
++			event.stopPropagation();
++			downloadTokenPositions();
++		});
++		var doneBtn = document.createElement("button");
++		doneBtn.type = "button";
++		doneBtn.textContent = "Done";
++		doneBtn.addEventListener("click", function onDone(event) {
++			event.stopPropagation();
++			api.setTokenEdit(false);
++		});
++		tokenBar.appendChild(note);
++		tokenBar.appendChild(downloadBtn);
++		tokenBar.appendChild(doneBtn);
++		viewport.appendChild(tokenBar);
++		return tokenBar;
++	}
++
++	function setTokenEdit(on) {
++		tokenEdit = !!on;
++		if (tokenEdit) {
++			cancelPending();
++			closePopup();
++			DiplomacyBoard.buildTokenPositions(graph);
++		} else {
++			tokenDrag = null;
++			tokenEditKey = "";
++			tokenEditKind = "";
++		}
++		ensureTokenBar().hidden = !tokenEdit;
++		host.classList.toggle("is-token-edit", tokenEdit);
++		drawUnits();
++		if (typeof options.onTokenEdit === "function") options.onTokenEdit(tokenEdit);
++	}
++
++	function tryTokenDragStart(event) {
++		if (!tokenEdit || event.button !== 0) return false;
++		if (event.target.closest(".move-popup, .map-zoom, .order-prompt, .token-edit-bar")) return false;
++		var hit = DiplomacyBoard.slotNear(graph, eventToMap(event), hitRadiusMap());
++		if (!hit) return false;
++		tokenDrag = {
++			key: hit.key,
++			kind: hit.kind,
++			pointerId: event.pointerId
++		};
++		tokenEditKey = hit.key;
++		tokenEditKind = hit.kind;
++		try {
++			viewport.setPointerCapture(event.pointerId);
++		} catch (err) {}
++		drawUnits();
++		return true;
++	}
++
++	function tokenDragMove(event) {
++		if (!tokenDrag || event.pointerId !== tokenDrag.pointerId) return false;
++		var at = eventToMap(event);
++		if (!at) return true;
++		DiplomacyBoard.moveTokenSlot(graph, tokenDrag.key, tokenDrag.kind, at);
++		drawUnits();
++		return true;
++	}
++
++	function tokenDragEnd(event) {
++		if (!tokenDrag) return false;
++		if (event && event.pointerId != null && event.pointerId !== tokenDrag.pointerId) return false;
++		tokenDrag = null;
++		skipClick = true;
++		setTimeout(function () {
++			skipClick = false;
++		}, 0);
++		drawUnits();
++		return true;
++	}
++
++	var cameraDown = camera.onPointerDown;
++	var cameraMove = camera.onPointerMove;
++	var cameraUp = camera.onPointerUp;
++	camera.onPointerDown = function (event) {
++		if (tryTokenDragStart(event)) return;
++		cameraDown(event);
++	};
++	camera.onPointerMove = function (event) {
++		if (tokenDragMove(event)) {
++			viewport.style.cursor = "grabbing";
++			return;
++		}
++		if (tokenEdit) {
++			var hover = DiplomacyBoard.slotNear(graph, eventToMap(event), hitRadiusMap());
++			viewport.style.cursor = hover ? "grab" : "";
++			setCaption(event);
++			return;
++		}
++		cameraMove(event);
++	};
++	camera.onPointerUp = function (event) {
++		if (tokenDragEnd(event)) return;
++		cameraUp(event);
++	};
++	camera.onPointerCancel = camera.onPointerUp;
++
+ 	popup.addEventListener("click", onPopupClick);
+ 	document.addEventListener("click", onDocumentClick);
+ 	document.addEventListener("keydown", onKey);
+@@ -1301,12 +1493,24 @@ DiplomacyBoard.mount = function (host, options) {
+ 			positionTool = next || "own";
+ 		},
+ 		setPlayingAs: function (id) {
+-			playingAs = id || "";
++			api.setPlayingAsPowers(id ? [id] : []);
++		},
++		setPlayingAsPowers: function (ids) {
++			assignPlayingAs(ids);
+ 			if (!popupStillAllowed()) closePopup();
+ 			if (mode === "retreat" || mode === "build") highlightPicks();
+ 			paintPlayerEdge();
+ 			drawUnits();
+ 		},
++		setTokenEdit: function (on) {
++			setTokenEdit(on);
++		},
++		exportTokenPositions: function () {
++			return DiplomacyBoard.exportTokenPositions(graph);
++		},
++		downloadTokenPositions: function () {
++			downloadTokenPositions();
++		},
+ 		getShowResolved: function () {
+ 			return showResolved;
+ 		},
+@@ -1356,7 +1560,7 @@ DiplomacyBoard.mount = function (host, options) {
+ 			cancelPending();
+ 			closePopup();
+ 			host.innerHTML = "";
+-			host.classList.remove("diplomacy-board", "is-position", "is-orders", "is-retreat", "is-build", "is-readonly", "is-picking", "is-resolved");
++			host.classList.remove("diplomacy-board", "is-position", "is-orders", "is-retreat", "is-build", "is-readonly", "is-picking", "is-resolved", "is-token-edit");
+ 		}
+ 	};
+ 
+@@ -1374,7 +1578,7 @@ DiplomacyBoard.mount = function (host, options) {
+ 		return api;
+ 	}
+ 	if (!options.mapUrl) DiplomacyBoard.fail("mount needs svg or mapUrl");
+-	fetch(options.mapUrl).then(function (response) {
++	fetch(options.mapUrl, { cache: "no-store" }).then(function (response) {
+ 		if (!response.ok) throw new Error("Could not load map");
+ 		return response.text();
+ 	}).then(function (text) {

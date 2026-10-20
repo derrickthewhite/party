@@ -1,7 +1,7 @@
 import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate } from './dom.js';
 import { createBaseGameScreen } from './gameScreen.js';
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
-import { loadDiplomacyBoard, loadDiplomacyGraph } from './diplomacyBoardLoader.js';
+import { loadDiplomacyBoard, loadDiplomacyGraph, withAssetStamp } from './diplomacyBoardLoader.js';
 
 function phaseKey(year, phase) {
 	return String(year || '') + ':' + String(phase || '');
@@ -155,11 +155,6 @@ export function createDiplomacyGameScreen(deps) {
 				<p class="top-user-label" data-ref="progressText">Submitted 0/0 · Ready 0/0</p>
 				<p data-ref="timerText" class="diplomacy-timer-text"></p>
 				<p data-ref="powerText"></p>
-				<div class="row mobile-stack" data-ref="activePowerRow">
-					<label>Ordering for
-						<select data-ref="activePowerSelect"></select>
-					</label>
-				</div>
 				<div class="row mobile-stack">
 					<div class="diplomacy-turn-nav" data-ref="turnNav">
 						<span class="diplomacy-turn-nav-caption">History</span>
@@ -186,6 +181,7 @@ export function createDiplomacyGameScreen(deps) {
 					<button data-ref="readyBtn">Ready</button>
 					<button data-ref="endTurnBtn">End turn</button>
 					<button type="button" data-ref="focusBtn">Focus board</button>
+					<button type="button" data-ref="editTokensBtn">Edit token positions</button>
 				</div>
 				<div data-ref="boardSlot">
 					<div class="diplomacy-board-host" data-ref="boardHost"></div>
@@ -252,7 +248,6 @@ export function createDiplomacyGameScreen(deps) {
 		docs: {},
 		dirtyPowers: {},
 		phaseKey: '',
-		activePower: '',
 		setupDirty: false,
 	};
 
@@ -273,6 +268,7 @@ export function createDiplomacyGameScreen(deps) {
 	let historyBusy = false;
 	let mountPromise = null;
 	let focusOpen = false;
+	let tokenEdit = false;
 	let assignmentBusy = 0;
 	let assignmentChain = Promise.resolve();
 	let settingsBusy = 0;
@@ -767,15 +763,10 @@ export function createDiplomacyGameScreen(deps) {
 		const names = viewerPowers().map(powerName);
 		refs.powerText.textContent = names.length ? ('You are ' + names.join(', ') + '.') : 'You do not have a nation.';
 		const powers = viewerPowers();
-		refs.activePowerRow.style.display = powers.length > 1 ? '' : 'none';
-		if (!localDraft.activePower || powers.indexOf(localDraft.activePower) === -1) {
-			localDraft.activePower = powers[0] || '';
-		}
-		fillSelect(refs.activePowerSelect, powers.map(function each(powerId) {
-			return { value: powerId, label: powerName(powerId) };
-		}), localDraft.activePower);
 		const canAct = isLiveView() && !!perms.can_act && powers.length > 0 && String(serverSnapshot.status || '') === 'in_progress';
-		const powerCanOrder = currentMode() !== 'build' || !!adjustmentEntry(data.adjustments, localDraft.activePower);
+		const powerCanOrder = currentMode() !== 'build' || powers.some(function each(powerId) {
+			return !!adjustmentEntry(data.adjustments, powerId);
+		});
 		refs.submitBtn.disabled = !canAct || !powerCanOrder;
 		refs.submitBtn.style.display = perms.can_act ? '' : 'none';
 		const showReady = canAct && !!data.viewer_required;
@@ -785,6 +776,7 @@ export function createDiplomacyGameScreen(deps) {
 		refs.endTurnBtn.style.display = perms.can_end_turn ? '' : 'none';
 		refs.endTurnBtn.disabled = !perms.can_end_turn;
 		refs.focusBtn.style.display = '';
+		refs.editTokensBtn.textContent = tokenEdit ? 'Done editing tokens' : 'Edit token positions';
 		paintTimer();
 		reconcileHistorySelect();
 		reconcilePlayRoster();
@@ -857,12 +849,11 @@ export function createDiplomacyGameScreen(deps) {
 		const data = dip();
 		const perms = serverSnapshot.permissions || {};
 		const powers = viewerPowers();
-		if (!localDraft.activePower || powers.indexOf(localDraft.activePower) === -1) {
-			localDraft.activePower = powers[0] || data.my_power || '';
-		}
 		const adjustments = Array.isArray(data.adjustments) ? data.adjustments : [];
-		const powerCanOrder = currentMode() !== 'build' || !!adjustmentEntry(adjustments, localDraft.activePower);
-		const canWrite = !!perms.can_act && !!localDraft.activePower && powerCanOrder && String(serverSnapshot.status || '') === 'in_progress';
+		const powerCanOrder = currentMode() !== 'build' || powers.some(function each(powerId) {
+			return !!adjustmentEntry(adjustments, powerId);
+		});
+		const canWrite = !!perms.can_act && powers.length > 0 && powerCanOrder && String(serverSnapshot.status || '') === 'in_progress';
 		applyingBoard = true;
 		try {
 			const key = phaseKey(data.year, data.phase);
@@ -872,7 +863,11 @@ export function createDiplomacyGameScreen(deps) {
 				localDraft.dirtyPowers = {};
 			}
 			clearMountedOrders(currentMode());
-			boardApi.setPlayingAs(localDraft.activePower || '');
+			if (typeof boardApi.setPlayingAsPowers === 'function') {
+				boardApi.setPlayingAsPowers(powers);
+			} else {
+				boardApi.setPlayingAs(powers[0] || '');
+			}
 			boardApi.setOrderScope('mine');
 			boardApi.setRetreats(Array.isArray(data.retreats) ? data.retreats : []);
 			boardApi.setAdjustments(adjustments);
@@ -881,7 +876,9 @@ export function createDiplomacyGameScreen(deps) {
 			if (data.position) {
 				boardApi.setPosition(data.position);
 			}
-			importOrders(ordersDocFor(localDraft.activePower), adjustments);
+			powers.forEach(function eachPower(powerId) {
+				importOrders(ordersDocFor(powerId), adjustments);
+			});
 			if (data.display_resolution) {
 				boardApi.setResolution(data.display_resolution);
 			} else {
@@ -910,17 +907,23 @@ export function createDiplomacyGameScreen(deps) {
 		}
 		mountPromise = (async function mount() {
 			const DiplomacyBoard = await loadDiplomacyBoard();
-			const graph = await loadDiplomacyGraph(data.map);
+			const loaded = await loadDiplomacyGraph(data.map);
+			const graph = loaded.graph || loaded;
+			const tokenPositions = loaded.tokenPositions || null;
 			if (boardApi) {
 				boardApi.destroy();
 				boardApi = null;
 			}
+			tokenEdit = false;
+			refs.editTokensBtn.textContent = 'Edit token positions';
 			boardReady = false;
 			boardApi = DiplomacyBoard.mount(refs.boardHost, {
 				graph: graph,
-				mapUrl: data.map.svg_url,
+				tokenPositions: tokenPositions,
+				mapUrl: withAssetStamp(data.map.svg_url),
 				mode: currentMode(),
-				playingAs: data.my_power || '',
+				playingAsPowers: viewerPowers(),
+				playingAs: viewerPowers()[0] || data.my_power || '',
 				orderScope: 'mine',
 				retreats: Array.isArray(data.retreats) ? data.retreats : [],
 				adjustments: Array.isArray(data.adjustments) ? data.adjustments : [],
@@ -930,16 +933,18 @@ export function createDiplomacyGameScreen(deps) {
 					applyBoardFromLive();
 					boardReady = true;
 				},
+				onTokenEdit: function onTokenEdit(on) {
+					tokenEdit = !!on;
+					refs.editTokensBtn.textContent = tokenEdit ? 'Done editing tokens' : 'Edit token positions';
+				},
 				onChange: function onChange() {
-					if (!boardReady || applyingBoard || !isLiveView()) {
+					if (!boardReady || applyingBoard || !isLiveView() || !boardApi) {
 						return;
 					}
-					const power = localDraft.activePower || dip().my_power || '';
-					if (!power || !boardApi) {
-						return;
-					}
-					localDraft.dirtyPowers[power] = true;
-					localDraft.docs[power] = boardApi.exportOrders();
+					viewerPowers().forEach(function eachPower(power) {
+						localDraft.dirtyPowers[power] = true;
+						localDraft.docs[power] = boardApi.exportOrders(power);
+					});
 				},
 			});
 			boardMapKey = data.map_key;
@@ -1172,36 +1177,35 @@ export function createDiplomacyGameScreen(deps) {
 		}
 	});
 
-	refs.activePowerSelect.addEventListener('change', function onActivePower() {
-		const next = refs.activePowerSelect.value;
-		if (!next || next === localDraft.activePower) {
-			return;
-		}
-		if (boardApi && localDraft.activePower) {
-			localDraft.docs[localDraft.activePower] = boardApi.exportOrders();
-			localDraft.dirtyPowers[localDraft.activePower] = true;
-		}
-		localDraft.activePower = next;
-		applyBoardFromLive();
-		reconcilePlayChrome();
-	});
-
 	refs.submitBtn.addEventListener('click', async function onSubmit() {
 		if (!lastGameId || !boardApi) {
 			return;
 		}
 		try {
-			const doc = boardApi.exportOrders();
-			await deps.api.submitDiplomacyOrder(lastGameId, actionTypeForMode(currentMode()), doc);
-			if (doc && doc.power) {
-				localDraft.dirtyPowers[doc.power] = false;
-				localDraft.docs[doc.power] = doc;
+			const powers = viewerPowers();
+			const actionType = actionTypeForMode(currentMode());
+			for (let i = 0; i < powers.length; i += 1) {
+				const doc = boardApi.exportOrders(powers[i]);
+				await deps.api.submitDiplomacyOrder(lastGameId, actionType, doc);
+				if (doc && doc.power) {
+					localDraft.dirtyPowers[doc.power] = false;
+					localDraft.docs[doc.power] = doc;
+				}
 			}
 			await refreshDiplomacyState({ silent: true });
 			setStatusNode('Orders submitted.', 'ok');
 		} catch (err) {
 			setStatusNode(err.message || 'Unable to submit orders.', 'error');
 		}
+	});
+
+	refs.editTokensBtn.addEventListener('click', function onEditTokens() {
+		if (!boardApi || typeof boardApi.setTokenEdit !== 'function') {
+			return;
+		}
+		tokenEdit = !tokenEdit;
+		boardApi.setTokenEdit(tokenEdit);
+		refs.editTokensBtn.textContent = tokenEdit ? 'Done editing tokens' : 'Edit token positions';
 	});
 
 	refs.readyBtn.addEventListener('click', async function onReady() {

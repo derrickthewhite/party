@@ -7,8 +7,18 @@ const SCRIPT_PATHS = [
 	'diplomacy/board/js/mount.js',
 ];
 
+export const ASSET_V = String(Date.now());
+
 let boardPromise = null;
 const graphCache = new Map();
+
+export function withAssetStamp(url) {
+	if (!url) {
+		return url;
+	}
+	const join = String(url).indexOf('?') === -1 ? '?' : '&';
+	return url + join + 'v=' + ASSET_V;
+}
 
 function loadScript(src) {
 	return new Promise(function loadOne(resolve, reject) {
@@ -17,7 +27,7 @@ function loadScript(src) {
 			return;
 		}
 		const script = document.createElement('script');
-		script.src = src;
+		script.src = withAssetStamp(src);
 		script.async = false;
 		script.dataset.diplomacySrc = src;
 		script.onload = function onLoad() {
@@ -36,9 +46,26 @@ function ensureBoardCss() {
 	}
 	const link = document.createElement('link');
 	link.rel = 'stylesheet';
-	link.href = 'diplomacy/board/css/board.css';
+	link.href = withAssetStamp('diplomacy/board/css/board.css');
 	link.dataset.diplomacyBoardCss = '1';
 	document.head.appendChild(link);
+}
+
+function fetchJson(url, missingValue) {
+	return fetch(withAssetStamp(url), { cache: 'no-store' }).then(function onResponse(response) {
+		if (response.status === 404 && missingValue !== undefined) {
+			return missingValue;
+		}
+		if (!response.ok) {
+			throw new Error('Unable to load ' + url);
+		}
+		return response.json();
+	}).catch(function onErr(err) {
+		if (missingValue !== undefined) {
+			return missingValue;
+		}
+		throw err;
+	});
 }
 
 export function loadDiplomacyBoard() {
@@ -64,28 +91,23 @@ export async function loadDiplomacyGraph(map) {
 	if (!key) {
 		throw new Error('Map is missing.');
 	}
-	if (graphCache.has(key)) {
-		return graphCache.get(key);
+	const cacheKey = key + ':' + ASSET_V;
+	if (graphCache.has(cacheKey)) {
+		return graphCache.get(cacheKey);
 	}
 	const graphUrl = map.graph_url || ('diplomacy/maps/' + key + '/' + key + '.graph.json');
 	const unionsUrl = map.unions_url || ('diplomacy/maps/' + key + '/' + key + '.unions.json');
-	const [graph, unions] = await Promise.all([
-		fetch(graphUrl).then(function onGraph(response) {
-			if (!response.ok) {
-				throw new Error('Unable to load the map graph.');
-			}
-			return response.json();
-		}),
-		fetch(unionsUrl).then(function onUnions(response) {
-			if (!response.ok) {
-				return [];
-			}
-			return response.json();
-		}).catch(function onUnionsErr() {
-			return [];
-		}),
+	const tokensUrl = map.tokens_url || ('diplomacy/maps/' + key + '/' + key + '.tokens.json');
+	const [graph, unions, tokens] = await Promise.all([
+		fetchJson(graphUrl),
+		fetchJson(unionsUrl, []),
+		fetchJson(tokensUrl, null),
 	]);
 	graph.unions = Array.isArray(unions) ? unions : [];
-	graphCache.set(key, graph);
-	return graph;
+	const payload = {
+		graph: graph,
+		tokenPositions: tokens && tokens.slots ? tokens : null,
+	};
+	graphCache.set(cacheKey, payload);
+	return payload;
 }

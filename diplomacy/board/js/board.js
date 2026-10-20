@@ -306,14 +306,73 @@ DiplomacyBoard.nearestSea = function (graph, province) {
 	return best;
 };
 
+DiplomacyBoard.mapKeyFromSource = function (source) {
+	return String(source || "").replace(/\.(svg|json)$/i, "");
+};
+
+DiplomacyBoard.tokenSlotKey = function (unitType, provinceId, coastId) {
+	if (unitType === "fleet" && coastId) return provinceId + ":" + coastId;
+	return provinceId;
+};
+
+DiplomacyBoard.ensureTokenSlots = function (graph) {
+	if (!graph.tokenSlots || typeof graph.tokenSlots !== "object") graph.tokenSlots = {};
+	return graph.tokenSlots;
+};
+
+DiplomacyBoard.mergeTokenPositions = function (graph, doc) {
+	var slots = DiplomacyBoard.ensureTokenSlots(graph);
+	var incoming = doc && doc.slots ? doc.slots : doc;
+	if (!incoming || typeof incoming !== "object") return graph;
+	for (var key in incoming) {
+		if (!Object.prototype.hasOwnProperty.call(incoming, key)) continue;
+		var kinds = incoming[key];
+		if (!kinds || typeof kinds !== "object") continue;
+		if (!slots[key]) slots[key] = {};
+		for (var kind in kinds) {
+			if (!Object.prototype.hasOwnProperty.call(kinds, kind)) continue;
+			var src = kinds[kind];
+			if (!src || typeof src.x !== "number" || typeof src.y !== "number") continue;
+			var copy = { x: src.x, y: src.y };
+			if (src.facing && typeof src.facing.x === "number" && typeof src.facing.y === "number") {
+				copy.facing = { x: src.facing.x, y: src.facing.y };
+			}
+			slots[key][kind] = copy;
+		}
+	}
+	return graph;
+};
+
+DiplomacyBoard.resolvedFleetCoast = function (province, coastId) {
+	var coast = DiplomacyBoard.coastById(province, coastId);
+	if (!coast && DiplomacyBoard.coastList(province).length === 1) coast = province.coasts[0];
+	return coast || null;
+};
+
+DiplomacyBoard.tokenSlotForUnit = function (graph, unit) {
+	if (!graph || !unit) return null;
+	var slots = graph.tokenSlots;
+	if (!slots) return null;
+	var provinceId = DiplomacyBoard.provinceId(graph, unit.province);
+	var kind = unit.unit === "fleet" ? "fleet" : "army";
+	var coastId = "";
+	if (kind === "fleet") {
+		var coast = DiplomacyBoard.resolvedFleetCoast(DiplomacyBoard.province(graph, provinceId), unit.coast);
+		if (coast && coast.id) coastId = coast.id;
+	}
+	var keyed = DiplomacyBoard.tokenSlotKey(kind, provinceId, coastId);
+	if (slots[keyed] && slots[keyed][kind]) return slots[keyed][kind];
+	if (kind === "fleet" && coastId && slots[provinceId] && slots[provinceId].fleet) return slots[provinceId].fleet;
+	return null;
+};
+
 // Armies use the province center. A fleet uses its coast anchor, or sits on
 // the water edge toward the nearest sea.
-DiplomacyBoard.unitPoint = function (graph, unit) {
+DiplomacyBoard.defaultUnitPoint = function (graph, unit) {
 	var province = DiplomacyBoard.province(graph, unit && unit.province);
 	if (!province || !province.center) return null;
 	if (!unit || unit.unit !== "fleet" || province.kind === "sea") return province.center;
-	var coast = DiplomacyBoard.coastById(province, unit.coast);
-	if (!coast && DiplomacyBoard.coastList(province).length === 1) coast = province.coasts[0];
+	var coast = DiplomacyBoard.resolvedFleetCoast(province, unit.coast);
 	if (coast && coast.anchor) return { x: coast.anchor.x, y: coast.anchor.y };
 	var sea = DiplomacyBoard.nearestSea(graph, province);
 	if (!sea) return province.center;
@@ -325,6 +384,12 @@ DiplomacyBoard.unitPoint = function (graph, unit) {
 		x: province.center.x + (dx / len) * step,
 		y: province.center.y + (dy / len) * step
 	};
+};
+
+DiplomacyBoard.unitPoint = function (graph, unit) {
+	var slot = DiplomacyBoard.tokenSlotForUnit(graph, unit);
+	if (slot) return { x: slot.x, y: slot.y };
+	return DiplomacyBoard.defaultUnitPoint(graph, unit);
 };
 
 // Local hull space has the bow at negative y. Map y grows downward, so
@@ -343,11 +408,10 @@ DiplomacyBoard.hullOffset = function (facing, lx, ly) {
 	};
 };
 
-DiplomacyBoard.fleetFacing = function (graph, unit, anchor) {
+DiplomacyBoard.defaultFleetFacing = function (graph, unit, anchor) {
 	var province = DiplomacyBoard.province(graph, unit && unit.province);
 	if (!province || !anchor) return { x: 0, y: -1 };
-	var coast = DiplomacyBoard.coastById(province, unit.coast);
-	if (!coast && DiplomacyBoard.coastList(province).length === 1) coast = province.coasts[0];
+	var coast = DiplomacyBoard.resolvedFleetCoast(province, unit && unit.coast);
 	if (coast && coast.facing && (coast.facing.x || coast.facing.y)) return coast.facing;
 	var ids = coast && Array.isArray(coast.fleet) ? coast.fleet : (province.fleet || []);
 	var sx = 0;
@@ -366,6 +430,133 @@ DiplomacyBoard.fleetFacing = function (graph, unit, anchor) {
 		return { x: nearest.center.x - anchor.x, y: nearest.center.y - anchor.y };
 	}
 	return { x: sx / n - anchor.x, y: sy / n - anchor.y };
+};
+
+DiplomacyBoard.fleetFacing = function (graph, unit, anchor) {
+	var slot = DiplomacyBoard.tokenSlotForUnit(graph, unit);
+	if (slot && slot.facing && (slot.facing.x || slot.facing.y)) return slot.facing;
+	return DiplomacyBoard.defaultFleetFacing(graph, unit, anchor);
+};
+
+DiplomacyBoard.moveTokenSlot = function (graph, key, kind, point) {
+	var slots = DiplomacyBoard.ensureTokenSlots(graph);
+	if (!slots[key]) slots[key] = {};
+	if (!slots[key][kind]) slots[key][kind] = { x: point.x, y: point.y };
+	slots[key][kind].x = point.x;
+	slots[key][kind].y = point.y;
+};
+
+DiplomacyBoard.buildTokenPositions = function (graph) {
+	DiplomacyBoard.uniteProvinces(graph);
+	var slots = DiplomacyBoard.ensureTokenSlots(graph);
+	var ids = [];
+	var id;
+	for (id in graph.provinces) {
+		if (Object.prototype.hasOwnProperty.call(graph.provinces, id)) ids.push(id);
+	}
+	ids.sort();
+	for (var i = 0; i < ids.length; i++) {
+		id = ids[i];
+		var province = graph.provinces[id];
+		if (!DiplomacyBoard.isOpen(province) || !province.center) continue;
+		if (province.kind !== "sea") {
+			if (!slots[id]) slots[id] = {};
+			if (!slots[id].army) {
+				var armyAt = DiplomacyBoard.defaultUnitPoint(graph, { province: id, unit: "army" });
+				if (armyAt) slots[id].army = { x: armyAt.x, y: armyAt.y };
+			}
+		}
+		if (province.kind === "sea") {
+			if (!slots[id]) slots[id] = {};
+			if (!slots[id].fleet) {
+				var seaAt = DiplomacyBoard.defaultUnitPoint(graph, { province: id, unit: "fleet" });
+				var seaFace = DiplomacyBoard.defaultFleetFacing(graph, { province: id, unit: "fleet" }, seaAt);
+				slots[id].fleet = { x: seaAt.x, y: seaAt.y, facing: { x: seaFace.x, y: seaFace.y } };
+			}
+		} else if (province.coastal) {
+			var coasts = DiplomacyBoard.coastList(province);
+			if (!coasts.length) {
+				if (!slots[id]) slots[id] = {};
+				if (!slots[id].fleet) {
+					var fleetAt = DiplomacyBoard.defaultUnitPoint(graph, { province: id, unit: "fleet" });
+					var fleetFace = DiplomacyBoard.defaultFleetFacing(graph, { province: id, unit: "fleet" }, fleetAt);
+					slots[id].fleet = { x: fleetAt.x, y: fleetAt.y, facing: { x: fleetFace.x, y: fleetFace.y } };
+				}
+			} else {
+				for (var c = 0; c < coasts.length; c++) {
+					var coast = coasts[c];
+					var key = DiplomacyBoard.tokenSlotKey("fleet", id, coast.id);
+					if (!slots[key]) slots[key] = {};
+					if (!slots[key].fleet) {
+						var coastAt = DiplomacyBoard.defaultUnitPoint(graph, { province: id, unit: "fleet", coast: coast.id });
+						var coastFace = DiplomacyBoard.defaultFleetFacing(graph, { province: id, unit: "fleet", coast: coast.id }, coastAt);
+						slots[key].fleet = { x: coastAt.x, y: coastAt.y, facing: { x: coastFace.x, y: coastFace.y } };
+					}
+				}
+			}
+		}
+	}
+	return {
+		kind: "diplomacy-token-positions",
+		map: DiplomacyBoard.mapKeyFromSource(graph.source),
+		slots: slots
+	};
+};
+
+DiplomacyBoard.listTokenSlots = function (graph) {
+	DiplomacyBoard.buildTokenPositions(graph);
+	var slots = graph.tokenSlots || {};
+	var out = [];
+	var keys = [];
+	var key;
+	for (key in slots) {
+		if (Object.prototype.hasOwnProperty.call(slots, key)) keys.push(key);
+	}
+	keys.sort();
+	for (var i = 0; i < keys.length; i++) {
+		key = keys[i];
+		var kinds = slots[key];
+		for (var kind in kinds) {
+			if (!Object.prototype.hasOwnProperty.call(kinds, kind)) continue;
+			var src = kinds[kind];
+			if (!src || typeof src.x !== "number" || typeof src.y !== "number") continue;
+			out.push({
+				key: key,
+				kind: kind,
+				x: src.x,
+				y: src.y,
+				facing: src.facing ? { x: src.facing.x, y: src.facing.y } : null
+			});
+		}
+	}
+	return out;
+};
+
+DiplomacyBoard.exportTokenPositions = function (graph) {
+	DiplomacyBoard.buildTokenPositions(graph);
+	return {
+		kind: "diplomacy-token-positions",
+		map: DiplomacyBoard.mapKeyFromSource(graph.source),
+		slots: DiplomacyBoard.clone(graph.tokenSlots)
+	};
+};
+
+DiplomacyBoard.slotNear = function (graph, mapPt, radius) {
+	if (!mapPt) return null;
+	var best = null;
+	var bestD = radius * radius;
+	var slots = DiplomacyBoard.listTokenSlots(graph);
+	for (var i = 0; i < slots.length; i++) {
+		var slot = slots[i];
+		var dx = mapPt.x - slot.x;
+		var dy = mapPt.y - slot.y;
+		var d = dx * dx + dy * dy;
+		if (d <= bestD) {
+			bestD = d;
+			best = slot;
+		}
+	}
+	return best;
 };
 
 // Direct move, or an army convoy along seas that currently have fleets.

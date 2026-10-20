@@ -10,7 +10,7 @@
   "samakand": "Samakand",
   "bukhara": "Bukhara",
   "armenia": "Armenia",
-  "lesbos": "Lesbos",
+  "lesbos": { "name": "Lesbos", "access": "unnamed" },
   "aegean-sea": "Aegean Sea",
   "aegean-island": {
     "name": "Aegean Island",
@@ -22,12 +22,12 @@
   "azerbaijan": "Azerbaijan",
   "balkh": "Balkh",
   "kashmir": "Kashmir",
-  "rhodes": "Rhodes",
+  "rhodes": { "name": "Rhodes", "access": "unnamed" },
   "syria": "Syria",
   "west-mediterranean": "West Mediterranean",
-  "crete": "Crete",
+  "crete": { "name": "Crete", "access": "unnamed" },
   "khorasan": "Khorasan",
-  "cyprus": "Cyprus",
+  "cyprus": { "name": "Cyprus", "access": "unnamed" },
   "jibal": "Jibal",
   "east-mediterranean": "East Mediterranean",
   "mesopotamia": "Mesopotamia",
@@ -66,5 +66,5 @@
   "goa": "Goa",
   "adal": "Adal",
   "gulf-of-aden": "Gulf of Aden",
-  "socotra": "Socotra"
+  "socotra": { "name": "Socotra", "access": "unnamed" }
 }

@@ -79,7 +79,7 @@ DiplomacyBoard.attachCamera = function (b) {
 
 	b.onPointerDown = function (event) {
 		if (event.button !== 0) return;
-		if (event.target.closest(".move-popup, .map-zoom, .order-prompt")) return;
+		if (event.target.closest(".move-popup, .map-zoom, .order-prompt, .token-edit-bar")) return;
 		b.pointers[event.pointerId] = { id: event.pointerId, x: event.clientX, y: event.clientY };
 		var pts = pointerList();
 		if (pts.length >= 2) {

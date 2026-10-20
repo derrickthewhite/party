@@ -2,6 +2,23 @@
 
 These rules are mandatory for all JavaScript UI changes in this repository.
 
+## STOP — Vendored Diplomacy board (`diplomacy/board`, `diplomacy/maps`)
+
+**Do not edit, patch, generate into, or “just quickly fix” anything under `diplomacy/board/` or `diplomacy/maps/`.**
+
+Those directories are a copy from a separate vendor project. This app only mounts `DiplomacyBoard`. If a bug or feature lives in board JS/CSS, map graphs, SVGs, token JSON, or board assets:
+
+1. **Stop.** Do not change those files in this repo.
+2. **Ask** whether to write a vendor handoff package (zip + goals) instead.
+3. Put host-only work in `js/`, `api/`, `server/`, etc.
+4. After the vendor ships, replace this copy — do not merge by editing the copy in place.
+
+“Downloadable instructions for board” means a package **the vendor implements**. It is not a changelog written after you already patched `diplomacy/board`.
+
+An approved plan that lists `diplomacy/board` or `diplomacy/maps` files to edit is **invalid**. Stop and ask; do not implement it.
+
+See `diplomacy/README.md`.
+
 ## Retained DOM Model
 
 1. Mount once:

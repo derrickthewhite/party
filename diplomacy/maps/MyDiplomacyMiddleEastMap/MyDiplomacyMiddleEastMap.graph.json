@@ -124,12 +124,9 @@
       "army": [],
       "fleet": [
         "constantinople",
-        "crete",
         "east-mediterranean",
         "greece",
         "izmir",
-        "lesbos",
-        "rhodes",
         "sofia",
         "west-mediterranean"
       ]
@@ -199,8 +196,7 @@
         "mekran",
         "oman",
         "persian-gulf",
-        "sindh",
-        "socotra"
+        "sindh"
       ]
     },
     "armenia": {
@@ -483,7 +479,7 @@
     "crete": {
       "name": "Crete",
       "kind": "land",
-      "access": "open",
+      "access": "unnamed",
       "coastal": true,
       "supplyCenter": false,
       "supplyCenters": 0,
@@ -497,16 +493,12 @@
         "west-mediterranean"
       ],
       "army": [],
-      "fleet": [
-        "aegean-sea",
-        "east-mediterranean",
-        "west-mediterranean"
-      ]
+      "fleet": []
     },
     "cyprus": {
       "name": "Cyprus",
       "kind": "land",
-      "access": "open",
+      "access": "unnamed",
       "coastal": true,
       "supplyCenter": false,
       "supplyCenters": 0,
@@ -518,9 +510,7 @@
         "east-mediterranean"
       ],
       "army": [],
-      "fleet": [
-        "east-mediterranean"
-      ]
+      "fleet": []
     },
     "east-mediterranean": {
       "name": "East Mediterranean",
@@ -549,14 +539,11 @@
       "army": [],
       "fleet": [
         "aegean-sea",
-        "crete",
-        "cyprus",
         "izmir",
         "konya",
         "libya",
         "lower-egypt",
         "palestine",
-        "rhodes",
         "syria",
         "west-mediterranean"
       ]
@@ -771,15 +758,13 @@
       ],
       "army": [
         "constantinople",
-        "konya",
-        "lesbos"
+        "konya"
       ],
       "fleet": [
         "aegean-sea",
         "constantinople",
         "east-mediterranean",
-        "konya",
-        "lesbos"
+        "konya"
       ]
     },
     "jibal": {
@@ -1000,7 +985,7 @@
     "lesbos": {
       "name": "Lesbos",
       "kind": "land",
-      "access": "open",
+      "access": "unnamed",
       "coastal": true,
       "supplyCenter": false,
       "supplyCenters": 0,
@@ -1012,13 +997,8 @@
         "aegean-sea",
         "izmir"
       ],
-      "army": [
-        "izmir"
-      ],
-      "fleet": [
-        "aegean-sea",
-        "izmir"
-      ]
+      "army": [],
+      "fleet": []
     },
     "libya": {
       "name": "Libya",
@@ -1445,7 +1425,7 @@
     "rhodes": {
       "name": "Rhodes",
       "kind": "land",
-      "access": "open",
+      "access": "unnamed",
       "coastal": true,
       "supplyCenter": false,
       "supplyCenters": 0,
@@ -1458,10 +1438,7 @@
         "east-mediterranean"
       ],
       "army": [],
-      "fleet": [
-        "aegean-sea",
-        "east-mediterranean"
-      ]
+      "fleet": []
     },
     "sahara": {
       "name": "Sahara",
@@ -1585,7 +1562,7 @@
     "socotra": {
       "name": "Socotra",
       "kind": "land",
-      "access": "open",
+      "access": "unnamed",
       "coastal": true,
       "supplyCenter": false,
       "supplyCenters": 0,
@@ -1597,9 +1574,7 @@
         "arabian-sea"
       ],
       "army": [],
-      "fleet": [
-        "arabian-sea"
-      ]
+      "fleet": []
     },
     "sofia": {
       "name": "Sofia",
@@ -1811,7 +1786,6 @@
       "army": [],
       "fleet": [
         "aegean-sea",
-        "crete",
         "east-mediterranean",
         "greece",
         "libya"

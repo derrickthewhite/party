@@ -313,14 +313,14 @@ describe('diplomacy presentation coverage', () => {
         return !!(title && title.textContent.includes('Builds') && submit && !submit.disabled && !bad);
       });
 
-      await ownerPage.select('[data-ref="activePowerSelect"]', 'france');
       await ownerPage.waitForFunction(() => {
         const active = document.querySelector('.screen:not(.hidden)');
         const submit = active && active.querySelector('[data-ref="submitBtn"]');
         const status = active && active.querySelector('[data-ref="status"]');
         const host = active && active.querySelector('[data-ref="boardHost"]');
+        const ordering = active && active.querySelector('[data-ref="activePowerSelect"]');
         const bad = status && /Unable to load|No adjustment/i.test(status.textContent);
-        return !!(submit && submit.disabled && host && host.querySelector('svg, canvas') && !bad);
+        return !!(submit && !submit.disabled && host && host.querySelector('svg, canvas') && !ordering && !bad);
       });
 
       const accepted = await owner.client.post(`/api/games/${game.id}/actions/diplomacy-order`, {

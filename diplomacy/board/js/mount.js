@@ -8,9 +8,12 @@ DiplomacyBoard.mount = function (host, options) {
 
 	var graph = options.graph;
 	DiplomacyBoard.uniteProvinces(graph);
+	if (options.tokenPositions) DiplomacyBoard.mergeTokenPositions(graph, options.tokenPositions);
+	DiplomacyBoard.buildTokenPositions(graph);
 	var mode = DiplomacyBoard.knownMode(options.mode);
 	var positionTool = options.positionTool || "own";
-	var playingAs = options.playingAs || "";
+	var playingAsPowers = [];
+	var playingAs = "";
 	var orderScope = options.orderScope || "all";
 	var retreats = Array.isArray(options.retreats) ? options.retreats : [];
 	var adjustments = Array.isArray(options.adjustments) ? options.adjustments : [];
@@ -34,6 +37,12 @@ DiplomacyBoard.mount = function (host, options) {
 	var skipClick = false;
 	var swallowClick = false;
 	var resizeObserver = null;
+	var popupAnchor = null;
+	var tokenEdit = false;
+	var tokenDrag = null;
+	var tokenEditKey = "";
+	var tokenEditKind = "";
+	var tokenBar = null;
 
 	host.innerHTML = "";
 	host.classList.add("diplomacy-board");
@@ -63,6 +72,30 @@ DiplomacyBoard.mount = function (host, options) {
 	viewport.appendChild(popup);
 	host.appendChild(viewport);
 	host.appendChild(caption);
+
+	function powerIdList(value) {
+		if (Array.isArray(value)) {
+			var out = [];
+			for (var i = 0; i < value.length; i++) {
+				if (value[i]) out.push(String(value[i]));
+			}
+			return out;
+		}
+		if (value) return [String(value)];
+		return [];
+	}
+
+	function assignPlayingAs(ids) {
+		playingAsPowers = powerIdList(ids);
+		playingAs = playingAsPowers[0] || "";
+	}
+
+	function controlsPower(id) {
+		if (orderScope === "all") return true;
+		return playingAsPowers.indexOf(id) !== -1;
+	}
+
+	assignPlayingAs(options.playingAsPowers && options.playingAsPowers.length ? options.playingAsPowers : options.playingAs);
 
 	function emit() {
 		if (typeof options.onChange === "function") {
@@ -204,21 +237,22 @@ DiplomacyBoard.mount = function (host, options) {
 	function unitClickable(unit) {
 		if (readOnly || mode !== "orders") return false;
 		if (orderScope === "all") return true;
-		return !!playingAs && unit.power === playingAs;
+		return controlsPower(unit.power);
 	}
 
 	function retreatClickable(entry) {
 		if (readOnly || !entry) return false;
 		if (orderScope === "all") return true;
-		return !!playingAs && entry.power === playingAs;
+		return controlsPower(entry.power);
 	}
 
 	function editableAdjustments() {
-		if (orderScope === "mine") {
-			var one = DiplomacyBoard.findAdjustment(adjustments, playingAs);
-			return one ? [one] : [];
+		if (orderScope !== "mine") return adjustments;
+		var mine = [];
+		for (var i = 0; i < adjustments.length; i++) {
+			if (controlsPower(adjustments[i].power)) mine.push(adjustments[i]);
 		}
-		return adjustments;
+		return mine;
 	}
 
 	function adjustmentAt(provinceId) {
@@ -253,12 +287,33 @@ DiplomacyBoard.mount = function (host, options) {
 		var pop = popup.getBoundingClientRect();
 		var left = (rect.width - pop.width) / 2;
 		var top = (rect.height - pop.height) / 2;
+		if (popupAnchor) {
+			var at = mapToStage(popupAnchor);
+			var stageRect = stage.getBoundingClientRect();
+			var originX = stageRect.left - rect.left + at.x;
+			var originY = stageRect.top - rect.top + at.y;
+			var gap = tokenSize() * 0.7;
+			left = originX + gap;
+			top = originY - pop.height / 2;
+			if (left + pop.width > rect.width - margin) left = originX - gap - pop.width;
+		}
 		if (left < margin) left = margin;
 		if (top < margin) top = margin;
 		if (left + pop.width > rect.width - margin) left = Math.max(margin, rect.width - margin - pop.width);
 		if (top + pop.height > rect.height - margin) top = Math.max(margin, rect.height - margin - pop.height);
 		popup.style.left = left + "px";
 		popup.style.top = top + "px";
+	}
+
+	function anchorPopup(point) {
+		popupAnchor = point && typeof point.x === "number" ? { x: point.x, y: point.y } : null;
+	}
+
+	function provinceAnchor(provinceId) {
+		var standing = DiplomacyBoard.unitAt(position.units, provinceId);
+		if (standing) return DiplomacyBoard.unitPoint(graph, standing);
+		var province = DiplomacyBoard.province(graph, provinceId);
+		return province && province.center ? province.center : null;
 	}
 
 	function pickList() {
@@ -433,11 +488,12 @@ DiplomacyBoard.mount = function (host, options) {
 		}
 		if (mode === "build") return !!adjustmentAt(openProvince);
 		var standing = DiplomacyBoard.unitAt(position.units, openProvince);
-		return !!(standing && standing.power === playingAs);
+		return !!(standing && controlsPower(standing.power));
 	}
 
 	function closePopup() {
 		openProvince = null;
+		popupAnchor = null;
 		popup.hidden = true;
 		popup.innerHTML = "";
 		drawUnits();
@@ -447,6 +503,7 @@ DiplomacyBoard.mount = function (host, options) {
 		popup.innerHTML = DiplomacyBoard.orderPopupHtml(graph, unit, orderFrom(unit.province));
 		popup.hidden = false;
 		openProvince = unit.province;
+		anchorPopup(DiplomacyBoard.unitPoint(graph, unit) || provinceAnchor(unit.province));
 		placePopup();
 		drawUnits();
 	}
@@ -508,11 +565,15 @@ DiplomacyBoard.mount = function (host, options) {
 			resolution: resolution,
 			openProvince: openProvince,
 			playingAs: playingAs,
+			playingAsPowers: playingAsPowers,
 			orderScope: orderScope,
 			readOnly: readOnly,
 			mode: mode,
 			retreats: retreats,
-			adjustments: adjustments
+			adjustments: adjustments,
+			tokenEdit: tokenEdit,
+			tokenEditKey: tokenEditKey,
+			tokenEditKind: tokenEditKind
 		});
 	}
 
@@ -523,8 +584,8 @@ DiplomacyBoard.mount = function (host, options) {
 	}
 
 	function paintPlayerEdge() {
-		var markPower = !readOnly && orderScope === "mine" && playingAs ? playingAs : "";
-		DiplomacyBoard.markOwnedProvinces(svg, cam, graph, position, markPower);
+		var markPowers = !readOnly && orderScope === "mine" ? playingAsPowers : [];
+		DiplomacyBoard.markOwnedProvinces(svg, cam, graph, position, markPowers);
 	}
 
 	function render() {
@@ -571,6 +632,7 @@ DiplomacyBoard.mount = function (host, options) {
 		popup.innerHTML = html;
 		popup.hidden = false;
 		openProvince = provinceId;
+		anchorPopup(provinceAnchor(provinceId));
 		placePopup();
 		drawUnits();
 	}
@@ -655,6 +717,7 @@ DiplomacyBoard.mount = function (host, options) {
 		popup.innerHTML = DiplomacyBoard.retreatPopupHtml(graph, view, orderFrom(DiplomacyBoard.canonProvince(graph, entry.province)));
 		popup.hidden = false;
 		openProvince = DiplomacyBoard.canonProvince(graph, entry.province);
+		anchorPopup(provinceAnchor(openProvince));
 		placePopup();
 		showPrompt();
 		highlightPicks();
@@ -680,6 +743,7 @@ DiplomacyBoard.mount = function (host, options) {
 		});
 		popup.hidden = false;
 		openProvince = id;
+		anchorPopup(provinceAnchor(id));
 		placePopup();
 		showPrompt();
 		highlightPicks();
@@ -821,8 +885,8 @@ DiplomacyBoard.mount = function (host, options) {
 	}
 
 	function onMapClick(event) {
-		if (readOnly || skipClick || swallowClick) return;
-		if (event.target.closest(".move-popup, .map-zoom, .order-prompt")) return;
+		if (tokenEdit || readOnly || skipClick || swallowClick) return;
+		if (event.target.closest(".move-popup, .map-zoom, .order-prompt, .token-edit-bar")) return;
 		handleMapPointer(event);
 	}
 
@@ -913,7 +977,7 @@ DiplomacyBoard.mount = function (host, options) {
 	}
 
 	function onDocumentClick(event) {
-		if (swallowClick) return;
+		if (tokenEdit || swallowClick) return;
 		if (host.contains(event.target)) return;
 		if (event.target && !document.contains(event.target)) return;
 		cancelPending();
@@ -931,8 +995,13 @@ DiplomacyBoard.mount = function (host, options) {
 	}
 
 	function setCaption(event) {
-		if (!event || event.target.closest(".map-zoom, .move-popup, .order-prompt")) {
+		if (!event || event.target.closest(".map-zoom, .move-popup, .order-prompt, .token-edit-bar")) {
 			caption.textContent = "";
+			return;
+		}
+		if (tokenEdit) {
+			var slot = DiplomacyBoard.slotNear(graph, eventToMap(event), hitRadiusMap());
+			caption.textContent = slot ? (slot.key + " " + slot.kind) : "Drag a token slot to move it.";
 			return;
 		}
 		var node = provinceFromEvent(event);
@@ -1176,6 +1245,129 @@ DiplomacyBoard.mount = function (host, options) {
 	};
 	DiplomacyBoard.attachCamera(camera);
 
+	function downloadTokenPositions() {
+		var doc = DiplomacyBoard.exportTokenPositions(graph);
+		var blob = new Blob([JSON.stringify(doc, null, 2) + "\n"], { type: "application/json" });
+		var url = URL.createObjectURL(blob);
+		var link = document.createElement("a");
+		link.href = url;
+		link.download = DiplomacyBoard.mapKeyFromSource(graph.source) + ".tokens.json";
+		document.body.appendChild(link);
+		link.click();
+		document.body.removeChild(link);
+		URL.revokeObjectURL(url);
+	}
+
+	function ensureTokenBar() {
+		if (tokenBar) return tokenBar;
+		tokenBar = document.createElement("div");
+		tokenBar.className = "token-edit-bar";
+		tokenBar.hidden = true;
+		var note = document.createElement("span");
+		note.textContent = "Editing token positions";
+		var downloadBtn = document.createElement("button");
+		downloadBtn.type = "button";
+		downloadBtn.textContent = "Download JSON";
+		downloadBtn.addEventListener("click", function onDownload(event) {
+			event.stopPropagation();
+			downloadTokenPositions();
+		});
+		var doneBtn = document.createElement("button");
+		doneBtn.type = "button";
+		doneBtn.textContent = "Done";
+		doneBtn.addEventListener("click", function onDone(event) {
+			event.stopPropagation();
+			api.setTokenEdit(false);
+		});
+		tokenBar.appendChild(note);
+		tokenBar.appendChild(downloadBtn);
+		tokenBar.appendChild(doneBtn);
+		viewport.appendChild(tokenBar);
+		return tokenBar;
+	}
+
+	function setTokenEdit(on) {
+		tokenEdit = !!on;
+		if (tokenEdit) {
+			cancelPending();
+			closePopup();
+			DiplomacyBoard.buildTokenPositions(graph);
+		} else {
+			tokenDrag = null;
+			tokenEditKey = "";
+			tokenEditKind = "";
+		}
+		ensureTokenBar().hidden = !tokenEdit;
+		host.classList.toggle("is-token-edit", tokenEdit);
+		drawUnits();
+		if (typeof options.onTokenEdit === "function") options.onTokenEdit(tokenEdit);
+	}
+
+	function tryTokenDragStart(event) {
+		if (!tokenEdit || event.button !== 0) return false;
+		if (event.target.closest(".move-popup, .map-zoom, .order-prompt, .token-edit-bar")) return false;
+		var hit = DiplomacyBoard.slotNear(graph, eventToMap(event), hitRadiusMap());
+		if (!hit) return false;
+		tokenDrag = {
+			key: hit.key,
+			kind: hit.kind,
+			pointerId: event.pointerId
+		};
+		tokenEditKey = hit.key;
+		tokenEditKind = hit.kind;
+		try {
+			viewport.setPointerCapture(event.pointerId);
+		} catch (err) {}
+		drawUnits();
+		return true;
+	}
+
+	function tokenDragMove(event) {
+		if (!tokenDrag || event.pointerId !== tokenDrag.pointerId) return false;
+		var at = eventToMap(event);
+		if (!at) return true;
+		DiplomacyBoard.moveTokenSlot(graph, tokenDrag.key, tokenDrag.kind, at);
+		drawUnits();
+		return true;
+	}
+
+	function tokenDragEnd(event) {
+		if (!tokenDrag) return false;
+		if (event && event.pointerId != null && event.pointerId !== tokenDrag.pointerId) return false;
+		tokenDrag = null;
+		skipClick = true;
+		setTimeout(function () {
+			skipClick = false;
+		}, 0);
+		drawUnits();
+		return true;
+	}
+
+	var cameraDown = camera.onPointerDown;
+	var cameraMove = camera.onPointerMove;
+	var cameraUp = camera.onPointerUp;
+	camera.onPointerDown = function (event) {
+		if (tokenDrag) return;
+		if (tryTokenDragStart(event)) return;
+		cameraDown(event);
+	};
+	camera.onPointerMove = function (event) {
+		if (tokenDragMove(event)) {
+			viewport.style.cursor = "grabbing";
+			return;
+		}
+		cameraMove(event);
+		if (!tokenEdit || camera.drag || camera.pinch) return;
+		var hover = DiplomacyBoard.slotNear(graph, eventToMap(event), hitRadiusMap());
+		viewport.style.cursor = hover ? "grab" : "";
+		setCaption(event);
+	};
+	camera.onPointerUp = function (event) {
+		if (tokenDragEnd(event)) return;
+		cameraUp(event);
+	};
+	camera.onPointerCancel = camera.onPointerUp;
+
 	popup.addEventListener("click", onPopupClick);
 	document.addEventListener("click", onDocumentClick);
 	document.addEventListener("keydown", onKey);
@@ -1301,11 +1493,29 @@ DiplomacyBoard.mount = function (host, options) {
 			positionTool = next || "own";
 		},
 		setPlayingAs: function (id) {
-			playingAs = id || "";
+			api.setPlayingAsPowers(id ? [id] : []);
+		},
+		setPlayingAsPowers: function (ids) {
+			assignPlayingAs(ids);
 			if (!popupStillAllowed()) closePopup();
 			if (mode === "retreat" || mode === "build") highlightPicks();
 			paintPlayerEdge();
 			drawUnits();
+		},
+		setTokenEdit: function (on) {
+			setTokenEdit(on);
+		},
+		exportTokenPositions: function () {
+			return DiplomacyBoard.exportTokenPositions(graph);
+		},
+		setTokenPositions: function (doc) {
+			DiplomacyBoard.mergeTokenPositions(graph, doc);
+			if (openProvince) anchorPopup(provinceAnchor(openProvince));
+			drawUnits();
+			if (!popup.hidden) placePopup();
+		},
+		downloadTokenPositions: function () {
+			downloadTokenPositions();
 		},
 		getShowResolved: function () {
 			return showResolved;
@@ -1356,7 +1566,7 @@ DiplomacyBoard.mount = function (host, options) {
 			cancelPending();
 			closePopup();
 			host.innerHTML = "";
-			host.classList.remove("diplomacy-board", "is-position", "is-orders", "is-retreat", "is-build", "is-readonly", "is-picking", "is-resolved");
+			host.classList.remove("diplomacy-board", "is-position", "is-orders", "is-retreat", "is-build", "is-readonly", "is-picking", "is-resolved", "is-token-edit");
 		}
 	};
 
@@ -1374,7 +1584,7 @@ DiplomacyBoard.mount = function (host, options) {
 		return api;
 	}
 	if (!options.mapUrl) DiplomacyBoard.fail("mount needs svg or mapUrl");
-	fetch(options.mapUrl).then(function (response) {
+	fetch(options.mapUrl, { cache: "no-store" }).then(function (response) {
 		if (!response.ok) throw new Error("Could not load map");
 		return response.text();
 	}).then(function (text) {

@@ -93,7 +93,10 @@ function contentTypeFor(filePath) {
 }
 
 function serveFile(res, filePath) {
-  res.writeHead(200, { 'Content-Type': contentTypeFor(filePath) });
+  res.writeHead(200, {
+    'Content-Type': contentTypeFor(filePath),
+    'Cache-Control': 'no-store',
+  });
   fs.createReadStream(filePath).pipe(res);
 }
 
