@@ -18,6 +18,41 @@ DiplomacyBoard.moveDestinations = function (graph, unit) {
 	return DiplomacyBoard.legalDestinations(graph, unit.province, unit.unit);
 };
 
+// Provinces the supported unit can move to that this unit can legally support.
+DiplomacyBoard.supportMoveDestinations = function (graph, position, supporter, target) {
+	if (!supporter || !target || supporter.province === target.province) return [];
+	var dests = DiplomacyBoard.moveDestinations(graph, supporter);
+	var ids = [];
+	for (var i = 0; i < dests.length; i++) {
+		if (target.province === dests[i]) continue;
+		if (DiplomacyBoard.supportMoveLegal(graph, position, supporter, target, dests[i])) ids.push(dests[i]);
+	}
+	return ids;
+};
+
+DiplomacyBoard.supportMoveLegal = function (graph, position, supporter, target, destId, coastId) {
+	if (!supporter || !target || !destId) return false;
+	var order = {
+		province: supporter.province,
+		unit: supporter.unit,
+		power: supporter.power,
+		action: "support-move",
+		target: target.province,
+		to: destId
+	};
+	if (coastId) order.coast = coastId;
+	if (DiplomacyBoard.isLegalOrder(graph, position, order)) return true;
+	if (coastId) return false;
+	var dest = DiplomacyBoard.province(graph, destId);
+	if (!DiplomacyBoard.isMultiCoast(dest)) return false;
+	var coasts = DiplomacyBoard.coastList(dest);
+	for (var i = 0; i < coasts.length; i++) {
+		order.coast = coasts[i].id;
+		if (DiplomacyBoard.isLegalOrder(graph, position, order)) return true;
+	}
+	return false;
+};
+
 DiplomacyBoard.coastOptions = function (graph, position, pending) {
 	if (!pending || !pending.unit) return [];
 	var action = DiplomacyBoard.normalizeAction(pending.action);
@@ -31,31 +66,31 @@ DiplomacyBoard.coastOptions = function (graph, position, pending) {
 		seen[key] = true;
 		out.push({ province: provinceId, coast: coastId });
 	}
-	function otherFleetCanEnter(provinceId, coastId, exceptId) {
-		var units = position && position.units ? position.units : [];
-		for (var u = 0; u < units.length; u++) {
-			var other = units[u];
-			if (other.province === exceptId || other.unit !== "fleet") continue;
-			if (DiplomacyBoard.fleetMoveLegal(graph, other.province, other.coast, provinceId, coastId)) return true;
-		}
-		return false;
+	var dests = [];
+	if (action === "move") {
+		if (n !== 0) return out;
+		dests = DiplomacyBoard.moveDestinations(graph, unit);
+	} else if (action === "support-move") {
+		if (n !== 1) return out;
+		var target = DiplomacyBoard.unitAt(position && position.units, DiplomacyBoard.clickProvince(pending.clicks[0]));
+		dests = DiplomacyBoard.supportMoveDestinations(graph, position, unit, target);
+	} else {
+		return out;
 	}
-	if (n !== 0) return out;
-	if (action !== "move" && action !== "support-move") return out;
-	var dests = action === "move"
-		? DiplomacyBoard.moveDestinations(graph, unit)
-		: DiplomacyBoard.legalDestinations(graph, unit.province, unit.unit);
 	for (var i = 0; i < dests.length; i++) {
 		var dest = DiplomacyBoard.province(graph, dests[i]);
 		if (!DiplomacyBoard.isMultiCoast(dest)) continue;
 		var coasts = DiplomacyBoard.coastList(dest);
 		for (var c = 0; c < coasts.length; c++) {
 			var coastId = coasts[c].id;
-			if (unit.unit === "fleet") {
+			if (action === "support-move") {
+				var ally = DiplomacyBoard.unitAt(position.units, DiplomacyBoard.clickProvince(pending.clicks[0]));
+				if (!DiplomacyBoard.supportMoveLegal(graph, position, unit, ally, dests[i], coastId)) continue;
+			} else if (unit.unit === "fleet") {
 				if (!DiplomacyBoard.fleetMoveLegal(graph, unit.province, unit.coast, dests[i], coastId)) continue;
-			} else if (!DiplomacyBoard.isLegalMove(graph, unit.province, unit.unit, dests[i])) continue;
-			if (action === "support-move" && !otherFleetCanEnter(dests[i], coastId, unit.province)) continue;
-			if (action === "move" && unit.unit !== "fleet") continue;
+			} else {
+				continue;
+			}
 			add(dests[i], coastId);
 		}
 	}
@@ -70,15 +105,6 @@ DiplomacyBoard.orderPickList = function (graph, position, pending) {
 	var dests = DiplomacyBoard.moveDestinations(graph, standing);
 	var ids = [];
 	var i;
-	function otherUnitCanReach(destId, destCoast) {
-		for (var u = 0; u < position.units.length; u++) {
-			var other = position.units[u];
-			if (other.province === standing.province || other.province === destId) continue;
-			if (destCoast && other.unit !== "fleet") continue;
-			if (DiplomacyBoard.canReach(graph, position, other, destId, destCoast)) return true;
-		}
-		return false;
-	}
 	if (action === "move") return dests;
 	if (action === "support-defense") {
 		for (i = 0; i < dests.length; i++) {
@@ -92,20 +118,16 @@ DiplomacyBoard.orderPickList = function (graph, position, pending) {
 	}
 	if (action === "support-move") {
 		if (n === 0) {
-			for (i = 0; i < dests.length; i++) {
-				if (otherUnitCanReach(dests[i], "")) ids.push(dests[i]);
+			for (i = 0; i < position.units.length; i++) {
+				var candidate = position.units[i];
+				if (DiplomacyBoard.supportMoveDestinations(graph, position, standing, candidate).length) {
+					ids.push(candidate.province);
+				}
 			}
 			return ids;
 		}
-		var dest = DiplomacyBoard.clickProvince(pending.clicks[0]);
-		var destCoast = DiplomacyBoard.clickCoast(pending.clicks[0]);
-		for (i = 0; i < position.units.length; i++) {
-			var candidate = position.units[i];
-			if (candidate.province === standing.province || candidate.province === dest) continue;
-			if (destCoast && candidate.unit !== "fleet") continue;
-			if (DiplomacyBoard.canReach(graph, position, candidate, dest, destCoast)) ids.push(candidate.province);
-		}
-		return ids;
+		var target = DiplomacyBoard.unitAt(position.units, DiplomacyBoard.clickProvince(pending.clicks[0]));
+		return DiplomacyBoard.supportMoveDestinations(graph, position, standing, target);
 	}
 	if (action === "convoy") {
 		if (standing.unit === "army") {
@@ -143,7 +165,7 @@ DiplomacyBoard.orderPrompt = function (pending) {
 	if (pending.action === "move" || pending.action === "attack") return "Click the province to move to.";
 	if (pending.action === "support-defense") return "Click the unit you are supporting.";
 	if (pending.action === "support-move" || pending.action === "support-attack") {
-		return n === 0 ? "Click the province the move would enter." : "Click a unit that could move there.";
+		return n === 0 ? "Click the unit to support." : "Click where it is moving.";
 	}
 	if (pending.action === "convoy") {
 		if (pending.unit.unit === "army") {
@@ -171,8 +193,8 @@ DiplomacyBoard.orderDraft = function (pending) {
 	if (pending.action === "move" || pending.action === "attack") putDest(clicks[0]);
 	if (pending.action === "support-defense") draft.target = DiplomacyBoard.clickProvince(clicks[0]);
 	if (pending.action === "support-move" || pending.action === "support-attack") {
-		putDest(clicks[0]);
-		draft.target = DiplomacyBoard.clickProvince(clicks[1]);
+		draft.target = DiplomacyBoard.clickProvince(clicks[0]);
+		putDest(clicks[1]);
 	}
 	if (pending.action === "convoy") {
 		if (standing.unit === "army") {

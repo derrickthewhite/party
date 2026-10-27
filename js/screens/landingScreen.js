@@ -3,6 +3,7 @@ import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameAc
 import { collectGameInfoIcons, setGameInfoIconNode, getMemberBadgeIcon } from '../gameStateIcons.js';
 import { enhanceSelectWithIcons } from '../components/iconSelect.js';
 import { LANDING_REFRESH_MS } from '../config.js';
+import { resolveRoomFilter, sortRoomsByName } from '../lobbyRoomFilter.js';
 
 export function createLandingScreen(deps) {
 	const api = deps.api;
@@ -68,7 +69,6 @@ export function createLandingScreen(deps) {
 	usersRoomsBtn.style.display = 'none';
 	const refresh = refs.refresh;
 	const signout = refs.signout;
-	let selectedRoomFilter = null;
 	const userLabel = refs.userLabel;
 	const gameTitleInput = refs.gameTitleInput;
 	const gameTypeSelect = refs.gameTypeSelect;
@@ -151,6 +151,7 @@ export function createLandingScreen(deps) {
 		state.patch({
 			user: null,
 			activeGame: null,
+			selectedRoomFilter: null,
 		});
 		state.setScreen('welcome');
 	});
@@ -178,27 +179,10 @@ export function createLandingScreen(deps) {
 		usersRoomsBtn.style.display = canToggle ? '' : 'none';
 	}
 
-	function sortedUserRooms(rooms) {
-		return (Array.isArray(rooms) ? rooms.slice() : []).sort(function sortRooms(left, right) {
-			return String(left.name || '').localeCompare(String(right.name || ''), undefined, { sensitivity: 'base' });
-		});
-	}
-
-	function syncRoomSelector(rooms) {
-		const sorted = sortedUserRooms(rooms);
+	function syncRoomSelector(rooms, selectedRoomFilter) {
+		const sorted = sortRoomsByName(rooms);
 		const showSelect = sorted.length > 1;
 		roomSelectWrap.style.display = showSelect ? '' : 'none';
-
-		const validIds = {};
-		sorted.forEach(function eachRoom(room) {
-			validIds[String(room.id)] = true;
-		});
-
-		if (!showSelect) {
-			selectedRoomFilter = sorted.length === 1 ? String(sorted[0].id) : null;
-		} else if (selectedRoomFilter !== 'all' && !validIds[String(selectedRoomFilter)]) {
-			selectedRoomFilter = String(sorted[0].id);
-		}
 
 		if (showSelect) {
 			const wanted = [{ value: 'all', label: 'All' }].concat(sorted.map(function eachRoom(room) {
@@ -257,8 +241,12 @@ export function createLandingScreen(deps) {
 	});
 
 	roomSelect.addEventListener('change', function onRoomChange() {
-		selectedRoomFilter = roomSelect.value || null;
-		renderGames(state.state.games);
+		const nextFilter = roomSelect.value || null;
+		if (String(state.state.selectedRoomFilter || '') === String(nextFilter || '')) {
+			return;
+		}
+
+		state.patch({ selectedRoomFilter: nextFilter });
 	});
 
 	syncAdminUiToggle();
@@ -285,6 +273,7 @@ export function createLandingScreen(deps) {
 			return;
 		}
 
+		const selectedRoomFilter = state.state.selectedRoomFilter;
 		if (selectedRoomFilter === 'all' || selectedRoomFilter == null) {
 			return;
 		}
@@ -302,7 +291,7 @@ export function createLandingScreen(deps) {
 		} finally {
 			createBusy = false;
 			setGameActionButtonLabel(createBtn, 'Create game');
-			syncRoomSelector((state.state.user && state.state.user.rooms) || []);
+			syncRoomSelector((state.state.user && state.state.user.rooms) || [], state.state.selectedRoomFilter);
 		}
 	});
 	let listRefreshBusy = false;
@@ -377,9 +366,15 @@ export function createLandingScreen(deps) {
 		syncGameTypeOptions();
 		const user = state.state.user || {};
 		userLabel.textContent = user.username ? 'Signed in as: ' + user.username : '';
-		syncRoomSelector(user.rooms || []);
-
 		const allRows = Array.isArray(games) ? games : [];
+		const selectedRoomFilter = resolveRoomFilter(state.state.selectedRoomFilter, user.rooms || [], allRows);
+		if (String(selectedRoomFilter || '') !== String(state.state.selectedRoomFilter || '')) {
+			state.patch({ selectedRoomFilter: selectedRoomFilter });
+			return;
+		}
+
+		syncRoomSelector(user.rooms || [], selectedRoomFilter);
+
 		const rows = selectedRoomFilter === 'all' || selectedRoomFilter == null
 			? allRows
 			: allRows.filter(function eachGame(game) {

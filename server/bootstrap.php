@@ -33,9 +33,23 @@ $pdo->exec('PRAGMA journal_mode = WAL');
 $pdo->exec('PRAGMA busy_timeout = 5000');
 
 apply_sql_file($pdo, __DIR__ . '/../sql/sqlite/001_schema.sql');
+sqlite_add_column_if_missing($pdo, 'games', 'diplomacy_timer_paused', 'INTEGER NOT NULL DEFAULT 0');
+sqlite_add_column_if_missing($pdo, 'games', 'diplomacy_timer_remaining_seconds', 'INTEGER NULL');
 apply_sql_file($pdo, __DIR__ . '/../sql/sqlite/002_seed.sql');
 apply_rumble_catalog_seed($pdo, __DIR__ . '/../sql/018_rumble_ability_catalog_tables.sql');
 fwrite(STDOUT, "SQLite schema and seed applied. default room code=local\n");
+
+function sqlite_add_column_if_missing(PDO $pdo, string $tableName, string $columnName, string $definition): void
+{
+    $stmt = $pdo->query('PRAGMA table_info(' . $tableName . ')');
+    $rows = $stmt ? $stmt->fetchAll() : [];
+    foreach ($rows as $row) {
+        if ((string)($row['name'] ?? '') === $columnName) {
+            return;
+        }
+    }
+    $pdo->exec('ALTER TABLE ' . $tableName . ' ADD COLUMN ' . $columnName . ' ' . $definition);
+}
 
 function apply_sql_file(PDO $pdo, string $filePath): void
 {

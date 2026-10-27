@@ -22,10 +22,13 @@ Options -Indexes
 # Explicitly prevent access to git internals
 RedirectMatch 404 \/\.git
 
-# Block direct requests to the /sql directory
+# Block direct requests to the /sql directory.
+# fleet.svg keeps its name. A request without ?v= is sent to the versioned URL.
 <IfModule mod_rewrite.c>
   RewriteEngine On
   RewriteRule ^sql/ - [F,L,NC]
+  RewriteCond %{QUERY_STRING} !(^|&)v=
+  RewriteRule ^diplomacy/board/assets/fleet\.svg$ /diplomacy/board/assets/fleet.svg?v=1792443899 [R=302,L]
 </IfModule>
 
 # Security headers (optional, harmless if supported)

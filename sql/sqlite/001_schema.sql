@@ -51,6 +51,8 @@ CREATE TABLE IF NOT EXISTS games (
   diplomacy_timer_minutes INTEGER NULL,
   diplomacy_timer_shortcut INTEGER NOT NULL DEFAULT 0,
   diplomacy_phase_deadline TEXT NULL,
+  diplomacy_timer_paused INTEGER NOT NULL DEFAULT 0,
+  diplomacy_timer_remaining_seconds INTEGER NULL,
   status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open', 'in_progress', 'closed')),
   created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,

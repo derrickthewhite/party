@@ -44,6 +44,13 @@ async function readDiplomacySnapshot(page) {
     const boardHost = activeScreen.querySelector('[data-ref="boardHost"]');
     const historyPrevBtn = activeScreen.querySelector('[data-ref="historyPrevBtn"]');
     const historyNextBtn = activeScreen.querySelector('[data-ref="historyNextBtn"]');
+    const orderCount = activeScreen.querySelector('[data-ref="orderCount"]');
+    const orderProgress = activeScreen.querySelector('[data-ref="orderProgress"]');
+    const resetOrdersBtn = activeScreen.querySelector('[data-ref="resetOrdersBtn"]');
+    const orderActions = activeScreen.querySelector('[data-ref="orderActions"]');
+    const actionRefs = orderActions
+      ? Array.from(orderActions.querySelectorAll('button[data-ref]')).map((node) => node.getAttribute('data-ref'))
+      : [];
 
     return {
       subtitle: (activeScreen.querySelector('[data-ref="subtitle"]') || { textContent: '' }).textContent.trim(),
@@ -59,6 +66,14 @@ async function readDiplomacySnapshot(page) {
       historyNextVisible: visible(historyNextBtn),
       historyPrevDisabled: !!(historyPrevBtn && historyPrevBtn.disabled),
       historyNextDisabled: !!(historyNextBtn && historyNextBtn.disabled),
+      orderCount: (orderCount || { textContent: '' }).textContent.trim(),
+      orderCountVisible: visible(orderProgress),
+      orderSubmittedState: (activeScreen.querySelector('[data-ref="orderSubmittedState"]') || { textContent: '' }).textContent.trim(),
+      orderReadyState: (activeScreen.querySelector('[data-ref="orderReadyState"]') || { textContent: '' }).textContent.trim(),
+      submitLabel: (submitBtn || { textContent: '' }).textContent.trim(),
+      readyLabel: (activeScreen.querySelector('[data-ref="readyBtn"]') || { textContent: '' }).textContent.trim(),
+      resetOrdersLast: actionRefs.length ? actionRefs[actionRefs.length - 1] === 'resetOrdersBtn' : false,
+      resetOrdersVisible: visible(resetOrdersBtn),
     };
   });
 }

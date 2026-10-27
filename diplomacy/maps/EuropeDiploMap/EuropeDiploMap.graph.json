@@ -47,7 +47,8 @@
       ],
       "army": [
         "territory-5",
-        "territory-7"
+        "territory-7",
+        "territory-26"
       ],
       "fleet": [
         "territory-12",
@@ -506,7 +507,9 @@
         "territory-28",
         "territory-29"
       ],
-      "army": [],
+      "army": [
+        "territory-10"
+      ],
       "fleet": [
         "territory-29"
       ]
@@ -1562,7 +1565,7 @@
           "id": "sc",
           "name": "South Coast",
           "anchor": { "x": 801.0, "y": 402.5 },
-          "fleet": ["territory-12", "territory-22"]
+          "fleet": ["territory-12", "territory-22", "territory-5"]
         }
       ]
     },
@@ -2113,7 +2116,7 @@
           "id": "nc",
           "name": "North Coast",
           "anchor": { "x": 133.3, "y": 826.8 },
-          "fleet": ["territory-67", "territory-61"]
+          "fleet": ["territory-67", "territory-61", "territory-76"]
         },
         {
           "id": "sc",

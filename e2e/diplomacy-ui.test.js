@@ -78,6 +78,11 @@ describe('diplomacy presentation coverage', () => {
       expect(snapshot.historyPrevVisible).toBe(true);
       expect(snapshot.historyNextVisible).toBe(true);
       expect(snapshot.progressText).toContain(`${detail.diplomacy.progress.submitted_count}/${detail.diplomacy.progress.required_count}`);
+      expect(snapshot.orderCountVisible).toBe(true);
+      expect(snapshot.orderCount).toMatch(/^\d+\/\d+$/);
+      expect(snapshot.orderSubmittedState).toMatch(/submitted/i);
+      expect(snapshot.orderReadyState).toMatch(/ready/i);
+      expect(snapshot.resetOrdersLast).toBe(true);
       expect(snapshot.endTurnVisible).toBe(true);
       expect(snapshot.endTurnDisabled).toBe(false);
     } finally {
@@ -115,6 +120,7 @@ describe('diplomacy presentation coverage', () => {
         expect(snapshot.playVisible).toBe(true);
         expect(snapshot.boardPresent).toBe(true);
         expect(snapshot.sendDisabled).toBe(true);
+        expect(snapshot.orderCountVisible).toBe(false);
         expect(snapshot.endTurnVisible).toBe(false);
       } finally {
         await observerPage.close();
@@ -357,6 +363,153 @@ describe('diplomacy presentation coverage', () => {
         const bad = status && /Unable to load|No adjustment/i.test(status.textContent);
         return !!(title && title.textContent.includes('Builds')
           && progress && progress.textContent.includes('Resolved turn')
+          && host && host.querySelector('svg, canvas')
+          && !bad);
+      });
+      const historySnapshot = await readDiplomacySnapshot(ownerPage);
+      expect(historySnapshot.orderCountVisible).toBe(false);
+    } finally {
+      await ownerPage.close();
+    }
+  });
+
+  test('a retreats turn stays on the history timeline instead of jumping to live', async () => {
+    const owner = await createSession('dip-retreat-owner');
+    const game = await createGame(owner, 'diplomacy', uniqueLabel('dip-retreat'));
+    const open = await getGameDetail(owner, game.id);
+    const ownerId = open.members.find((member) => member.username === owner.credentials.username).id;
+    const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
+      json: {
+        diplomacy_map_key: 'EuropeDiploMap',
+        diplomacy_nation_mode: 'owner',
+        diplomacy_nation_count: 'all',
+      },
+    });
+    expect(saved.status).toBe(200);
+    const assigned = await owner.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+      json: {
+        updates: [
+          { power: 'france', state: ownerId },
+          { power: 'germany', state: ownerId },
+        ],
+      },
+    });
+    expect(assigned.status).toBe(200);
+    await startGame(owner, game.id);
+
+    const { rootDir } = getServerInfo();
+    const bundledPhp = path.join(rootDir, 'runtime', 'php', 'windows', 'php.exe');
+    const phpBin = process.env.PARTY_PHP_BIN || (fs.existsSync(bundledPhp) ? bundledPhp : 'php');
+    const script = [
+      'require "api/lib/diplomacy.php";',
+      '$gameId = (int)$argv[1];',
+      '$loaded = diplomacy_load_map("EuropeDiploMap");',
+      '$graph = $loaded["graph"];',
+      '$position = $loaded["start"];',
+      '$ids = [];',
+      'foreach ($graph["provinces"] as $id => $province) {',
+      '  $name = strtolower((string)($province["name"] ?? ""));',
+      '  if ($name === "picardy" || $name === "burgundy" || $name === "belgium") { $ids[$name] = $id; }',
+      '}',
+      'foreach (["picardy", "burgundy", "belgium"] as $name) {',
+      '  if (empty($ids[$name])) { fwrite(STDERR, "missing $name\\n"); exit(1); }',
+      '}',
+      '$position["units"] = [',
+      '  ["province" => $ids["picardy"], "unit" => "army", "power" => "france"],',
+      '  ["province" => $ids["burgundy"], "unit" => "army", "power" => "france"],',
+      '  ["province" => $ids["belgium"], "unit" => "army", "power" => "germany"],',
+      '];',
+      'diplomacy_write_snapshot($gameId, 1901, "spring_orders", $position, null, null);',
+      'db()->prepare("UPDATE game_state SET phase = :phase, current_round = 1901 WHERE game_id = :id")->execute(["phase" => "spring_orders", "id" => $gameId]);',
+      'echo json_encode(["picardy" => $ids["picardy"], "burgundy" => $ids["burgundy"], "belgium" => $ids["belgium"], "map" => $position["map"]]);',
+    ].join('');
+    const plantedResult = spawnSync(phpBin, ['-r', script, String(game.id)], {
+      cwd: rootDir,
+      encoding: 'utf8',
+      env: process.env,
+    });
+    if (plantedResult.status !== 0) {
+      throw new Error((plantedResult.stderr || plantedResult.stdout || `php exited ${plantedResult.status}`).trim());
+    }
+    const planted = JSON.parse(String(plantedResult.stdout || '').trim());
+
+    const franceOrders = await owner.client.post(`/api/games/${game.id}/actions/diplomacy-order`, {
+      json: {
+        action_type: 'order',
+        payload: {
+          kind: 'diplomacy-orders',
+          map: planted.map,
+          power: 'france',
+          orders: [
+            { province: planted.picardy, unit: 'army', action: 'move', to: planted.belgium },
+            { province: planted.burgundy, unit: 'army', action: 'support-move', target: planted.picardy, to: planted.belgium },
+          ],
+        },
+      },
+    });
+    expect(franceOrders.status).toBeGreaterThanOrEqual(200);
+    expect(franceOrders.status).toBeLessThan(300);
+    const germanyHold = await owner.client.post(`/api/games/${game.id}/actions/diplomacy-order`, {
+      json: {
+        action_type: 'order',
+        payload: {
+          kind: 'diplomacy-orders',
+          map: planted.map,
+          power: 'germany',
+          orders: [],
+        },
+      },
+    });
+    expect(germanyHold.status).toBeGreaterThanOrEqual(200);
+    expect(germanyHold.status).toBeLessThan(300);
+    const springReady = await owner.client.post(`/api/games/${game.id}/actions/diplomacy-ready`, {
+      json: { ready: true },
+    });
+    expect(springReady.status).toBe(200);
+
+    const retreatsLive = await getGameDetail(owner, game.id);
+    expect(retreatsLive.phase).toBe('spring_retreats');
+    const germanyRetreat = retreatsLive.diplomacy.retreats.find((entry) => entry.power === 'germany');
+    const retreatOrder = await owner.client.post(`/api/games/${game.id}/actions/diplomacy-order`, {
+      json: {
+        action_type: 'retreat',
+        payload: {
+          kind: 'diplomacy-retreats',
+          map: planted.map,
+          power: 'germany',
+          orders: [{ action: 'disband', province: germanyRetreat.province, unit: germanyRetreat.unit }],
+        },
+      },
+    });
+    expect(retreatOrder.status).toBeGreaterThanOrEqual(200);
+    expect(retreatOrder.status).toBeLessThan(300);
+    const retreatReady = await owner.client.post(`/api/games/${game.id}/actions/diplomacy-ready`, {
+      json: { ready: true },
+    });
+    expect(retreatReady.status).toBe(200);
+
+    const advanced = await getGameDetail(owner, game.id);
+    expect(advanced.phase).toBe('fall_orders');
+    const ownerPage = await openAuthenticatedPage(owner, { screen: 'game', game: game.id }, { viewport: { width: 390, height: 900 } });
+    try {
+      await waitForActiveHeading(ownerPage, phaseHeadingForGame(advanced, 'Diplomacy'));
+      await waitForDiplomacyBoard(ownerPage);
+      await ownerPage.waitForFunction(() => {
+        const select = document.querySelector('[data-ref="historySelect"]');
+        return !!(select && Array.from(select.options).some((option) => option.value === '1901:spring_retreats'));
+      });
+      await ownerPage.select('[data-ref="historySelect"]', '1901:spring_retreats');
+      await ownerPage.waitForFunction(() => {
+        const active = document.querySelector('.screen:not(.hidden)');
+        const title = active && active.querySelector('[data-ref="phaseTitle"]');
+        const progress = active && active.querySelector('[data-ref="progressText"]');
+        const status = active && active.querySelector('[data-ref="status"]');
+        const host = active && active.querySelector('[data-ref="boardHost"]');
+        const select = active && active.querySelector('[data-ref="historySelect"]');
+        const bad = status && /Unable to load|Two units/i.test(status.textContent);
+        return !!(title && /Spring retreats/i.test(title.textContent)
+          && progress && progress.textContent.includes('Resolved turn')
+          && select && select.value === '1901:spring_retreats'
           && host && host.querySelector('svg, canvas')
           && !bad);
       });

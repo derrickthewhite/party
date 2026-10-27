@@ -27,10 +27,30 @@ async function createSession(label, options = {}) {
   };
 }
 
-async function createGame(ownerSession, gameType, title) {
-  const roomId = ownerSession.user && Array.isArray(ownerSession.user.rooms) && ownerSession.user.rooms[0]
-    ? ownerSession.user.rooms[0].id
-    : undefined;
+async function createRoom(adminSession, name) {
+  const response = await adminSession.client.post('/api/admin/rooms', {
+    json: {
+      name: name || uniqueLabel('room'),
+      code: uniqueLabel('room-code').slice(0, 40),
+    },
+  });
+  expect(response.status).toBe(201);
+  return response.body.data.room;
+}
+
+async function addRoomMembers(adminSession, roomId, userIds) {
+  const response = await adminSession.client.post(`/api/admin/rooms/${roomId}/members`, {
+    json: { user_ids: userIds },
+  });
+  expect(response.status).toBe(200);
+  return response.body.data;
+}
+
+async function createGame(ownerSession, gameType, title, options = {}) {
+  const roomId = options.roomId
+    || (ownerSession.user && Array.isArray(ownerSession.user.rooms) && ownerSession.user.rooms[0]
+      ? ownerSession.user.rooms[0].id
+      : undefined);
   const response = await ownerSession.client.post('/api/games', {
     json: {
       title: title || uniqueLabel(gameType),
@@ -129,7 +149,9 @@ async function grantRumbleAbilities(session, gameId, userId, abilityIds) {
 }
 
 module.exports = {
+  addRoomMembers,
   createGame,
+  createRoom,
   createSession,
   endGame,
   endRumbleBidding,

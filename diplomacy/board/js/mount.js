@@ -38,6 +38,7 @@ DiplomacyBoard.mount = function (host, options) {
 	var swallowClick = false;
 	var resizeObserver = null;
 	var popupAnchor = null;
+	var popupPlace = "anchor";
 	var tokenEdit = false;
 	var tokenDrag = null;
 	var tokenEditKey = "";
@@ -280,33 +281,49 @@ DiplomacyBoard.mount = function (host, options) {
 		if (popup.hidden) return;
 		var rect = viewport.getBoundingClientRect();
 		var margin = 8;
+		var bottomReserve = popupPlace === "corner" && !prompt.hidden ? prompt.offsetHeight + 6 : 0;
 		popup.style.left = "0px";
 		popup.style.top = "0px";
-		popup.style.maxHeight = Math.max(48, rect.height - margin * 2) + "px";
+		popup.style.maxHeight = Math.max(48, rect.height - margin * 2 - bottomReserve) + "px";
 		popup.style.maxWidth = Math.max(120, rect.width - margin * 2) + "px";
 		var pop = popup.getBoundingClientRect();
 		var left = (rect.width - pop.width) / 2;
 		var top = (rect.height - pop.height) / 2;
-		if (popupAnchor) {
+		if (popupPlace === "corner") {
+			left = rect.width - margin - pop.width;
+			top = rect.height - margin - bottomReserve - pop.height;
+		} else if (popupAnchor) {
 			var at = mapToStage(popupAnchor);
 			var stageRect = stage.getBoundingClientRect();
 			var originX = stageRect.left - rect.left + at.x;
 			var originY = stageRect.top - rect.top + at.y;
-			var gap = tokenSize() * 0.7;
-			left = originX + gap;
-			top = originY - pop.height / 2;
-			if (left + pop.width > rect.width - margin) left = originX - gap - pop.width;
+			if (popupPlace === "over") {
+				left = originX - pop.width / 2;
+				top = originY - pop.height / 2;
+			} else {
+				var gap = tokenSize() * 0.7;
+				left = originX + gap;
+				top = originY - pop.height / 2;
+				if (left + pop.width > rect.width - margin) left = originX - gap - pop.width;
+			}
 		}
+		var bottom = margin + bottomReserve;
 		if (left < margin) left = margin;
 		if (top < margin) top = margin;
 		if (left + pop.width > rect.width - margin) left = Math.max(margin, rect.width - margin - pop.width);
-		if (top + pop.height > rect.height - margin) top = Math.max(margin, rect.height - margin - pop.height);
+		if (top + pop.height > rect.height - bottom) top = Math.max(margin, rect.height - bottom - pop.height);
 		popup.style.left = left + "px";
 		popup.style.top = top + "px";
 	}
 
 	function anchorPopup(point) {
 		popupAnchor = point && typeof point.x === "number" ? { x: point.x, y: point.y } : null;
+	}
+
+	function provinceCenter(provinceId) {
+		var province = DiplomacyBoard.province(graph, provinceId);
+		if (!province || !province.center || typeof province.center.x !== "number") return null;
+		return { x: province.center.x, y: province.center.y };
 	}
 
 	function provinceAnchor(provinceId) {
@@ -398,19 +415,49 @@ DiplomacyBoard.mount = function (host, options) {
 		highlightPicks();
 	}
 
-	function refreshCoastPopup() {
-		if (!pending) return;
-		var options = DiplomacyBoard.coastOptions(graph, position, pending);
-		if (!options.length) {
-			if (popup.hidden === false && popup.querySelector("[data-pick-coast]")) {
-				popup.hidden = true;
-				popup.innerHTML = "";
-			}
-			return;
+	function hideCoastPopup() {
+		if (popup.hidden !== false || !popup.querySelector("[data-pick-coast]")) return;
+		popup.hidden = true;
+		popup.innerHTML = "";
+		if (popupPlace === "over") {
+			popupPlace = "anchor";
+			popupAnchor = null;
 		}
+	}
+
+	function soleCoastProvince(options) {
+		var id = "";
+		for (var i = 0; i < options.length; i++) {
+			if (!id) id = options[i].province;
+			else if (id !== options[i].province) return "";
+		}
+		return id;
+	}
+
+	function showCoastPopup(provinceId, options) {
 		popup.innerHTML = DiplomacyBoard.coastOptionsHtml(graph, pending.unit, options);
 		popup.hidden = false;
+		popupPlace = "over";
+		anchorPopup(provinceCenter(provinceId) || provinceAnchor(provinceId));
 		placePopup();
+	}
+
+	function refreshCoastPopup(provinceId) {
+		if (!pending) return;
+		var options = DiplomacyBoard.coastOptions(graph, position, pending);
+		var at = provinceId || soleCoastProvince(options);
+		if (at) {
+			var narrowed = [];
+			for (var i = 0; i < options.length; i++) {
+				if (options[i].province === at) narrowed.push(options[i]);
+			}
+			options = narrowed;
+		}
+		if (!at || options.length < 2) {
+			hideCoastPopup();
+			return;
+		}
+		showCoastPopup(at, options);
 	}
 
 	function startPending(unit, action) {
@@ -465,11 +512,12 @@ DiplomacyBoard.mount = function (host, options) {
 		if (!pending) return false;
 		if (pickList().indexOf(provinceId) === -1) return false;
 		var action = DiplomacyBoard.normalizeAction(pending.action);
-		var choosingDest = pending.clicks.length === 0 && (action === "move" || action === "support-move");
+		var choosingDest = (action === "move" && pending.clicks.length === 0)
+			|| (action === "support-move" && pending.clicks.length === 1);
 		if (choosingDest) {
 			var choices = coastChoicesFor(provinceId);
 			if (choices.length > 1) {
-				refreshCoastPopup();
+				refreshCoastPopup(provinceId);
 				return true;
 			}
 			if (choices.length === 1) {
@@ -494,6 +542,7 @@ DiplomacyBoard.mount = function (host, options) {
 	function closePopup() {
 		openProvince = null;
 		popupAnchor = null;
+		popupPlace = "anchor";
 		popup.hidden = true;
 		popup.innerHTML = "";
 		drawUnits();
@@ -503,6 +552,7 @@ DiplomacyBoard.mount = function (host, options) {
 		popup.innerHTML = DiplomacyBoard.orderPopupHtml(graph, unit, orderFrom(unit.province));
 		popup.hidden = false;
 		openProvince = unit.province;
+		popupPlace = "anchor";
 		anchorPopup(DiplomacyBoard.unitPoint(graph, unit) || provinceAnchor(unit.province));
 		placePopup();
 		drawUnits();
@@ -577,6 +627,11 @@ DiplomacyBoard.mount = function (host, options) {
 		});
 	}
 
+	DiplomacyBoard.loadFleetArt(DiplomacyBoard.unitAssetBase || options.assetBase);
+	DiplomacyBoard.whenFleetArt(function () {
+		if (!destroyed) drawUnits();
+	});
+
 	function relayout() {
 		if (destroyed) return;
 		drawUnits();
@@ -632,7 +687,8 @@ DiplomacyBoard.mount = function (host, options) {
 		popup.innerHTML = html;
 		popup.hidden = false;
 		openProvince = provinceId;
-		anchorPopup(provinceAnchor(provinceId));
+		popupPlace = "over";
+		anchorPopup(provinceCenter(provinceId) || provinceAnchor(provinceId));
 		placePopup();
 		drawUnits();
 	}
@@ -717,9 +773,10 @@ DiplomacyBoard.mount = function (host, options) {
 		popup.innerHTML = DiplomacyBoard.retreatPopupHtml(graph, view, orderFrom(DiplomacyBoard.canonProvince(graph, entry.province)));
 		popup.hidden = false;
 		openProvince = DiplomacyBoard.canonProvince(graph, entry.province);
-		anchorPopup(provinceAnchor(openProvince));
-		placePopup();
+		popupPlace = "corner";
+		popupAnchor = null;
 		showPrompt();
+		placePopup();
 		highlightPicks();
 		drawUnits();
 	}
@@ -743,6 +800,7 @@ DiplomacyBoard.mount = function (host, options) {
 		});
 		popup.hidden = false;
 		openProvince = id;
+		popupPlace = "anchor";
 		anchorPopup(provinceAnchor(id));
 		placePopup();
 		showPrompt();
@@ -869,6 +927,12 @@ DiplomacyBoard.mount = function (host, options) {
 			return;
 		}
 		if (pending && provinceId && pickList().indexOf(provinceId) !== -1) {
+			chooseProvince(provinceId);
+			return;
+		}
+		// Same target as a move: the whole province. Unit circles stay a fixed
+		// size on screen, so zoomed out they cover a build site and swallow the click.
+		if (mode === "build" && provinceId && offeredProvinces().indexOf(provinceId) !== -1) {
 			chooseProvince(provinceId);
 			return;
 		}
@@ -1510,7 +1574,7 @@ DiplomacyBoard.mount = function (host, options) {
 		},
 		setTokenPositions: function (doc) {
 			DiplomacyBoard.mergeTokenPositions(graph, doc);
-			if (openProvince) anchorPopup(provinceAnchor(openProvince));
+			if (popupPlace === "anchor" && openProvince) anchorPopup(provinceAnchor(openProvince));
 			drawUnits();
 			if (!popup.hidden) placePopup();
 		},

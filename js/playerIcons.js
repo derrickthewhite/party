@@ -78,11 +78,11 @@ export function pickRandomPlayerIconKey(iconCatalog, currentIconKey) {
 	const seenKeys = new Set();
 	const selectableIcons = availableIcons.filter(function isSelectableIcon(entry) {
 		const item = catalogIconEntry(entry);
-		if (!item || item.hidden || seenKeys.has(item.key)) {
+		if (!item || item.hidden || !item.auto_assign || item.key === normalizedCurrentIconKey || seenKeys.has(item.key)) {
 			return false;
 		}
 		seenKeys.add(item.key);
-		return item.key !== normalizedCurrentIconKey;
+		return true;
 	});
 
 	if (!selectableIcons.length) {

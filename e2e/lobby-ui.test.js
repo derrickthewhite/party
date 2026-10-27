@@ -5,7 +5,9 @@ const {
   waitForActiveHeading,
 } = require('./support/app-driver');
 const {
+  addRoomMembers,
   createGame,
+  createRoom,
   createSession,
   endGame,
   joinGame,
@@ -133,6 +135,141 @@ describe('lobby presentation coverage', () => {
         expect(row.end.disabled).toBe(!game.permissions.can_end);
         expect(row.remove.disabled).toBe(!game.permissions.can_delete);
       }
+    } finally {
+      await page.close();
+    }
+  });
+});
+
+async function setupMultiRoomUser(label, extraRoomName) {
+  const admin = await createSession(`${label}-admin`, { admin: true });
+  const user = await createSession(`${label}-user`);
+  const extraRoom = await createRoom(admin, extraRoomName || `Zulu ${uniqueLabel('zulu')}`);
+  await addRoomMembers(admin, extraRoom.id, [user.user.id]);
+  const mainRoom = user.user.rooms[0];
+  return { admin, user, extraRoom, mainRoom };
+}
+
+async function waitForRoomFilter(page, expectedValue) {
+  await page.waitForFunction((value) => {
+    const select = document.querySelector('[data-ref="roomSelect"]');
+    return !!select && !select.closest('.hidden') && select.value === String(value);
+  }, { timeout: 15000 }, String(expectedValue));
+
+  await page.waitForFunction((value) => {
+    return new URL(window.location.href).searchParams.get('room') === String(value);
+  }, { timeout: 15000 }, String(expectedValue));
+}
+
+describe('lobby room routing', () => {
+  test('multi-room users land on the room where they have the most active memberships', async () => {
+    const { user, extraRoom, mainRoom } = await setupMultiRoomUser('lobby-rank');
+    await createGame(user, 'chat', uniqueLabel('main-one'), { roomId: mainRoom.id });
+    await createGame(user, 'chat', uniqueLabel('zulu-one'), { roomId: extraRoom.id });
+    await createGame(user, 'chat', uniqueLabel('zulu-two'), { roomId: extraRoom.id });
+
+    const page = await openAuthenticatedPage(user, { screen: 'landing' });
+    try {
+      await waitForActiveHeading(page, 'Game Lobby');
+      await waitForRoomFilter(page, extraRoom.id);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test('membership ties prefer rooms where the user is a player rather than observer', async () => {
+    const { admin, user, extraRoom, mainRoom } = await setupMultiRoomUser('lobby-tie');
+    const observed = await createGame(admin, 'chat', uniqueLabel('main-obs'), { roomId: mainRoom.id });
+    await observeGame(user, observed.id);
+    await createGame(user, 'chat', uniqueLabel('zulu-player'), { roomId: extraRoom.id });
+
+    const page = await openAuthenticatedPage(user, { screen: 'landing' });
+    try {
+      await waitForActiveHeading(page, 'Game Lobby');
+      await waitForRoomFilter(page, extraRoom.id);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test('closed games are ignored when ranking the default room', async () => {
+    const { user, extraRoom, mainRoom } = await setupMultiRoomUser('lobby-closed', `AAA ${uniqueLabel('aaa')}`);
+    const closedOne = await createGame(user, 'chat', uniqueLabel('aaa-closed-1'), { roomId: extraRoom.id });
+    const closedTwo = await createGame(user, 'chat', uniqueLabel('aaa-closed-2'), { roomId: extraRoom.id });
+    await endGame(user, closedOne.id);
+    await endGame(user, closedTwo.id);
+    await createGame(user, 'chat', uniqueLabel('main-open'), { roomId: mainRoom.id });
+
+    const page = await openAuthenticatedPage(user, { screen: 'landing' });
+    try {
+      await waitForActiveHeading(page, 'Game Lobby');
+      await waitForRoomFilter(page, mainRoom.id);
+    } finally {
+      await page.close();
+    }
+  });
+
+  test('room query param is honored and All survives refresh and returning from a game', async () => {
+    const { user, extraRoom, mainRoom } = await setupMultiRoomUser('lobby-url');
+    await createGame(user, 'chat', uniqueLabel('zulu-rank'), { roomId: extraRoom.id });
+    await createGame(user, 'chat', uniqueLabel('zulu-rank-2'), { roomId: extraRoom.id });
+    const mainGame = await createGame(user, 'chat', uniqueLabel('main-share'), { roomId: mainRoom.id });
+
+    const page = await openAuthenticatedPage(user, { screen: 'landing', room: mainRoom.id });
+    try {
+      await waitForActiveHeading(page, 'Game Lobby');
+      await waitForRoomFilter(page, mainRoom.id);
+
+      await page.select('[data-ref="roomSelect"]', 'all');
+      await waitForRoomFilter(page, 'all');
+
+      await page.reload({ waitUntil: 'networkidle0' });
+      await waitForActiveHeading(page, 'Game Lobby');
+      await waitForRoomFilter(page, 'all');
+
+      await page.evaluate((title) => {
+        const rows = Array.from(document.querySelectorAll('.game-item'));
+        const row = rows.find((item) => {
+          const name = item.querySelector('[data-ref="name"]');
+          return !!name && name.textContent.includes(title);
+        });
+        if (!row) {
+          throw new Error('Missing game row');
+        }
+        row.querySelector('[data-ref="open"]').click();
+      }, mainGame.title);
+
+      await page.waitForFunction(() => {
+        const activeScreen = document.querySelector('.screen:not(.hidden)');
+        const back = activeScreen && activeScreen.querySelector('[data-ref="back"]');
+        return !!back && back.textContent.includes('Back to lobby');
+      }, { timeout: 15000 });
+
+      await page.click('.screen:not(.hidden) [data-ref="back"]');
+      await waitForActiveHeading(page, 'Game Lobby');
+      await waitForRoomFilter(page, 'all');
+    } finally {
+      await page.close();
+    }
+  });
+
+  test('returning from a deep-linked game selects that game\'s room', async () => {
+    const { user, extraRoom, mainRoom } = await setupMultiRoomUser('lobby-back');
+    await createGame(user, 'chat', uniqueLabel('zulu-more-1'), { roomId: extraRoom.id });
+    await createGame(user, 'chat', uniqueLabel('zulu-more-2'), { roomId: extraRoom.id });
+    const mainGame = await createGame(user, 'chat', uniqueLabel('main-deep'), { roomId: mainRoom.id });
+
+    const page = await openAuthenticatedPage(user, { screen: 'game', game: mainGame.id });
+    try {
+      await page.waitForFunction(() => {
+        const activeScreen = document.querySelector('.screen:not(.hidden)');
+        const back = activeScreen && activeScreen.querySelector('[data-ref="back"]');
+        return !!back && back.textContent.includes('Back to lobby');
+      }, { timeout: 15000 });
+
+      await page.click('.screen:not(.hidden) [data-ref="back"]');
+      await waitForActiveHeading(page, 'Game Lobby');
+      await waitForRoomFilter(page, mainRoom.id);
     } finally {
       await page.close();
     }

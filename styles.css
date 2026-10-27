@@ -1522,6 +1522,21 @@ button:disabled {
   align-self: end;
 }
 
+.diplomacy-timer-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.diplomacy-timer-row[hidden] {
+  display: none !important;
+}
+
+.diplomacy-timer-row .diplomacy-timer-text {
+  margin: 0;
+}
+
 .diplomacy-timer-text:empty {
   display: none;
 }
@@ -1783,6 +1798,45 @@ button:disabled {
   width: 18px;
   height: 18px;
   display: block;
+}
+
+.diplomacy-order-progress {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  margin-left: 8px;
+  min-width: 0;
+}
+
+.diplomacy-order-progress[hidden] {
+  display: none !important;
+}
+
+.diplomacy-order-count {
+  flex: 0 0 auto;
+  font-size: 2rem;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.diplomacy-order-state {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+  min-width: 0;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--muted);
+}
+
+.diplomacy-order-state .is-on {
+  color: var(--ink);
 }
 
 .admin-icons-toolbar,

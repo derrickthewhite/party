@@ -491,3 +491,42 @@ DiplomacyBoard.adjudicate = function (graph, position, orders) {
 		return powerName(order.power) + " " + kind + " " + placeName(order.province) + " — " + order.summary + ".";
 	}
 };
+
+// Applies a movement-phase result. Successful moves take their destination.
+// A unit that would have to retreat is removed.
+DiplomacyBoard.resolveMovement = function (graph, position, orders) {
+	var result = DiplomacyBoard.adjudicate(graph, position, orders);
+	var units = [];
+	var moved = 0;
+	var disbanded = 0;
+	var drawn = result.units || [];
+	for (var i = 0; i < drawn.length; i++) {
+		var unit = drawn[i];
+		if (unit.dislodged) {
+			disbanded += 1;
+			continue;
+		}
+		if (unit.province !== unit.origin) moved += 1;
+		var next = {
+			province: unit.province,
+			unit: unit.unit,
+			power: unit.power
+		};
+		if (unit.coast) next.coast = unit.coast;
+		units.push(next);
+	}
+	var nextPosition = {
+		kind: "diplomacy-position",
+		map: position.map,
+		powers: position.powers,
+		ownership: position.ownership,
+		units: units
+	};
+	DiplomacyBoard.validatePosition(graph, nextPosition);
+	return {
+		position: nextPosition,
+		moved: moved,
+		disbanded: disbanded,
+		text: result.text
+	};
+};

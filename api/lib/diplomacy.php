@@ -16,7 +16,8 @@ function diplomacy_game_row(int $gameId): ?array
     $stmt = db()->prepare(
         'SELECT g.id, g.owner_user_id, g.title, g.game_type, g.status, g.diplomacy_map_key, g.diplomacy_nation_mode, g.diplomacy_nation_count, '
         . 'g.diplomacy_home_centers, g.diplomacy_assignments, g.diplomacy_timer_minutes, g.diplomacy_timer_shortcut, '
-        . 'g.diplomacy_phase_deadline, gs.phase, gs.current_round, gs.winner_summary '
+        . 'g.diplomacy_phase_deadline, g.diplomacy_timer_paused, g.diplomacy_timer_remaining_seconds, '
+        . 'gs.phase, gs.current_round, gs.winner_summary '
         . 'FROM games g '
         . 'LEFT JOIN game_state gs ON gs.game_id = g.id '
         . 'WHERE g.id = :id LIMIT 1'
@@ -266,22 +267,72 @@ function diplomacy_timer_minutes_from_body(array $body): ?int
     return $minutes;
 }
 
-function diplomacy_set_phase_deadline(int $gameId, ?int $minutes): void
+function diplomacy_clear_timer_pause(int $gameId): void
 {
-    if ($minutes === null || $minutes < 1) {
-        db()->prepare('UPDATE games SET diplomacy_phase_deadline = NULL WHERE id = :id')->execute(['id' => $gameId]);
-        return;
-    }
-    $minutes = (int)$minutes;
+    db()->prepare(
+        'UPDATE games SET diplomacy_timer_paused = 0, diplomacy_timer_remaining_seconds = NULL WHERE id = :id'
+    )->execute(['id' => $gameId]);
+}
+
+function diplomacy_timer_is_paused(?array $game): bool
+{
+    return $game !== null && (int)($game['diplomacy_timer_paused'] ?? 0) === 1;
+}
+
+function diplomacy_set_phase_deadline_from_seconds(int $gameId, int $seconds): void
+{
+    $seconds = max(0, $seconds);
     if (db_is_sqlite()) {
         db()->prepare(
-            'UPDATE games SET diplomacy_phase_deadline = datetime(\'now\', \'+' . $minutes . ' minutes\') WHERE id = :id'
+            'UPDATE games SET diplomacy_phase_deadline = datetime(\'now\', \'+' . $seconds . ' seconds\') WHERE id = :id'
         )->execute(['id' => $gameId]);
         return;
     }
     db()->prepare(
-        'UPDATE games SET diplomacy_phase_deadline = DATE_ADD(UTC_TIMESTAMP(), INTERVAL ' . $minutes . ' MINUTE) WHERE id = :id'
+        'UPDATE games SET diplomacy_phase_deadline = DATE_ADD(UTC_TIMESTAMP(), INTERVAL ' . $seconds . ' SECOND) WHERE id = :id'
     )->execute(['id' => $gameId]);
+}
+
+function diplomacy_set_phase_deadline(int $gameId, ?int $minutes): void
+{
+    diplomacy_clear_timer_pause($gameId);
+    if ($minutes === null || $minutes < 1) {
+        db()->prepare('UPDATE games SET diplomacy_phase_deadline = NULL WHERE id = :id')->execute(['id' => $gameId]);
+        return;
+    }
+    diplomacy_set_phase_deadline_from_seconds($gameId, ((int)$minutes) * 60);
+}
+
+function diplomacy_set_timer_paused(int $gameId, bool $paused): void
+{
+    $game = diplomacy_game_row($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+    if ((string)$game['status'] !== 'in_progress') {
+        error_response('The timer can only be paused while the game is in progress.', 409);
+    }
+    if (diplomacy_running_timer_minutes($game) === null) {
+        error_response('A phase timer is not enabled.', 422);
+    }
+    if ($paused === diplomacy_timer_is_paused($game)) {
+        return;
+    }
+    if ($paused) {
+        $deadline = diplomacy_deadline_timestamp($game['diplomacy_phase_deadline'] ?? null);
+        $remaining = $deadline === null ? 0 : max(0, $deadline - time());
+        db()->prepare(
+            'UPDATE games SET diplomacy_timer_paused = 1, diplomacy_timer_remaining_seconds = :remaining, '
+            . 'diplomacy_phase_deadline = NULL WHERE id = :id'
+        )->execute([
+            'remaining' => $remaining,
+            'id' => $gameId,
+        ]);
+        return;
+    }
+    $remaining = (int)($game['diplomacy_timer_remaining_seconds'] ?? 0);
+    diplomacy_clear_timer_pause($gameId);
+    diplomacy_set_phase_deadline_from_seconds($gameId, $remaining);
 }
 
 function diplomacy_deadline_timestamp(?string $raw): ?int
@@ -809,16 +860,41 @@ function diplomacy_history_index(int $gameId): array
             'mode' => diplomacy_phase_mode($phase),
         ];
     }
+    $game = diplomacy_game_row($gameId);
+    if ($game && (string)($game['status'] ?? '') === 'in_progress') {
+        $year = (int)($game['current_round'] ?? 0);
+        $phase = (string)($game['phase'] ?? '');
+        $last = $items !== [] ? $items[count($items) - 1] : null;
+        if ($year > 0 && $phase !== '' && $phase !== 'setup'
+            && (!$last || (int)$last['year'] !== $year || (string)$last['phase'] !== $phase)) {
+            $items[] = [
+                'year' => $year,
+                'phase' => $phase,
+                'label' => diplomacy_phase_label($phase, $year),
+                'mode' => diplomacy_phase_mode($phase),
+                'current' => true,
+            ];
+        }
+    }
     return $items;
 }
 
 function diplomacy_snapshot_for_history(int $gameId, int $year, string $phase): ?array
 {
     $row = diplomacy_current_snapshot($gameId, $year, $phase);
-    if ($row === null || $row['resolution'] === null) {
+    if ($row === null) {
         return null;
     }
-    return $row;
+    if ($row['resolution'] !== null) {
+        return $row;
+    }
+    $game = diplomacy_game_row($gameId);
+    if ($game && (string)($game['status'] ?? '') === 'in_progress'
+        && (int)($game['current_round'] ?? 0) === $year
+        && (string)($game['phase'] ?? '') === $phase) {
+        return $row;
+    }
+    return null;
 }
 
 function diplomacy_load_phase_actions(int $gameId, int $year, string $phase): array
@@ -1341,6 +1417,7 @@ function diplomacy_resolve_current_phase(int $gameId): int
             }
             $resolution = diplomacy_adjudicate($loaded['graph'], $position, $unitOrders);
             $nextPosition = diplomacy_apply_movement($position, $resolution);
+            diplomacy_canonicalize_position($loaded['graph'], $nextPosition);
             $retreats = diplomacy_retreat_choices($loaded['graph'], $nextPosition, $resolution);
             $resolution['retreats'] = $retreats;
             $ordersDoc = diplomacy_combined_orders_document(
@@ -1369,7 +1446,8 @@ function diplomacy_resolve_current_phase(int $gameId): int
                 ? $priorSnap['resolution']
                 : ['units' => $position['units'], 'results' => [], 'attacker_origins' => []];
             $retreats = diplomacy_retreat_choices($loaded['graph'], $position, $prior);
-            $nextPosition = diplomacy_apply_retreats($position, $prior, $docs, $retreats);
+            $nextPosition = diplomacy_apply_retreats($loaded['graph'], $position, $prior, $docs, $retreats);
+            diplomacy_canonicalize_position($loaded['graph'], $nextPosition);
             $resolution = [
                 'text' => diplomacy_retreat_summary_text($loaded['graph'], $position, $prior, $docs, $retreats),
                 'notes' => [],
@@ -1398,6 +1476,7 @@ function diplomacy_resolve_current_phase(int $gameId): int
         } else {
             $adjustments = diplomacy_adjustment_choices($loaded['graph'], $position, $homes, $playerPowers);
             $nextPosition = diplomacy_apply_adjustments($loaded['graph'], $position, $docs, $adjustments, $homes, $playerPowers);
+            diplomacy_canonicalize_position($loaded['graph'], $nextPosition);
             $resolution = [
                 'text' => diplomacy_adjust_summary_text($loaded['graph'], $position, $nextPosition),
                 'notes' => [],
@@ -1454,6 +1533,7 @@ function diplomacy_resolve_current_phase(int $gameId): int
 function diplomacy_after_fall(array &$graph, array $position, array $homes, array $playerPowers): array
 {
     $captured = diplomacy_capture_supply_centers($graph, $position);
+    diplomacy_canonicalize_position($graph, $captured);
     $winners = diplomacy_winners($graph, $captured);
     if ($winners) {
         $names = [];
@@ -1532,6 +1612,9 @@ function diplomacy_apply_due_timer(int $gameId): void
     if ((int)($game['diplomacy_timer_shortcut'] ?? 0) !== 1) {
         return;
     }
+    if (diplomacy_timer_is_paused($game)) {
+        return;
+    }
     $deadline = diplomacy_deadline_timestamp($game['diplomacy_phase_deadline'] ?? null);
     if ($deadline === null || $deadline > time()) {
         return;
@@ -1589,6 +1672,7 @@ function diplomacy_game_build_detail_payload(int $gameId, array $game, array $us
             $snapshot = diplomacy_current_snapshot($gameId, $year, $phase);
             if ($snapshot) {
                 $position = $snapshot['position'];
+                diplomacy_canonicalize_position($loaded['graph'], $position);
                 $choices = diplomacy_current_choices($gameId, $row, $loaded, $snapshot);
                 $centerCounts = diplomacy_centers_by_power($loaded['graph'], $position);
             }
@@ -1786,10 +1870,15 @@ function diplomacy_game_build_detail_payload(int $gameId, array $game, array $us
                 ? null
                 : (int)$row['diplomacy_timer_minutes'],
             'shortcut' => (int)($row['diplomacy_timer_shortcut'] ?? 0) === 1,
-            'deadline' => diplomacy_deadline_iso($row['diplomacy_phase_deadline'] ?? null),
-            'remaining_seconds' => ($deadlineTs = diplomacy_deadline_timestamp($row['diplomacy_phase_deadline'] ?? null)) === null
+            'paused' => diplomacy_timer_is_paused($row),
+            'deadline' => diplomacy_timer_is_paused($row)
                 ? null
-                : max(0, $deadlineTs - time()),
+                : diplomacy_deadline_iso($row['diplomacy_phase_deadline'] ?? null),
+            'remaining_seconds' => diplomacy_timer_is_paused($row)
+                ? (int)($row['diplomacy_timer_remaining_seconds'] ?? 0)
+                : (($deadlineTs = diplomacy_deadline_timestamp($row['diplomacy_phase_deadline'] ?? null)) === null
+                    ? null
+                    : max(0, $deadlineTs - time())),
         ],
         'progress' => [
             'year' => $year,

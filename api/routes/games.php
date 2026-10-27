@@ -90,6 +90,13 @@ function handle_games_route(string $method, array $segments): void
         games_set_diplomacy_assignments((int)$segments[1]);
     }
 
+    if (count($segments) === 3 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'diplomacy-timer-pause') {
+        if ($method !== 'POST') {
+            error_response('Method not allowed.', 405);
+        }
+        games_set_diplomacy_timer_pause((int)$segments[1]);
+    }
+
     if (count($segments) === 3 && $segments[0] === 'games' && ctype_digit($segments[1]) && $segments[2] === 'diplomacy-snapshot') {
         if ($method !== 'GET') {
             error_response('Method not allowed.', 405);
@@ -635,6 +642,29 @@ function games_update_settings(int $gameId): void
     games_detail($gameId);
 }
 
+function games_set_diplomacy_timer_pause(int $gameId): void
+{
+    $user = require_user();
+    $game = game_find_by_id($gameId);
+    if ($game === null) {
+        error_response('Game not found.', 404);
+    }
+    if (normalize_game_type((string)$game['game_type']) !== 'diplomacy') {
+        error_response('This game is not Diplomacy.', 409);
+    }
+    $isOwner = (int)$game['owner_user_id'] === (int)$user['id'];
+    $isAdmin = (int)($user['is_admin'] ?? 0) === 1;
+    if (!$isOwner && !$isAdmin) {
+        error_response('Forbidden.', 403);
+    }
+    $body = json_input();
+    if (!array_key_exists('paused', $body)) {
+        error_response('paused is required.', 422);
+    }
+    diplomacy_set_timer_paused($gameId, (bool)$body['paused']);
+    games_detail($gameId);
+}
+
 function games_set_diplomacy_assignments(int $gameId): void
 {
     $user = require_user();
@@ -694,6 +724,28 @@ function games_diplomacy_snapshot(int $gameId): void
         error_response('Snapshot not found.', 404);
     }
 
+    $game = diplomacy_game_row($gameId);
+    if ($game) {
+        $loaded = diplomacy_load_map((string)($game['diplomacy_map_key'] ?? diplomacy_default_map_key()));
+        diplomacy_canonicalize_position($loaded['graph'], $snapshot['position']);
+    }
+
+    $resolution = is_array($snapshot['resolution'] ?? null) ? $snapshot['resolution'] : null;
+    $displayResolution = $resolution;
+    $retreats = is_array($resolution) && is_array($resolution['retreats'] ?? null)
+        ? $resolution['retreats']
+        : [];
+    if (diplomacy_phase_mode((string)$snapshot['phase']) === 'retreat') {
+        $prior = diplomacy_prior_movement_snapshot($gameId, (int)$snapshot['year'], (string)$snapshot['phase']);
+        $priorResolution = is_array($prior) && is_array($prior['resolution'] ?? null) ? $prior['resolution'] : null;
+        if ($priorResolution) {
+            $displayResolution = $priorResolution;
+            if ($retreats === [] && is_array($priorResolution['retreats'] ?? null)) {
+                $retreats = $priorResolution['retreats'];
+            }
+        }
+    }
+
     success_response([
         'snapshot' => [
             'year' => $snapshot['year'],
@@ -702,7 +754,9 @@ function games_diplomacy_snapshot(int $gameId): void
             'mode' => diplomacy_phase_mode($snapshot['phase']),
             'position' => $snapshot['position'],
             'orders' => $snapshot['orders'],
-            'resolution' => $snapshot['resolution'],
+            'resolution' => $resolution,
+            'display_resolution' => $displayResolution,
+            'retreats' => $retreats,
         ],
     ]);
 }
@@ -714,7 +768,7 @@ function games_detail(int $gameId): void
 
     try {
         $stmt = db()->prepare(
-            'SELECT g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, u.username AS owner_username, '
+            'SELECT g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, g.room_id, u.username AS owner_username, '
             . 'gs.phase, gs.current_round, g.mafia_setup_mode, g.mafia_setup_mafia_count '
             . 'FROM games g '
             . 'JOIN users u ON u.id = g.owner_user_id '
@@ -736,7 +790,7 @@ function games_detail(int $gameId): void
 
         $stage = 'games_detail.refresh_game';
         $refreshStmt = db()->prepare(
-            'SELECT g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, u.username AS owner_username, '
+            'SELECT g.id, g.owner_user_id, g.title, g.game_type, g.status, g.created_at, g.room_id, u.username AS owner_username, '
             . 'gs.phase, gs.current_round, g.mafia_setup_mode, g.mafia_setup_mafia_count '
             . 'FROM games g '
             . 'JOIN users u ON u.id = g.owner_user_id '
@@ -773,6 +827,7 @@ function games_detail(int $gameId): void
                 'status' => (string)$game['status'],
                 'created_at' => (string)$game['created_at'],
                 'owner_username' => (string)$game['owner_username'],
+                'room_id' => (int)$game['room_id'],
                 'phase' => (string)($game['phase'] ?? default_phase_for_game_type((string)$game['game_type'])),
                 'current_round' => (int)($game['current_round'] ?? 1),
 				'member_count' => count($members),

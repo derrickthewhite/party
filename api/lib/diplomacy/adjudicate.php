@@ -463,7 +463,7 @@ function diplomacy_adjudicate(array &$graph, array $position, array $orders): ar
         $list[$i]['moved'] = $moved;
         $list[$i]['dislodged'] = !$moved && isset($taken[$list[$i]['province']]);
         $list[$i]['pathOk'] = ($list[$i]['action'] ?? '') === 'move' ? $pathSucceeds($list[$i]) : false;
-        $list[$i]['summary'] = diplomacy_adjudicate_summary($list[$i], $placeName, $supportWanted);
+        $list[$i]['summary'] = diplomacy_adjudicate_summary($list[$i], $placeName, $supportWanted, $graph);
     }
 
     $lines = [];
@@ -502,13 +502,35 @@ function diplomacy_adjudicate(array &$graph, array $position, array $orders): ar
         if (!$outcome) {
             continue;
         }
-        $drawn[] = [
+        $destCoast = (string)($outcome['destCoast'] ?? '');
+        $unitCoast = (string)($standing['coast'] ?? '');
+        $coast = '';
+        if (!empty($outcome['moved']) && ($standing['unit'] ?? '') === 'fleet') {
+            $coast = $destCoast;
+            if ($coast === '' && !empty($outcome['to'])) {
+                $inferred = diplomacy_infer_dest_coast(
+                    $graph,
+                    $standing['province'],
+                    $unitCoast !== '' ? $unitCoast : null,
+                    $outcome['to'],
+                    null
+                );
+                $coast = $inferred ?? '';
+            }
+        } else {
+            $coast = $unitCoast;
+        }
+        $drawnUnit = [
             'province' => !empty($outcome['moved']) ? $outcome['to'] : $standing['province'],
             'origin' => $standing['province'],
             'unit' => $standing['unit'],
             'power' => $standing['power'],
             'dislodged' => !empty($outcome['dislodged']),
         ];
+        if ($coast !== '') {
+            $drawnUnit['coast'] = $coast;
+        }
+        $drawn[] = $drawnUnit;
     }
 
     return [
@@ -535,6 +557,9 @@ function diplomacy_adjudicate_make_order(array $unit, ?array $raw): array
         'supportTo' => null,
         'convoyFrom' => null,
         'convoyTo' => null,
+        'destCoast' => '',
+        'unitCoast' => (string)($unit['coast'] ?? ''),
+        'supportCoast' => '',
         'state' => 0,
         'resolution' => false,
         'illegal' => false,
@@ -546,6 +571,7 @@ function diplomacy_adjudicate_make_order(array $unit, ?array $raw): array
     if ($action === 'move') {
         $order['action'] = 'move';
         $order['to'] = $raw['to'] ?? null;
+        $order['destCoast'] = (string)($raw['coast'] ?? '');
         if (!$order['to']) {
             $order['illegal'] = true;
         }
@@ -569,15 +595,23 @@ function diplomacy_adjudicate_make_order(array $unit, ?array $raw): array
         $order['supportMove'] = true;
         $order['supportTarget'] = $raw['target'] ?? null;
         $order['supportTo'] = $raw['to'] ?? null;
+        $order['supportCoast'] = (string)($raw['coast'] ?? '');
     } elseif ($action !== 'hold') {
         $order['illegal'] = true;
     }
     return $order;
 }
 
-function diplomacy_adjudicate_summary(array $order, callable $placeName, callable $supportWanted): string
+function diplomacy_adjudicate_summary(array $order, callable $placeName, callable $supportWanted, array &$graph): string
 {
     $dest = !empty($order['to']) ? $placeName($order['to']) : '';
+    if (($order['action'] ?? '') === 'move' && !empty($order['destCoast'])) {
+        $province = diplomacy_province($graph, $order['to'] ?? '');
+        $coast = diplomacy_coast_by_id($province, $order['destCoast']);
+        if ($coast && !empty($coast['name'])) {
+            $dest .= ', ' . $coast['name'];
+        }
+    }
     if (($order['action'] ?? '') === 'move' && !empty($order['dislodged'])) {
         if (!empty($order['viaConvoy']) && empty($order['pathOk'])) {
             return 'convoy to ' . $dest . ' is disrupted, and the unit is dislodged';

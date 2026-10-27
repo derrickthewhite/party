@@ -69,6 +69,8 @@
 
 .diplomacy-board.is-position .map-stage path[data-kind="land"],
 .diplomacy-board.is-position .map-stage path:not([data-kind="sea"]),
+.diplomacy-board.is-build .map-stage path.is-pick,
+.diplomacy-board.is-retreat .map-stage path.is-pick,
 .diplomacy-board.is-picking .map-stage path.is-pick {
 	cursor: pointer;
 }

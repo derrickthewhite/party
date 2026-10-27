@@ -113,3 +113,72 @@ test('PHP movement adjudication matches the vendored board for hold, move, and b
     expect(phpResult.text).toBe(boardResult.text);
   });
 });
+
+test('a fleet that moves into St Petersburg keeps a coast', () => {
+  const { rootDir } = getServerInfo();
+  const DiplomacyBoard = loadBoard(rootDir);
+  const loaded = loadMap(rootDir, 'EuropeDiploMap');
+  DiplomacyBoard.uniteProvinces(loaded.graph);
+  const position = DiplomacyBoard.clone(loaded.start);
+  DiplomacyBoard.canonicalizePosition(loaded.graph, position);
+
+  const stp = 'territory-6';
+  const barents = 'territory-1';
+  const bothnia = 'territory-12';
+  position.units = position.units.filter((unit) => unit.province !== barents);
+  position.units.push({ province: barents, unit: 'fleet', power: 'england' });
+
+  const russianFleet = position.units.find((unit) => unit.power === 'russia' && unit.province === stp);
+  expect(russianFleet).toBeTruthy();
+  expect(russianFleet.coast).toBe('sc');
+
+  const orders = [
+    {
+      province: barents,
+      unit: 'fleet',
+      power: 'england',
+      action: 'move',
+      to: stp,
+      coast: 'nc',
+    },
+    {
+      province: stp,
+      unit: 'fleet',
+      power: 'russia',
+      action: 'move',
+      to: bothnia,
+    },
+  ];
+
+  const boardResult = DiplomacyBoard.adjudicate(loaded.graph, position, orders);
+  const phpResult = phpAdjudicate(rootDir, {
+    graph: loaded.graph,
+    position,
+    orders,
+  });
+  expect(phpResult.results).toEqual(boardResult.results);
+  expect(phpResult.units).toEqual(boardResult.units);
+
+  const englishInStp = phpResult.units.find((unit) => unit.power === 'england' && unit.province === stp);
+  expect(englishInStp).toBeTruthy();
+  expect(englishInStp.unit).toBe('fleet');
+  expect(englishInStp.coast).toBe('nc');
+  expect(englishInStp.dislodged).toBe(false);
+
+  const inferred = phpAdjudicate(rootDir, {
+    graph: loaded.graph,
+    position,
+    orders: [
+      {
+        province: barents,
+        unit: 'fleet',
+        power: 'england',
+        action: 'move',
+        to: stp,
+      },
+      orders[1],
+    ],
+  });
+  const inferredEnglish = inferred.units.find((unit) => unit.power === 'england' && unit.province === stp);
+  expect(inferredEnglish && inferredEnglish.coast).toBe('nc');
+});

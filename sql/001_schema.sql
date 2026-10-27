@@ -64,6 +64,8 @@ CREATE TABLE IF NOT EXISTS `games` (
   `diplomacy_timer_minutes` INT UNSIGNED NULL DEFAULT NULL,
   `diplomacy_timer_shortcut` TINYINT(1) NOT NULL DEFAULT 0,
   `diplomacy_phase_deadline` TIMESTAMP NULL DEFAULT NULL,
+  `diplomacy_timer_paused` TINYINT(1) NOT NULL DEFAULT 0,
+  `diplomacy_timer_remaining_seconds` INT UNSIGNED NULL DEFAULT NULL,
   `created_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   `updated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),

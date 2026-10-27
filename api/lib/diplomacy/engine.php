@@ -68,14 +68,10 @@ function diplomacy_apply_movement(array $position, array $resolution): array
     $next = diplomacy_clone($position);
     $next['units'] = [];
     foreach ((array)($resolution['units'] ?? []) as $unit) {
-        if (!is_array($unit) || empty($unit['province'])) {
+        if (!is_array($unit) || empty($unit['province']) || !empty($unit['dislodged'])) {
             continue;
         }
-        $next['units'][] = [
-            'province' => $unit['province'],
-            'unit' => $unit['unit'],
-            'power' => $unit['power'],
-        ];
+        $next['units'][] = diplomacy_unit_record($unit);
     }
     return $next;
 }
@@ -107,7 +103,13 @@ function diplomacy_retreat_choices(array &$graph, array $position, array $resolu
         }
         $origin = $unit['origin'] ?? $unit['province'];
         $legal = [];
-        foreach (diplomacy_legal_destinations($graph, $origin, (string)$unit['unit']) as $dest) {
+        $dests = ($unit['unit'] ?? '') === 'fleet'
+            ? diplomacy_fleet_moves($graph, $origin, $unit['coast'] ?? null)
+            : diplomacy_legal_destinations($graph, $origin, (string)$unit['unit']);
+        if ($dests === [] && ($unit['unit'] ?? '') === 'fleet') {
+            $dests = diplomacy_legal_destinations($graph, $origin, 'fleet');
+        }
+        foreach ($dests as $dest) {
             if (isset($occupied[$dest]) || isset($contested[$dest])) {
                 continue;
             }
@@ -117,18 +119,22 @@ function diplomacy_retreat_choices(array &$graph, array $position, array $resolu
             $legal[] = $dest;
         }
         sort($legal);
-        $choices[] = [
+        $choice = [
             'province' => $origin,
             'unit' => $unit['unit'],
             'power' => $unit['power'],
             'choices' => $legal,
             'disband' => true,
         ];
+        if (($unit['unit'] ?? '') === 'fleet' && !empty($unit['coast'])) {
+            $choice['coast'] = $unit['coast'];
+        }
+        $choices[] = $choice;
     }
     return $choices;
 }
 
-function diplomacy_apply_retreats(array $position, array $resolution, array $retreatDocs, array $retreatChoices): array
+function diplomacy_apply_retreats(array &$graph, array $position, array $resolution, array $retreatDocs, array $retreatChoices): array
 {
     $next = diplomacy_clone($position);
     $byOrigin = [];
@@ -171,11 +177,7 @@ function diplomacy_apply_retreats(array $position, array $resolution, array $ret
         if (!is_array($unit) || !empty($unit['dislodged'])) {
             continue;
         }
-        $kept[$unit['province']] = [
-            'province' => $unit['province'],
-            'unit' => $unit['unit'],
-            'power' => $unit['power'],
-        ];
+        $kept[$unit['province']] = diplomacy_unit_record($unit);
     }
     foreach ($planned as $item) {
         $dest = $item['to'];
@@ -183,11 +185,23 @@ function diplomacy_apply_retreats(array $position, array $resolution, array $ret
             continue;
         }
         $unit = $item['unit'];
-        $kept[$dest] = [
-            'province' => $dest,
-            'unit' => $unit['unit'],
-            'power' => $unit['power'],
-        ];
+        $order = $byOrigin[$item['origin']] ?? null;
+        $record = diplomacy_unit_record($unit, $dest);
+        if (($unit['unit'] ?? '') === 'fleet') {
+            $coast = diplomacy_infer_dest_coast(
+                $graph,
+                $item['origin'],
+                $unit['coast'] ?? null,
+                $dest,
+                $order['coast'] ?? null
+            );
+            if ($coast) {
+                $record['coast'] = $coast;
+            } else {
+                unset($record['coast']);
+            }
+        }
+        $kept[$dest] = $record;
     }
     $next['units'] = array_values($kept);
     return $next;
@@ -370,11 +384,15 @@ function diplomacy_apply_adjustments(
                     continue;
                 }
                 $used[$provinceId] = true;
-                $units[] = [
+                $unit = [
                     'province' => $provinceId,
                     'unit' => $unitType,
                     'power' => $powerId,
                 ];
+                if ($unitType === 'fleet' && !empty($order['coast'])) {
+                    $unit['coast'] = $order['coast'];
+                }
+                $units[] = $unit;
                 $built += 1;
             }
             continue;

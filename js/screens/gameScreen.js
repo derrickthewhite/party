@@ -5,6 +5,7 @@ import { pickRandomPlayerIconKey, rememberPlayerIconCatalog, setPlayerIconImage 
 import { collectGameInfoIcons, setGameInfoIconNode } from '../gameStateIcons.js';
 import { showGameIconPickerModal } from './gameIconPickerModal.js';
 import { bindPlayerIconPreview } from './playerIconPreviewModal.js';
+import { roomFilterAfterLeavingGame } from '../lobbyRoomFilter.js';
 
 export function createBaseGameScreen(deps, options) {
 	const config = options || {};
@@ -130,9 +131,20 @@ export function createBaseGameScreen(deps, options) {
 		sidebarPanel.appendChild(mountedSidebarPanel);
 	}
 
+	function lobbyReturnPatch() {
+		const activeGame = state.state.activeGame;
+		return {
+			activeGame: null,
+			selectedRoomFilter: roomFilterAfterLeavingGame(
+				state.state.selectedRoomFilter,
+				activeGame && activeGame.room_id
+			),
+		};
+	}
+
 	refs.back.addEventListener('click', function onBack() {
 		chat.stopPolling();
-		state.patch({ activeGame: null });
+		state.patch(lobbyReturnPatch());
 		state.setScreen('landing');
 	});
 
@@ -155,7 +167,7 @@ export function createBaseGameScreen(deps, options) {
 		try {
 			await api.leaveGame(activeGame.id);
 			chat.stopPolling();
-			state.patch({ activeGame: null });
+			state.patch(lobbyReturnPatch());
 			await refreshGames();
 			state.setScreen('landing');
 		} catch (err) {
@@ -365,7 +377,7 @@ export function createBaseGameScreen(deps, options) {
 		try {
 			await api.deleteGame(activeGame.id);
 			chat.stopPolling();
-			state.patch({ activeGame: null });
+			state.patch(lobbyReturnPatch());
 			await refreshGames();
 			state.setScreen('landing');
 		} catch (err) {

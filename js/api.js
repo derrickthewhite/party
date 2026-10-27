@@ -89,6 +89,9 @@ function createApiModule() {
 		setDiplomacyAssignments: (gameId, updates) => request('/games/' + encodeURIComponent(gameId) + '/diplomacy-assignment', 'POST', {
 			updates: updates || [],
 		}),
+		setDiplomacyTimerPaused: (gameId, paused) => request('/games/' + encodeURIComponent(gameId) + '/diplomacy-timer-pause', 'POST', {
+			paused: !!paused,
+		}),
 		diplomacySnapshot: (gameId, year, phase) => request(
 			'/games/' + encodeURIComponent(gameId) + '/diplomacy-snapshot?year=' + encodeURIComponent(year) + '&phase=' + encodeURIComponent(phase),
 			'GET'

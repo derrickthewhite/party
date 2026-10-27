@@ -298,9 +298,13 @@ function diplomacy_canonicalize_position(array &$graph, array &$position): array
         $position['units'] = [];
     }
     foreach ($position['units'] as &$unit) {
+        if (!is_array($unit)) {
+            continue;
+        }
         if (isset($unit['province'])) {
             $unit['province'] = diplomacy_province_id($graph, $unit['province']);
         }
+        diplomacy_normalize_unit_coast($graph, $unit);
     }
     unset($unit);
     return $position;
@@ -491,6 +495,9 @@ function diplomacy_copy_order(array $raw, array $standing): array
     ];
     if ($action === 'move') {
         $order['to'] = $raw['to'] ?? null;
+        if (!empty($raw['coast'])) {
+            $order['coast'] = $raw['coast'];
+        }
     }
     if ($action === 'support-defense') {
         $order['target'] = $raw['target'] ?? null;
@@ -498,6 +505,9 @@ function diplomacy_copy_order(array $raw, array $standing): array
     if ($action === 'support-move') {
         $order['target'] = $raw['target'] ?? null;
         $order['to'] = $raw['to'] ?? null;
+        if (!empty($raw['coast'])) {
+            $order['coast'] = $raw['coast'];
+        }
     }
     if ($action === 'convoy') {
         $order['from'] = $raw['from'] ?? (($standing['unit'] ?? '') === 'army' ? $standing['province'] : ($raw['from'] ?? null));
@@ -506,7 +516,167 @@ function diplomacy_copy_order(array $raw, array $standing): array
             $order['via'] = array_values($raw['via']);
         }
     }
+    if ($action === 'retreat' && !empty($raw['coast'])) {
+        $order['coast'] = $raw['coast'];
+    }
+    if ($action === 'build' && !empty($raw['coast'])) {
+        $order['coast'] = $raw['coast'];
+    }
     return $order;
+}
+
+function diplomacy_coast_list(?array $province): array
+{
+    if (!$province || !isset($province['coasts']) || !is_array($province['coasts'])) {
+        return [];
+    }
+    $out = [];
+    foreach ($province['coasts'] as $coast) {
+        if (is_array($coast) && !empty($coast['id'])) {
+            $out[] = $coast;
+        }
+    }
+    return $out;
+}
+
+function diplomacy_is_multi_coast(?array $province): bool
+{
+    return count(diplomacy_coast_list($province)) > 1;
+}
+
+function diplomacy_coast_by_id(?array $province, $coastId): ?array
+{
+    if ($coastId === null || $coastId === '') {
+        return null;
+    }
+    foreach (diplomacy_coast_list($province) as $coast) {
+        if ((string)$coast['id'] === (string)$coastId) {
+            return $coast;
+        }
+    }
+    return null;
+}
+
+function diplomacy_coast_via_allows(?array $coast, $otherId, $otherCoast): bool
+{
+    if (!$coast || !isset($coast['via']) || !is_array($coast['via'])) {
+        return true;
+    }
+    $key = (string)$otherId;
+    if (!array_key_exists($key, $coast['via'])) {
+        return true;
+    }
+    $allowed = $coast['via'][$key];
+    return is_array($allowed) && in_array($otherCoast, $allowed, true);
+}
+
+function diplomacy_fleet_moves(array &$graph, $provinceId, $coastId = null): array
+{
+    $province = diplomacy_province($graph, $provinceId);
+    if (!$province) {
+        return [];
+    }
+    if (diplomacy_is_multi_coast($province)) {
+        $coast = diplomacy_coast_by_id($province, $coastId);
+        return $coast && isset($coast['fleet']) && is_array($coast['fleet'])
+            ? array_values($coast['fleet'])
+            : [];
+    }
+    return array_values((array)($province['fleet'] ?? []));
+}
+
+function diplomacy_fleet_move_legal(array &$graph, $fromId, $fromCoast, $toId, $toCoast): bool
+{
+    $fromId = diplomacy_province_id($graph, $fromId);
+    $toId = diplomacy_province_id($graph, $toId);
+    if (!$fromId || !$toId || $fromId === $toId) {
+        return false;
+    }
+    if (!in_array($toId, diplomacy_fleet_moves($graph, $fromId, $fromCoast), true)) {
+        return false;
+    }
+    $dest = diplomacy_province($graph, $toId);
+    if (diplomacy_is_multi_coast($dest)) {
+        if (!$toCoast) {
+            return false;
+        }
+        $coast = diplomacy_coast_by_id($dest, $toCoast);
+        if (!$coast || !in_array($fromId, (array)($coast['fleet'] ?? []), true)) {
+            return false;
+        }
+        $origin = diplomacy_province($graph, $fromId);
+        if (!diplomacy_is_multi_coast($origin)) {
+            return true;
+        }
+        $from = diplomacy_coast_by_id($origin, $fromCoast);
+        if (!$from) {
+            return false;
+        }
+        return diplomacy_coast_via_allows($from, $toId, $toCoast)
+            && diplomacy_coast_via_allows($coast, $fromId, $fromCoast);
+    }
+    return $toCoast === null || $toCoast === '';
+}
+
+function diplomacy_reachable_coasts(array &$graph, $fromId, $fromCoast, $toId): array
+{
+    $dest = diplomacy_province($graph, $toId);
+    if (!diplomacy_is_multi_coast($dest)) {
+        return [];
+    }
+    $out = [];
+    foreach (diplomacy_coast_list($dest) as $coast) {
+        if (diplomacy_fleet_move_legal($graph, $fromId, $fromCoast, $toId, $coast['id'])) {
+            $out[] = $coast;
+        }
+    }
+    return $out;
+}
+
+function diplomacy_infer_dest_coast(array &$graph, $fromId, $fromCoast, $toId, $destCoast = null): ?string
+{
+    $dest = diplomacy_province($graph, $toId);
+    if (!diplomacy_is_multi_coast($dest)) {
+        return null;
+    }
+    if (diplomacy_coast_by_id($dest, $destCoast)) {
+        return (string)$destCoast;
+    }
+    $reachable = diplomacy_reachable_coasts($graph, $fromId, $fromCoast, $toId);
+    if (count($reachable) === 1) {
+        return (string)$reachable[0]['id'];
+    }
+    return null;
+}
+
+function diplomacy_normalize_unit_coast(array &$graph, array &$unit): void
+{
+    $province = diplomacy_province($graph, $unit['province'] ?? '');
+    if (($unit['unit'] ?? '') === 'fleet' && diplomacy_is_multi_coast($province)) {
+        if (!diplomacy_coast_by_id($province, $unit['coast'] ?? null)) {
+            $coasts = diplomacy_coast_list($province);
+            if ($coasts) {
+                $unit['coast'] = $coasts[0]['id'];
+            } else {
+                unset($unit['coast']);
+            }
+        }
+        return;
+    }
+    unset($unit['coast']);
+}
+
+function diplomacy_unit_record(array $unit, $province = null): array
+{
+    $record = [
+        'province' => $province !== null ? $province : $unit['province'],
+        'unit' => $unit['unit'],
+        'power' => $unit['power'],
+    ];
+    if (($unit['unit'] ?? '') === 'fleet' && !empty($unit['coast'])) {
+        $record['coast'] = $unit['coast'];
+    }
+    return $record;
 }
 
 function diplomacy_is_legal_order(array &$graph, array $position, array $order): bool

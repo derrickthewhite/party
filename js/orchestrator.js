@@ -10,6 +10,7 @@ import { createMafiaGameScreen } from './screens/mafiaGameScreen.js';
 import { createRumbleGameScreen } from './screens/rumbleGameScreen.js';
 import { createSigninScreen } from './screens/signinScreen.js';
 import { createSignupScreen } from './screens/signupScreen.js';
+import { isValidRoomFilter } from './lobbyRoomFilter.js';
 import { getInitialRoute, isSafeNext, isValidGameId } from './url-utils.js';
 import { createStubGameScreen } from './screens/stubGameScreen.js';
 import { createWelcomeScreen } from './screens/welcomeScreen.js';
@@ -103,7 +104,10 @@ export function initializePartyApp() {
 	const initialRoute = getInitialRoute();
 	let currentNext = isSafeNext(initialRoute.next) ? initialRoute.next : null;
 	let currentGameId = isValidGameId(initialRoute.game) ? initialRoute.game : null;
-	state.patch({ adminUiEnabled: !!initialRoute.admin_ui_enabled });
+	state.patch({
+		adminUiEnabled: !!initialRoute.admin_ui_enabled,
+		selectedRoomFilter: isValidRoomFilter(initialRoute.room) ? String(initialRoute.room) : null,
+	});
 
 	function navigateToScreen(screen) {
 		state.clearStatus();
@@ -214,6 +218,9 @@ export function initializePartyApp() {
 			}
 			if (current.adminUiEnabled) {
 				params.set('admin_ui', '1');
+			}
+			if (isValidRoomFilter(current.selectedRoomFilter)) {
+				params.set('room', String(current.selectedRoomFilter));
 			}
 			const qs = params.toString();
 			history.replaceState(null, '', qs ? '?' + qs : location.pathname + location.hash);

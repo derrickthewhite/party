@@ -2,6 +2,13 @@ import { collectRefs, cloneTemplateNode, createNodeFromHtml, createTemplate } fr
 import { createBaseGameScreen } from './gameScreen.js';
 import { createGameActionButtonMarkup, setGameActionButtonLabel } from './gameActionButtons.js';
 import { loadDiplomacyBoard, loadDiplomacyGraph, withAssetStamp } from './diplomacyBoardLoader.js';
+import {
+	applySessionHoldDiff,
+	countOrderProgress,
+	formatOrderProgress,
+	holdKeysFromDocs,
+	orderDocsEqual,
+} from './diplomacyOrderProgress.js';
 
 function phaseKey(year, phase) {
 	return String(year || '') + ':' + String(phase || '');
@@ -61,42 +68,71 @@ function orderMatchesAdjustment(entry, order) {
 	return false;
 }
 
-function documentsForBoard(doc, adjustments) {
-	if (!doc) {
-		return [];
+function orderMatchesRetreat(entry, order) {
+	if (!entry || !order) {
+		return false;
 	}
-	if (doc.kind !== 'diplomacy-adjustments') {
-		return [doc];
+	if (String(order.province || '') !== String(entry.province || '')) {
+		return false;
 	}
-	if (doc.power) {
-		return adjustmentEntry(adjustments, doc.power) ? [doc] : [];
+	if (order.power && entry.power && String(order.power) !== String(entry.power)) {
+		return false;
 	}
+	return true;
+}
+
+function splitCombinedDocuments(doc, entries, matches) {
+	const list = Array.isArray(entries) ? entries : [];
 	const orders = Array.isArray(doc.orders) ? doc.orders : [];
 	const used = new Set();
 	const docs = [];
-	(Array.isArray(adjustments) ? adjustments : []).forEach(function eachEntry(entry) {
-		if (!entry || !entry.power) {
+	const seenPower = {};
+	list.forEach(function eachEntry(entry) {
+		const power = entry && entry.power ? String(entry.power) : '';
+		if (!power || seenPower[power]) {
 			return;
 		}
+		seenPower[power] = true;
 		const mine = [];
 		orders.forEach(function eachOrder(order, index) {
-			if (used.has(index) || !orderMatchesAdjustment(entry, order)) {
+			if (used.has(index)) {
+				return;
+			}
+			const hit = list.some(function eachItem(item) {
+				return !!(item && String(item.power || '') === power && matches(item, order));
+			});
+			if (!hit) {
 				return;
 			}
 			used.add(index);
 			mine.push(order);
 		});
-		if (!mine.length) {
-			return;
-		}
 		docs.push({
-			kind: 'diplomacy-adjustments',
+			kind: doc.kind,
 			map: doc.map || '',
-			power: entry.power,
+			power: power,
 			orders: mine,
 		});
 	});
 	return docs;
+}
+
+function documentsForBoard(doc, adjustments, retreats) {
+	if (!doc) {
+		return [];
+	}
+	if (doc.kind === 'diplomacy-adjustments' && !doc.power) {
+		return splitCombinedDocuments(doc, adjustments, orderMatchesAdjustment).filter(function each(item) {
+			return item.orders.length > 0;
+		});
+	}
+	if (doc.kind === 'diplomacy-retreats' && !doc.power) {
+		return splitCombinedDocuments(doc, retreats, orderMatchesRetreat);
+	}
+	if (doc.kind === 'diplomacy-adjustments') {
+		return adjustmentEntry(adjustments, doc.power) ? [doc] : [];
+	}
+	return [doc];
 }
 
 export function createDiplomacyGameScreen(deps) {
@@ -153,7 +189,10 @@ export function createDiplomacyGameScreen(deps) {
 					${createGameActionButtonMarkup('refresh', 'refreshPlayBtn', '')}
 				</div>
 				<p class="top-user-label" data-ref="progressText">Submitted 0/0 · Ready 0/0</p>
-				<p data-ref="timerText" class="diplomacy-timer-text"></p>
+				<div class="diplomacy-timer-row" data-ref="timerRow" hidden>
+					<p data-ref="timerText" class="diplomacy-timer-text"></p>
+					<button type="button" data-ref="pauseTimerBtn">Pause timer</button>
+				</div>
 				<p data-ref="powerText"></p>
 				<div class="row mobile-stack">
 					<div class="diplomacy-turn-nav" data-ref="turnNav">
@@ -172,6 +211,13 @@ export function createDiplomacyGameScreen(deps) {
 									<path fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"></path>
 								</svg>
 							</button>
+							<div class="diplomacy-order-progress" data-ref="orderProgress" hidden>
+								<span class="diplomacy-order-count" data-ref="orderCount">0/0</span>
+								<div class="diplomacy-order-state">
+									<span data-ref="orderSubmittedState">Not submitted</span>
+									<span data-ref="orderReadyState">Not ready</span>
+								</div>
+							</div>
 						</div>
 					</div>
 					<div data-ref="playActionsSlot"></div>
@@ -181,7 +227,7 @@ export function createDiplomacyGameScreen(deps) {
 					<button data-ref="readyBtn">Ready</button>
 					<button data-ref="endTurnBtn">End turn</button>
 					<button type="button" data-ref="focusBtn">Focus board</button>
-					<button type="button" data-ref="editTokensBtn">Edit token positions</button>
+					<button type="button" data-ref="resetOrdersBtn">Reset orders</button>
 				</div>
 				<div data-ref="boardSlot">
 					<div class="diplomacy-board-host" data-ref="boardHost"></div>
@@ -192,6 +238,13 @@ export function createDiplomacyGameScreen(deps) {
 			<div class="diplomacy-focus-layer" data-ref="focusLayer" hidden>
 				<div class="row">
 					<strong data-ref="focusTitle">Board</strong>
+					<div class="diplomacy-order-progress" data-ref="focusOrderProgress" hidden>
+						<span class="diplomacy-order-count" data-ref="focusOrderCount">0/0</span>
+						<div class="diplomacy-order-state">
+							<span data-ref="focusOrderSubmittedState">Not submitted</span>
+							<span data-ref="focusOrderReadyState">Not ready</span>
+						</div>
+					</div>
 					<div data-ref="focusSpacer"></div>
 					<div data-ref="focusActionsSlot"></div>
 					<button type="button" data-ref="focusCloseBtn">Close</button>
@@ -249,6 +302,8 @@ export function createDiplomacyGameScreen(deps) {
 		dirtyPowers: {},
 		phaseKey: '',
 		setupDirty: false,
+		sessionHolds: {},
+		holdSnapshot: {},
 	};
 
 	const nationRows = new Map();
@@ -268,7 +323,6 @@ export function createDiplomacyGameScreen(deps) {
 	let historyBusy = false;
 	let mountPromise = null;
 	let focusOpen = false;
-	let tokenEdit = false;
 	let assignmentBusy = 0;
 	let assignmentChain = Promise.resolve();
 	let settingsBusy = 0;
@@ -283,7 +337,7 @@ export function createDiplomacyGameScreen(deps) {
 	}
 
 	function isLiveView() {
-		return historyView === 'live';
+		return isLiveHistoryTarget(historyView);
 	}
 
 	function playerMembers() {
@@ -661,29 +715,58 @@ export function createDiplomacyGameScreen(deps) {
 		return 'Each player needs ' + quota + ' nations. Leftovers stay unassigned and become civil disorder. Anyone still short is filled from open nations, then from civil disorder.';
 	}
 
+	function livePhaseKey() {
+		return phaseKey(dip().year, dip().phase);
+	}
+
+	function isLiveHistoryTarget(target) {
+		return target === 'live' || target === livePhaseKey();
+	}
+
 	function historyEntries() {
+		const currentKey = livePhaseKey();
 		const history = Array.isArray(dip().history) ? dip().history : [];
 		return history.map(function eachItem(item) {
 			const value = phaseKey(item.year, item.phase);
-			return { value: value, label: item.label || value };
+			return {
+				value: value === currentKey ? 'live' : value,
+				label: item.label || value,
+			};
 		});
 	}
 
 	function chronologicalNavValues() {
-		return historyEntries().map(function each(item) {
-			return item.value;
-		}).concat(['live']);
+		const values = [];
+		historyEntries().forEach(function each(item) {
+			if (values.indexOf(item.value) === -1) {
+				values.push(item.value);
+			}
+		});
+		if (values.indexOf('live') === -1) {
+			values.push('live');
+		}
+		return values;
 	}
 
 	function reconcileHistorySelect() {
-		const items = [{ value: 'live', label: 'Live board' }].concat(historyEntries());
-		fillSelect(refs.historySelect, items, historyView);
+		const liveLabel = dip().phase_label || 'Live board';
+		const past = [];
+		const seen = { live: true };
+		historyEntries().forEach(function each(item) {
+			if (seen[item.value]) {
+				return;
+			}
+			seen[item.value] = true;
+			past.push(item);
+		});
+		const items = [{ value: 'live', label: liveLabel }].concat(past);
+		fillSelect(refs.historySelect, items, isLiveHistoryTarget(historyView) ? 'live' : historyView);
 		if (!items.some(function has(item) { return item.value === historyView; })) {
 			historyView = 'live';
 			refs.historySelect.value = 'live';
 		}
 		const nav = chronologicalNavValues();
-		const index = nav.indexOf(historyView);
+		const index = nav.indexOf(isLiveHistoryTarget(historyView) ? 'live' : historyView);
 		refs.historyPrevBtn.disabled = index <= 0;
 		refs.historyNextBtn.disabled = index < 0 || index >= nav.length - 1;
 	}
@@ -717,10 +800,19 @@ export function createDiplomacyGameScreen(deps) {
 		reconcileNations();
 	}
 
+	function formatTimerClock(totalSeconds) {
+		const remain = Math.max(0, Math.floor(Number(totalSeconds) || 0));
+		return Math.floor(remain / 60) + ':' + String(remain % 60).padStart(2, '0');
+	}
+
 	function paintTimer() {
 		const timer = dip().timer || {};
 		if (!timer.shortcut || !timer.minutes || isOpen()) {
 			refs.timerText.textContent = '';
+			return;
+		}
+		if (timer.paused) {
+			refs.timerText.textContent = 'Timer paused with ' + formatTimerClock(timer.remaining_seconds) + ' remaining.';
 			return;
 		}
 		if (!timer.deadline) {
@@ -729,9 +821,8 @@ export function createDiplomacyGameScreen(deps) {
 		}
 		const end = Date.parse(timer.deadline);
 		const remain = Number.isFinite(end) ? Math.max(0, Math.floor((end - Date.now()) / 1000)) : 0;
-		const clock = Math.floor(remain / 60) + ':' + String(remain % 60).padStart(2, '0');
 		if (remain > 0) {
-			refs.timerText.textContent = 'Phase ends in ' + clock + '.';
+			refs.timerText.textContent = 'Phase ends in ' + formatTimerClock(remain) + '.';
 			return;
 		}
 		refs.timerText.textContent = 'The phase timer has run out.';
@@ -767,19 +858,26 @@ export function createDiplomacyGameScreen(deps) {
 		const powerCanOrder = currentMode() !== 'build' || powers.some(function each(powerId) {
 			return !!adjustmentEntry(data.adjustments, powerId);
 		});
-		refs.submitBtn.disabled = !canAct || !powerCanOrder;
-		refs.submitBtn.style.display = perms.can_act ? '' : 'none';
-		const showReady = canAct && !!data.viewer_required;
-		refs.readyBtn.style.display = showReady ? '' : 'none';
-		refs.readyBtn.disabled = !showReady;
-		refs.readyBtn.textContent = data.viewer_ready ? 'Cancel ready' : 'Ready';
+		paintSubmitAndReady(canAct, powerCanOrder);
 		refs.endTurnBtn.style.display = perms.can_end_turn ? '' : 'none';
 		refs.endTurnBtn.disabled = !perms.can_end_turn;
+		refs.resetOrdersBtn.style.display = perms.can_act ? '' : 'none';
+		refs.resetOrdersBtn.disabled = !canAct;
+		const timer = data.timer || {};
+		const canPauseTimer = isLiveView()
+			&& !!perms.can_end_turn
+			&& !!timer.shortcut
+			&& String(serverSnapshot.status || '') === 'in_progress';
+		const showTimer = !isOpen() && !!timer.shortcut && !!timer.minutes;
+		refs.timerRow.hidden = !showTimer && !canPauseTimer;
+		refs.pauseTimerBtn.style.display = canPauseTimer ? '' : 'none';
+		refs.pauseTimerBtn.disabled = !canPauseTimer;
+		refs.pauseTimerBtn.textContent = timer.paused ? 'Resume timer' : 'Pause timer';
 		refs.focusBtn.style.display = '';
-		refs.editTokensBtn.textContent = tokenEdit ? 'Done editing tokens' : 'Edit token positions';
 		paintTimer();
 		reconcileHistorySelect();
 		reconcilePlayRoster();
+		paintOrderCount();
 	}
 
 	function currentMode() {
@@ -790,8 +888,35 @@ export function createDiplomacyGameScreen(deps) {
 		return (dip().position && dip().position.map) || '';
 	}
 
+	function canWriteOrders() {
+		const perms = serverSnapshot.permissions || {};
+		const powers = viewerPowers();
+		const adjustments = Array.isArray(dip().adjustments) ? dip().adjustments : [];
+		const powerCanOrder = currentMode() !== 'build' || powers.some(function each(powerId) {
+			return !!adjustmentEntry(adjustments, powerId);
+		});
+		return !!perms.can_act && powers.length > 0 && powerCanOrder && String(serverSnapshot.status || '') === 'in_progress';
+	}
+
+	function captureBoardDraft() {
+		if (!boardApi) {
+			return;
+		}
+		const powers = viewerPowers();
+		if (!powers.length) {
+			const doc = boardApi.exportOrders();
+			if (doc && doc.power) {
+				localDraft.docs[doc.power] = doc;
+			}
+			return;
+		}
+		powers.forEach(function eachPower(power) {
+			localDraft.docs[power] = boardApi.exportOrders(power);
+		});
+	}
+
 	function ordersDocFor(power) {
-		if (power && localDraft.dirtyPowers[power] && localDraft.docs[power]) {
+		if (power && localDraft.docs[power]) {
 			return localDraft.docs[power];
 		}
 		const byPower = dip().my_orders_by_power || {};
@@ -804,11 +929,193 @@ export function createDiplomacyGameScreen(deps) {
 		return emptyOrdersDoc(currentMode(), positionMap(), power);
 	}
 
-	function importOrders(doc, adjustments) {
+	function viewerOrderDocs() {
+		return viewerPowers().map(function eachPower(power) {
+			if (boardApi && isLiveView() && typeof boardApi.exportOrders === 'function') {
+				return boardApi.exportOrders(power);
+			}
+			return ordersDocFor(power);
+		});
+	}
+
+	function resetSessionHolds() {
+		localDraft.sessionHolds = {};
+		localDraft.holdSnapshot = {};
+	}
+
+	function syncHoldSnapshot(docs) {
+		localDraft.holdSnapshot = holdKeysFromDocs(docs || viewerOrderDocs());
+	}
+
+	function noteSessionHolds() {
+		const current = holdKeysFromDocs(viewerOrderDocs());
+		localDraft.sessionHolds = applySessionHoldDiff(
+			localDraft.sessionHolds,
+			localDraft.holdSnapshot,
+			current
+		);
+		localDraft.holdSnapshot = current;
+	}
+
+	function orderProgress() {
+		const data = dip();
+		const position = data.position || {};
+		return countOrderProgress({
+			mode: currentMode(),
+			powers: viewerPowers(),
+			docs: viewerOrderDocs(),
+			units: Array.isArray(position.units) ? position.units : [],
+			retreats: Array.isArray(data.retreats) ? data.retreats : [],
+			adjustments: Array.isArray(data.adjustments) ? data.adjustments : [],
+			sessionHolds: localDraft.sessionHolds,
+		});
+	}
+
+	function orderingPowers() {
+		const powers = viewerPowers();
+		if (currentMode() !== 'build') {
+			return powers;
+		}
+		const adjustments = Array.isArray(dip().adjustments) ? dip().adjustments : [];
+		return powers.filter(function each(powerId) {
+			return !!adjustmentEntry(adjustments, powerId);
+		});
+	}
+
+	function serverOrdersDocFor(power) {
+		const byPower = dip().my_orders_by_power || {};
+		if (power && byPower[power]) {
+			return byPower[power];
+		}
+		return emptyOrdersDoc(currentMode(), positionMap(), power);
+	}
+
+	function viewerHasSubmitted() {
+		const powers = orderingPowers();
+		if (!powers.length) {
+			return false;
+		}
+		return powers.every(function each(powerId) {
+			const power = powerById(powerId);
+			return !!(power && power.orders_submitted);
+		});
+	}
+
+	function currentOrdersDocFor(power) {
+		if (boardApi && isLiveView() && typeof boardApi.exportOrders === 'function') {
+			return boardApi.exportOrders(power);
+		}
+		return ordersDocFor(power);
+	}
+
+	function currentMatchesSubmitted() {
+		return orderingPowers().every(function each(power) {
+			return orderDocsEqual(currentOrdersDocFor(power), serverOrdersDocFor(power));
+		});
+	}
+
+	function paintSubmitAndReady(canActFlag, powerCanOrderFlag) {
+		const perms = serverSnapshot.permissions || {};
+		const canAct = canActFlag == null
+			? (isLiveView() && !!perms.can_act && viewerPowers().length > 0 && String(serverSnapshot.status || '') === 'in_progress')
+			: canActFlag;
+		const powerCanOrder = powerCanOrderFlag == null
+			? (currentMode() !== 'build' || viewerPowers().some(function each(powerId) {
+				return !!adjustmentEntry(dip().adjustments, powerId);
+			}))
+			: powerCanOrderFlag;
+		const ready = !!dip().viewer_ready;
+		const submitted = viewerHasSubmitted();
+		const unchanged = submitted && currentMatchesSubmitted();
+		if (ready) {
+			refs.submitBtn.textContent = 'Not ready';
+			refs.submitBtn.disabled = !canAct;
+		} else {
+			refs.submitBtn.textContent = submitted ? 'Update orders' : 'Submit orders';
+			refs.submitBtn.disabled = !canAct || !powerCanOrder || unchanged;
+		}
+		refs.submitBtn.style.display = perms.can_act ? '' : 'none';
+		const showReady = canAct && !!dip().viewer_required && !ready;
+		refs.readyBtn.style.display = showReady ? '' : 'none';
+		refs.readyBtn.disabled = !showReady;
+		refs.readyBtn.textContent = 'Ready';
+	}
+
+	function paintOrderCount() {
+		const show = isLiveView() && viewerPowers().length > 0 && !isOpen();
+		const progress = show ? orderProgress() : { given: 0, total: 0 };
+		const label = formatOrderProgress(progress);
+		const submitted = viewerHasSubmitted();
+		const ready = !!dip().viewer_ready;
+		const groups = [
+			{
+				wrap: refs.orderProgress,
+				count: refs.orderCount,
+				submitted: refs.orderSubmittedState,
+				ready: refs.orderReadyState,
+			},
+			{
+				wrap: refs.focusOrderProgress,
+				count: refs.focusOrderCount,
+				submitted: refs.focusOrderSubmittedState,
+				ready: refs.focusOrderReadyState,
+			},
+		];
+		groups.forEach(function eachGroup(group) {
+			if (group.count) {
+				group.count.textContent = label;
+			}
+			if (group.submitted) {
+				group.submitted.textContent = submitted ? 'Submitted' : 'Not submitted';
+				group.submitted.classList.toggle('is-on', submitted);
+			}
+			if (group.ready) {
+				group.ready.textContent = ready ? 'Ready' : 'Not ready';
+				group.ready.classList.toggle('is-on', ready);
+			}
+			if (group.wrap) {
+				group.wrap.hidden = !show;
+			}
+		});
+		paintSubmitAndReady();
+	}
+
+	function positionForBoard(position) {
+		const DiplomacyBoard = typeof window !== 'undefined' ? window.DiplomacyBoard : null;
+		if (!position || !DiplomacyBoard || !boardApi || !boardApi.graph) {
+			return position;
+		}
+		const next = DiplomacyBoard.clone(position);
+		const units = Array.isArray(next.units) ? next.units : [];
+		units.forEach(function eachUnit(unit) {
+			if (!unit) {
+				return;
+			}
+			const home = DiplomacyBoard.province(boardApi.graph, unit.province);
+			if (!home) {
+				return;
+			}
+			if (unit.unit === 'fleet' && DiplomacyBoard.isMultiCoast(home)) {
+				if (!DiplomacyBoard.coastById(home, unit.coast)) {
+					const coasts = DiplomacyBoard.coastList(home);
+					if (coasts[0] && coasts[0].id) {
+						unit.coast = coasts[0].id;
+					}
+				}
+				return;
+			}
+			if (unit.coast) {
+				delete unit.coast;
+			}
+		});
+		return next;
+	}
+
+	function importOrders(doc, adjustments, retreats) {
 		if (!boardApi || !doc) {
 			return;
 		}
-		documentsForBoard(doc, adjustments).forEach(function each(item) {
+		documentsForBoard(doc, adjustments, retreats).forEach(function each(item) {
 			boardApi.importDocument(item);
 		});
 	}
@@ -842,51 +1149,61 @@ export function createDiplomacyGameScreen(deps) {
 		requestAnimationFrame(relayoutBoard);
 	}
 
-	function applyBoardFromLive() {
+	function applyBoardFromLive(options) {
 		if (!boardApi || !isLiveView()) {
 			return;
 		}
+		const reloadBoard = !!(options && options.reloadBoard);
+		const resetOrders = !!(options && options.resetOrders);
 		const data = dip();
-		const perms = serverSnapshot.permissions || {};
 		const powers = viewerPowers();
 		const adjustments = Array.isArray(data.adjustments) ? data.adjustments : [];
-		const powerCanOrder = currentMode() !== 'build' || powers.some(function each(powerId) {
-			return !!adjustmentEntry(adjustments, powerId);
-		});
-		const canWrite = !!perms.can_act && powers.length > 0 && powerCanOrder && String(serverSnapshot.status || '') === 'in_progress';
+		const canWrite = canWriteOrders();
 		applyingBoard = true;
 		try {
 			const key = phaseKey(data.year, data.phase);
-			if (localDraft.phaseKey !== key) {
+			const phaseChanged = localDraft.phaseKey !== key;
+			if (phaseChanged) {
 				localDraft.phaseKey = key;
 				localDraft.docs = {};
 				localDraft.dirtyPowers = {};
+				resetSessionHolds();
 			}
-			clearMountedOrders(currentMode());
-			if (typeof boardApi.setPlayingAsPowers === 'function') {
-				boardApi.setPlayingAsPowers(powers);
-			} else {
-				boardApi.setPlayingAs(powers[0] || '');
+			if (resetOrders) {
+				localDraft.docs = {};
+				localDraft.dirtyPowers = {};
+				resetSessionHolds();
 			}
-			boardApi.setOrderScope('mine');
-			boardApi.setRetreats(Array.isArray(data.retreats) ? data.retreats : []);
-			boardApi.setAdjustments(adjustments);
-			boardApi.setMode(currentMode());
-			boardApi.setReadOnly(!canWrite);
-			if (data.position) {
-				boardApi.setPosition(data.position);
-			}
-			powers.forEach(function eachPower(powerId) {
-				importOrders(ordersDocFor(powerId), adjustments);
-			});
-			if (data.display_resolution) {
-				boardApi.setResolution(data.display_resolution);
-			} else {
-				boardApi.setShowResolved(false);
+			const keepBoardOrders = !phaseChanged && !reloadBoard && !resetOrders;
+			if (!keepBoardOrders) {
+				clearMountedOrders(currentMode());
+				if (typeof boardApi.setPlayingAsPowers === 'function') {
+					boardApi.setPlayingAsPowers(powers);
+				} else {
+					boardApi.setPlayingAs(powers[0] || '');
+				}
+				boardApi.setOrderScope('mine');
+				boardApi.setRetreats(Array.isArray(data.retreats) ? data.retreats : []);
+				boardApi.setAdjustments(adjustments);
+				boardApi.setMode(currentMode());
+				boardApi.setReadOnly(!canWrite);
+				if (data.position) {
+					boardApi.setPosition(positionForBoard(data.position));
+				}
+				powers.forEach(function eachPower(powerId) {
+					importOrders(ordersDocFor(powerId), adjustments);
+				});
+				if (data.display_resolution) {
+					boardApi.setResolution(data.display_resolution);
+				} else {
+					boardApi.setShowResolved(false);
+				}
 			}
 			refs.resolutionText.textContent = data.display_resolution && data.display_resolution.text
 				? data.display_resolution.text
 				: '';
+			syncHoldSnapshot();
+			paintOrderCount();
 		} finally {
 			applyingBoard = false;
 		}
@@ -911,11 +1228,10 @@ export function createDiplomacyGameScreen(deps) {
 			const graph = loaded.graph || loaded;
 			const tokenPositions = loaded.tokenPositions || null;
 			if (boardApi) {
+				captureBoardDraft();
 				boardApi.destroy();
 				boardApi = null;
 			}
-			tokenEdit = false;
-			refs.editTokensBtn.textContent = 'Edit token positions';
 			boardReady = false;
 			boardApi = DiplomacyBoard.mount(refs.boardHost, {
 				graph: graph,
@@ -927,28 +1243,26 @@ export function createDiplomacyGameScreen(deps) {
 				orderScope: 'mine',
 				retreats: Array.isArray(data.retreats) ? data.retreats : [],
 				adjustments: Array.isArray(data.adjustments) ? data.adjustments : [],
-				readOnly: true,
+				readOnly: !canWriteOrders(),
 				position: data.position,
 				onReady: function onReady() {
 					applyBoardFromLive();
 					boardReady = true;
 				},
-				onTokenEdit: function onTokenEdit(on) {
-					tokenEdit = !!on;
-					refs.editTokensBtn.textContent = tokenEdit ? 'Done editing tokens' : 'Edit token positions';
-				},
 				onChange: function onChange() {
 					if (!boardReady || applyingBoard || !isLiveView() || !boardApi) {
 						return;
 					}
+					captureBoardDraft();
+					noteSessionHolds();
 					viewerPowers().forEach(function eachPower(power) {
 						localDraft.dirtyPowers[power] = true;
-						localDraft.docs[power] = boardApi.exportOrders(power);
 					});
+					paintOrderCount();
 				},
 			});
 			boardMapKey = data.map_key;
-			applyBoardFromLive();
+			applyBoardFromLive({ reloadBoard: true });
 		})();
 		try {
 			await mountPromise;
@@ -1177,8 +1491,28 @@ export function createDiplomacyGameScreen(deps) {
 		}
 	});
 
+	async function setViewerReady(markingReady) {
+		if (!lastGameId) {
+			return;
+		}
+		await deps.api.setDiplomacyReady(lastGameId, markingReady);
+		await refreshDiplomacyState({ silent: true });
+		setStatusNode(markingReady ? 'Marked ready.' : 'Ready canceled.', 'ok');
+	}
+
 	refs.submitBtn.addEventListener('click', async function onSubmit() {
-		if (!lastGameId || !boardApi) {
+		if (!lastGameId) {
+			return;
+		}
+		if (dip().viewer_ready) {
+			try {
+				await setViewerReady(false);
+			} catch (err) {
+				setStatusNode(err.message || 'Unable to update ready.', 'error');
+			}
+			return;
+		}
+		if (!boardApi) {
 			return;
 		}
 		try {
@@ -1199,26 +1533,36 @@ export function createDiplomacyGameScreen(deps) {
 		}
 	});
 
-	refs.editTokensBtn.addEventListener('click', function onEditTokens() {
-		if (!boardApi || typeof boardApi.setTokenEdit !== 'function') {
+	refs.resetOrdersBtn.addEventListener('click', function onResetOrders() {
+		if (!boardApi || !isLiveView()) {
 			return;
 		}
-		tokenEdit = !tokenEdit;
-		boardApi.setTokenEdit(tokenEdit);
-		refs.editTokensBtn.textContent = tokenEdit ? 'Done editing tokens' : 'Edit token positions';
+		applyBoardFromLive({ resetOrders: true });
+		setStatusNode('Orders reset.', 'ok');
 	});
 
 	refs.readyBtn.addEventListener('click', async function onReady() {
+		try {
+			await setViewerReady(!dip().viewer_ready);
+		} catch (err) {
+			setStatusNode(err.message || 'Unable to update ready.', 'error');
+		}
+	});
+
+	refs.pauseTimerBtn.addEventListener('click', async function onPauseTimer() {
 		if (!lastGameId) {
 			return;
 		}
-		const markingReady = !dip().viewer_ready;
+		const pausing = !(dip().timer || {}).paused;
+		refs.pauseTimerBtn.disabled = true;
 		try {
-			await deps.api.setDiplomacyReady(lastGameId, markingReady);
-			await refreshDiplomacyState({ silent: true });
-			setStatusNode(markingReady ? 'Marked ready.' : 'Ready canceled.', 'ok');
+			const detail = await deps.api.setDiplomacyTimerPaused(lastGameId, pausing);
+			applyDetail(detail);
+			setStatusNode(pausing ? 'Timer paused.' : 'Timer resumed.', 'ok');
 		} catch (err) {
-			setStatusNode(err.message || 'Unable to update ready.', 'error');
+			setStatusNode(err.message || 'Unable to update the timer.', 'error');
+		} finally {
+			reconcilePlayChrome();
 		}
 	});
 
@@ -1231,6 +1575,7 @@ export function createDiplomacyGameScreen(deps) {
 			localDraft.docs = {};
 			localDraft.dirtyPowers = {};
 			localDraft.phaseKey = '';
+			resetSessionHolds();
 			historyView = 'live';
 			await refreshDiplomacyState({ silent: true });
 			setStatusNode('Turn resolved.', 'ok');
@@ -1247,13 +1592,16 @@ export function createDiplomacyGameScreen(deps) {
 	});
 
 	async function applyHistoryView(nextView) {
-		const target = nextView || 'live';
+		const target = isLiveHistoryTarget(nextView || 'live') ? 'live' : (nextView || 'live');
 		if (historyBusy) {
 			return;
 		}
 		if (target === historyView && refs.historySelect.value === target) {
 			reconcilePlayChrome();
 			return;
+		}
+		if (historyView === 'live' && target !== 'live') {
+			captureBoardDraft();
 		}
 		historyBusy = true;
 		refs.historyPrevBtn.disabled = true;
@@ -1264,7 +1612,7 @@ export function createDiplomacyGameScreen(deps) {
 		}
 		try {
 			if (historyView === 'live') {
-				applyBoardFromLive();
+				applyBoardFromLive({ reloadBoard: true });
 				return;
 			}
 			if (!lastGameId || !boardApi) {
@@ -1276,33 +1624,50 @@ export function createDiplomacyGameScreen(deps) {
 			try {
 				const result = await deps.api.diplomacySnapshot(lastGameId, year, phase);
 				const snapshot = result.snapshot || {};
+				if (!snapshot.resolution && isLiveHistoryTarget(phaseKey(snapshot.year, snapshot.phase))) {
+					historyView = 'live';
+					applyBoardFromLive({ reloadBoard: true });
+					return;
+				}
 				applyingBoard = true;
 				boardApi.setReadOnly(true);
+				if (typeof boardApi.setOrderScope === 'function') {
+					boardApi.setOrderScope('all');
+				}
 				const resolution = snapshot.resolution || {};
-				const adjustments = Array.isArray(resolution.adjustments) ? resolution.adjustments : [];
+				const display = snapshot.display_resolution || resolution;
+				const adjustments = Array.isArray(resolution.adjustments)
+					? resolution.adjustments
+					: (Array.isArray(display.adjustments) ? display.adjustments : []);
+				const retreats = Array.isArray(snapshot.retreats)
+					? snapshot.retreats
+					: (Array.isArray(resolution.retreats)
+						? resolution.retreats
+						: (Array.isArray(display.retreats) ? display.retreats : []));
 				clearMountedOrders(snapshot.mode || 'orders');
-				boardApi.setRetreats(Array.isArray(resolution.retreats) ? resolution.retreats : []);
+				boardApi.setRetreats(retreats);
 				boardApi.setAdjustments(adjustments);
 				boardApi.setMode(snapshot.mode || 'orders');
 				if (snapshot.position) {
-					boardApi.setPosition(snapshot.position);
+					boardApi.setPosition(positionForBoard(snapshot.position));
 				}
 				if (snapshot.orders) {
-					importOrders(snapshot.orders, adjustments);
+					try {
+						importOrders(snapshot.orders, adjustments, retreats);
+					} catch (importErr) {
+						setStatusNode(importErr.message || 'Unable to show those orders.', 'error');
+					}
 				}
-				if (snapshot.resolution) {
-					boardApi.setResolution(snapshot.resolution);
-					refs.resolutionText.textContent = snapshot.resolution.text || '';
+				if (display && (display.units || display.text || display.results)) {
+					boardApi.setResolution(display);
 				} else {
 					boardApi.setShowResolved(false);
-					refs.resolutionText.textContent = '';
 				}
+				refs.resolutionText.textContent = resolution.text || display.text || '';
 				applyingBoard = false;
 			} catch (err) {
 				applyingBoard = false;
-				historyView = 'live';
 				setStatusNode(err.message || 'Unable to load history.', 'error');
-				applyBoardFromLive();
 			}
 		} finally {
 			historyBusy = false;
@@ -1312,7 +1677,7 @@ export function createDiplomacyGameScreen(deps) {
 
 	function stepHistory(delta) {
 		const nav = chronologicalNavValues();
-		const index = nav.indexOf(historyView);
+		const index = nav.indexOf(isLiveHistoryTarget(historyView) ? 'live' : historyView);
 		const next = nav[index + delta];
 		if (!next) {
 			return;

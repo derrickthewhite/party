@@ -19,6 +19,58 @@ function orderDoc(power, map, orders = []) {
   };
 }
 
+function retreatDoc(power, map, orders = []) {
+  return {
+    kind: 'diplomacy-retreats',
+    map,
+    power,
+    orders,
+  };
+}
+
+function plantDislodgePosition(gameId) {
+  const fs = require('fs');
+  const path = require('path');
+  const { spawnSync } = require('child_process');
+  const { rootDir } = getServerInfo();
+  const bundledPhp = path.join(rootDir, 'runtime', 'php', 'windows', 'php.exe');
+  const phpBin = process.env.PARTY_PHP_BIN || (fs.existsSync(bundledPhp) ? bundledPhp : 'php');
+  const script = [
+    'require "api/lib/diplomacy.php";',
+    '$gameId = (int)$argv[1];',
+    '$loaded = diplomacy_load_map("EuropeDiploMap");',
+    '$graph = $loaded["graph"];',
+    '$position = $loaded["start"];',
+    '$ids = [];',
+    'foreach ($graph["provinces"] as $id => $province) {',
+    '  $name = strtolower((string)($province["name"] ?? ""));',
+    '  if ($name === "picardy" || $name === "burgundy" || $name === "belgium") {',
+    '    $ids[$name] = $id;',
+    '  }',
+    '}',
+    'foreach (["picardy", "burgundy", "belgium"] as $name) {',
+    '  if (empty($ids[$name])) { fwrite(STDERR, "missing $name\\n"); exit(1); }',
+    '}',
+    '$position["units"] = [',
+    '  ["province" => $ids["picardy"], "unit" => "army", "power" => "france"],',
+    '  ["province" => $ids["burgundy"], "unit" => "army", "power" => "france"],',
+    '  ["province" => $ids["belgium"], "unit" => "army", "power" => "germany"],',
+    '];',
+    'diplomacy_write_snapshot($gameId, 1901, "spring_orders", $position, null, null);',
+    'db()->prepare("UPDATE game_state SET phase = :phase, current_round = 1901 WHERE game_id = :id")->execute(["phase" => "spring_orders", "id" => $gameId]);',
+    'echo json_encode(["picardy" => $ids["picardy"], "burgundy" => $ids["burgundy"], "belgium" => $ids["belgium"], "map" => $position["map"]]);',
+  ].join('');
+  const result = spawnSync(phpBin, ['-r', script, String(gameId)], {
+    cwd: rootDir,
+    encoding: 'utf8',
+    env: process.env,
+  });
+  if (result.status !== 0) {
+    throw new Error((result.stderr || result.stdout || `php exited ${result.status}`).trim());
+  }
+  return JSON.parse(String(result.stdout || '').trim());
+}
+
 async function createDiplomacyGame(owner) {
   const response = await owner.client.post('/api/games', {
     json: { title: uniqueName('dip'), game_type: 'diplomacy' },
@@ -181,6 +233,91 @@ test('orders stay hidden until resolve, then empty retreats and builds are skipp
   const afterFall = await detail(owner.client, game.id);
   expect(afterFall.phase).toBe('spring_orders');
   expect(afterFall.current_round).toBe(1902);
+});
+
+test('a dislodge keeps spring retreats on the history timeline', async () => {
+  const owner = await session('dip-retreat-history-owner');
+  const game = await createDiplomacyGame(owner);
+  const open = await detail(owner.client, game.id);
+  const ownerId = memberId(open, owner);
+  const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
+    json: {
+      diplomacy_map_key: 'EuropeDiploMap',
+      diplomacy_nation_mode: 'owner',
+      diplomacy_nation_count: 'all',
+    },
+  });
+  expect(saved.status).toBe(200);
+  const assigned = await owner.client.post(`/api/games/${game.id}/diplomacy-assignment`, {
+    json: {
+      updates: [
+        { power: 'france', state: ownerId },
+        { power: 'germany', state: ownerId },
+      ],
+    },
+  });
+  expect(assigned.status).toBe(200);
+  await owner.client.post(`/api/games/${game.id}/start`);
+
+  const planted = plantDislodgePosition(game.id);
+  const map = planted.map;
+  await submitOrders(owner.client, game.id, 'france', map, [
+    { province: planted.picardy, unit: 'army', action: 'move', to: planted.belgium },
+    { province: planted.burgundy, unit: 'army', action: 'support-move', target: planted.picardy, to: planted.belgium },
+  ]);
+  await submitOrders(owner.client, game.id, 'germany', map);
+  await markReady(owner.client, game.id);
+
+  const retreatsLive = await detail(owner.client, game.id);
+  expect(retreatsLive.phase).toBe('spring_retreats');
+  const provinces = (retreatsLive.diplomacy.position.units || []).map((unit) => unit.province);
+  expect(new Set(provinces).size).toBe(provinces.length);
+  expect(provinces).toContain(planted.belgium);
+  expect(retreatsLive.diplomacy.position.units.some((unit) => unit.power === 'germany')).toBe(false);
+  expect(retreatsLive.diplomacy.retreats.some((entry) => entry.power === 'germany' && entry.province === planted.belgium)).toBe(true);
+  expect(retreatsLive.diplomacy.history.some((item) => item.phase === 'spring_orders')).toBe(true);
+  const liveRetreats = retreatsLive.diplomacy.history.find((item) => item.phase === 'spring_retreats');
+  expect(liveRetreats).toBeTruthy();
+  expect(liveRetreats.current).toBe(true);
+
+  const liveSnap = await owner.client.get(`/api/games/${game.id}/diplomacy-snapshot?year=1901&phase=spring_retreats`);
+  expect(liveSnap.status).toBe(200);
+  expect(liveSnap.body.data.snapshot.mode).toBe('retreat');
+  expect((liveSnap.body.data.snapshot.display_resolution.units || []).some((unit) => unit.dislodged)).toBe(true);
+
+  const germanyRetreat = retreatsLive.diplomacy.retreats.find((entry) => entry.power === 'germany');
+  const retreatResponse = await owner.client.post(`/api/games/${game.id}/actions/diplomacy-order`, {
+    json: {
+      action_type: 'retreat',
+      payload: retreatDoc('germany', map, [{
+        action: 'disband',
+        province: germanyRetreat.province,
+        unit: germanyRetreat.unit,
+      }]),
+    },
+  });
+  expect(retreatResponse.status).toBeGreaterThanOrEqual(200);
+  expect(retreatResponse.status).toBeLessThan(300);
+  await markReady(owner.client, game.id);
+
+  const afterRetreats = await detail(owner.client, game.id);
+  expect(afterRetreats.phase).toBe('fall_orders');
+  const pastRetreats = afterRetreats.diplomacy.history.find((item) => item.phase === 'spring_retreats');
+  expect(pastRetreats).toBeTruthy();
+  expect(pastRetreats.current).toBeUndefined();
+  expect(afterRetreats.diplomacy.history.some((item) => item.phase === 'spring_orders')).toBe(true);
+  expect(afterRetreats.diplomacy.history.some((item) => item.phase === 'fall_orders' && item.current)).toBe(true);
+
+  const pastSnap = await owner.client.get(`/api/games/${game.id}/diplomacy-snapshot?year=1901&phase=spring_retreats`);
+  expect(pastSnap.status).toBe(200);
+  expect(pastSnap.body.data.snapshot.mode).toBe('retreat');
+  expect(pastSnap.body.data.snapshot.orders.kind).toBe('diplomacy-retreats');
+  expect(pastSnap.body.data.snapshot.orders.orders).toEqual([
+    { action: 'disband', province: germanyRetreat.province, unit: germanyRetreat.unit },
+  ]);
+  expect(pastSnap.body.data.snapshot.resolution).toBeTruthy();
+  expect((pastSnap.body.data.snapshot.retreats || []).some((entry) => entry.power === 'germany')).toBe(true);
+  expect((pastSnap.body.data.snapshot.display_resolution.units || []).some((unit) => unit.dislodged)).toBe(true);
 });
 
 test('owner can resolve early and too many players cannot start', async () => {
@@ -631,6 +768,72 @@ test('a phase timer shortcuts only when that option is on', async () => {
   expect(advanced.phase).toBe('fall_orders');
   expect(advanced.diplomacy.timer.shortcut).toBe(true);
   expect(advanced.diplomacy.timer.remaining_seconds).toBeGreaterThan(0);
+});
+
+test('the owner can pause a phase timer so an overdue deadline does not advance', async () => {
+  const fs = require('fs');
+  const path = require('path');
+  const { spawnSync } = require('child_process');
+  const owner = await session('dip-pause-owner');
+  const player = await session('dip-pause-player');
+  const game = await createDiplomacyGame(owner);
+  await player.client.post(`/api/games/${game.id}/join`);
+  const saved = await owner.client.post(`/api/games/${game.id}/settings`, {
+    json: {
+      diplomacy_map_key: 'EuropeDiploMap',
+      diplomacy_nation_mode: 'random',
+      diplomacy_nation_count: 'single',
+      diplomacy_timer_minutes: 30,
+      diplomacy_timer_shortcut: true,
+    },
+  });
+  expect(saved.status).toBe(200);
+  await owner.client.post(`/api/games/${game.id}/start`);
+
+  const forbidden = await player.client.post(`/api/games/${game.id}/diplomacy-timer-pause`, {
+    json: { paused: true },
+  });
+  expect(forbidden.status).toBe(403);
+
+  const paused = await owner.client.post(`/api/games/${game.id}/diplomacy-timer-pause`, {
+    json: { paused: true },
+  });
+  expect(paused.status).toBe(200);
+  expect(paused.body.data.game.diplomacy.timer.paused).toBe(true);
+  expect(paused.body.data.game.diplomacy.timer.deadline).toBeNull();
+  expect(paused.body.data.game.diplomacy.timer.remaining_seconds).toBeGreaterThan(0);
+  const held = paused.body.data.game.diplomacy.timer.remaining_seconds;
+  const phaseWhilePaused = paused.body.data.game.phase;
+
+  const { rootDir } = getServerInfo();
+  const bundledPhp = path.join(rootDir, 'runtime', 'php', 'windows', 'php.exe');
+  const phpBin = process.env.PARTY_PHP_BIN || (fs.existsSync(bundledPhp) ? bundledPhp : 'php');
+  const forced = spawnSync(phpBin, ['-r', [
+    'require "api/lib/diplomacy.php";',
+    '$gameId = (int)$argv[1];',
+    'diplomacy_apply_due_timer($gameId);',
+    'echo "ok";',
+  ].join(''), String(game.id)], {
+    cwd: rootDir,
+    encoding: 'utf8',
+    env: process.env,
+  });
+  if (forced.status !== 0) {
+    throw new Error((forced.stderr || forced.stdout || `php exited ${forced.status}`).trim());
+  }
+  const stillPaused = await detail(owner.client, game.id);
+  expect(stillPaused.phase).toBe(phaseWhilePaused);
+  expect(stillPaused.diplomacy.timer.paused).toBe(true);
+  expect(stillPaused.diplomacy.timer.remaining_seconds).toBe(held);
+
+  const resumed = await owner.client.post(`/api/games/${game.id}/diplomacy-timer-pause`, {
+    json: { paused: false },
+  });
+  expect(resumed.status).toBe(200);
+  expect(resumed.body.data.game.diplomacy.timer.paused).toBe(false);
+  expect(resumed.body.data.game.diplomacy.timer.deadline).toBeTruthy();
+  expect(resumed.body.data.game.diplomacy.timer.remaining_seconds).toBeGreaterThan(0);
+  expect(resumed.body.data.game.phase).toBe(phaseWhilePaused);
 });
 
 test('random assign-all deals open nations and reset clears every claim', async () => {

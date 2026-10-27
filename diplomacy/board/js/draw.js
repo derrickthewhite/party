@@ -314,6 +314,167 @@ DiplomacyBoard.syncUnitsCanvas = function (canvas, stage) {
 };
 
 (function () {
+if (typeof document !== "undefined" && document.currentScript && document.currentScript.src) {
+	DiplomacyBoard.unitAssetBase = document.currentScript.src.replace(/\/js\/[^/?#]+(?:[?#].*)?$/, "/assets/");
+}
+if (!DiplomacyBoard.unitAssetVersion) DiplomacyBoard.unitAssetVersion = String(Date.now());
+
+var fleetArtUrl = "";
+var fleetWaiters = [];
+
+function unitAssetRoot(base) {
+	var root = base || DiplomacyBoard.unitAssetBase || "assets/";
+	if (root.charAt(root.length - 1) !== "/") root += "/";
+	return root;
+}
+
+function viewBoxOf(svg) {
+	var raw = svg.getAttribute("viewBox");
+	if (raw) {
+		var parts = raw.trim().split(/[\s,]+/);
+		if (parts.length === 4) {
+			var x = parseFloat(parts[0]);
+			var y = parseFloat(parts[1]);
+			var w = parseFloat(parts[2]);
+			var h = parseFloat(parts[3]);
+			if (w > 0 && h > 0) return { x: x, y: y, w: w, h: h };
+		}
+	}
+	var width = parseFloat(svg.getAttribute("width")) || 24;
+	var height = parseFloat(svg.getAttribute("height")) || 24;
+	return { x: 0, y: 0, w: width, h: height };
+}
+
+function pointsToPath(points, close) {
+	var nums = points.trim().split(/[\s,]+/);
+	var d = "";
+	var started = false;
+	for (var i = 0; i + 1 < nums.length; i += 2) {
+		var x = parseFloat(nums[i]);
+		var y = parseFloat(nums[i + 1]);
+		if (x !== x || y !== y) continue;
+		d += (started ? "L" : "M") + x + " " + y + " ";
+		started = true;
+	}
+	if (close && started) d += "Z";
+	return d;
+}
+
+function readFleetArt(svgText) {
+	if (typeof DOMParser === "undefined" || typeof Path2D === "undefined") return null;
+	var doc = new DOMParser().parseFromString(svgText, "image/svg+xml");
+	var svg = doc.querySelector("svg");
+	if (!svg) return null;
+	var box = viewBoxOf(svg);
+	var chunks = [];
+	var nodes = svg.querySelectorAll("path, polygon, polyline");
+	for (var i = 0; i < nodes.length; i++) {
+		var node = nodes[i];
+		if (node.closest && node.closest("defs")) continue;
+		if (node.localName === "path") {
+			var pathData = node.getAttribute("d");
+			if (pathData) chunks.push(pathData);
+		} else {
+			var points = node.getAttribute("points");
+			if (points) chunks.push(pointsToPath(points, node.localName === "polygon"));
+		}
+	}
+	if (!chunks.length) return null;
+	var d = chunks.join(" ");
+	return {
+		path: new Path2D(d),
+		samples: sampleFleetPath(d),
+		cx: box.x + box.w / 2,
+		cy: box.y + box.h / 2,
+		w: box.w,
+		h: box.h
+	};
+}
+
+function sampleFleetPath(d) {
+	if (typeof document === "undefined" || !document.body) return [];
+	var ns = "http://www.w3.org/2000/svg";
+	var svg = document.createElementNS(ns, "svg");
+	var path = document.createElementNS(ns, "path");
+	path.setAttribute("d", d);
+	svg.appendChild(path);
+	svg.setAttribute("width", "0");
+	svg.setAttribute("height", "0");
+	svg.style.position = "absolute";
+	svg.style.left = "-9999px";
+	document.body.appendChild(svg);
+	var len = path.getTotalLength();
+	var count = Math.max(64, Math.ceil(len * 3));
+	var pts = [];
+	for (var i = 0; i <= count; i++) {
+		var point = path.getPointAtLength((len * i) / count);
+		pts.push([point.x, point.y]);
+	}
+	svg.remove();
+	return pts;
+}
+
+function finishFleetArt() {
+	var waiters = fleetWaiters.splice(0, fleetWaiters.length);
+	for (var i = 0; i < waiters.length; i++) waiters[i]();
+}
+
+DiplomacyBoard.whenFleetArt = function (fn) {
+	if (typeof fn !== "function") return;
+	if (DiplomacyBoard.fleetArt) fn();
+	else fleetWaiters.push(fn);
+};
+
+DiplomacyBoard.loadFleetArt = function (base) {
+	if (typeof fetch !== "function") return;
+	var version = DiplomacyBoard.unitAssetVersion || String(Date.now());
+	var url = unitAssetRoot(base) + "fleet.svg?v=" + encodeURIComponent(version);
+	if (url === fleetArtUrl) return;
+	fleetArtUrl = url;
+	DiplomacyBoard.fleetArt = null;
+	fetch(url, { cache: "no-store" }).then(function (response) {
+		if (!response.ok) throw new Error("Could not load fleet.svg");
+		return response.text();
+	}).then(function (text) {
+		if (url !== fleetArtUrl) return;
+		DiplomacyBoard.fleetArt = readFleetArt(text);
+		finishFleetArt();
+	}).catch(function () {
+		if (url !== fleetArtUrl) return;
+	});
+};
+
+function fleetMatrix(x, y, r, facing, art) {
+	var fx = facing && typeof facing.x === "number" ? facing.x : 0;
+	var fy = facing && typeof facing.y === "number" ? facing.y : -1;
+	var len = Math.hypot(fx, fy) || 1;
+	var ux = fx / len;
+	var uy = fy / len;
+	var scale = (2 * r) / Math.max(art.w, art.h);
+	var matrix = new DOMMatrix();
+	matrix.translateSelf(x, y);
+	matrix.multiplySelf(new DOMMatrix([-uy, ux, -ux, -uy, 0, 0]));
+	matrix.scaleSelf(scale, scale);
+	matrix.translateSelf(-art.cx, -art.cy);
+	return matrix;
+}
+
+function traceFleet(ctx, art, x, y, r, facing) {
+	var pts = art.samples || [];
+	if (!pts.length) return;
+	var scale = (2 * r) / Math.max(art.w, art.h);
+	for (var i = 0; i < pts.length; i++) {
+		var lx = (pts[i][0] - art.cx) * scale;
+		var ly = (pts[i][1] - art.cy) * scale;
+		var off = DiplomacyBoard.hullOffset(facing, lx, ly);
+		var px = x + off.x;
+		var py = y + off.y;
+		if (i === 0) ctx.moveTo(px, py);
+		else ctx.lineTo(px, py);
+	}
+	ctx.closePath();
+}
+
 function starPath(ctx, x, y, r) {
 	var inner = r * 0.38;
 	ctx.beginPath();
@@ -493,27 +654,14 @@ function paintPendingDisband(ctx, project, token, center, color) {
 }
 
 function hullPath(ctx, x, y, r, facing) {
-	var scale = r;
-	var pts = [
-		[0, -0.95],
-		[-0.28, -0.48],
-		[-0.40, 0.02],
-		[-0.62, 0.58],
-		[-0.58, 0.96],
-		[0.58, 0.96],
-		[0.62, 0.58],
-		[0.40, 0.02],
-		[0.28, -0.48]
-	];
+	var art = DiplomacyBoard.fleetArt;
 	ctx.beginPath();
-	for (var i = 0; i < pts.length; i++) {
-		var off = DiplomacyBoard.hullOffset(facing, pts[i][0] * scale, pts[i][1] * scale);
-		var px = x + off.x;
-		var py = y + off.y;
-		if (i === 0) ctx.moveTo(px, py);
-		else ctx.lineTo(px, py);
+	if (!art) return;
+	if (art.path && typeof ctx.addPath === "function" && typeof DOMMatrix === "function") {
+		ctx.addPath(art.path, fleetMatrix(x, y, r, facing, art));
+		return;
 	}
-	ctx.closePath();
+	traceFleet(ctx, art, x, y, r, facing);
 }
 
 function paintRing(ctx, x, y, radius, color) {
@@ -813,4 +961,6 @@ DiplomacyBoard.paintUnitsAndOrders = function (ctx, view) {
 	}
 	DiplomacyBoard.paintTokenSlots(ctx, view);
 };
+
+if (DiplomacyBoard.unitAssetBase) DiplomacyBoard.loadFleetArt(DiplomacyBoard.unitAssetBase);
 })();
